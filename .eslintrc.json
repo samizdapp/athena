@@ -27,6 +27,12 @@
             "destructuredArrayIgnorePattern": "^_",
             "caughtErrorsIgnorePattern": "^_"
           }
+        ],
+        "no-constant-condition": [
+          "error",
+          {
+            "checkLoops": false
+          }
         ]
       }
     },

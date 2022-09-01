@@ -14,7 +14,11 @@
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
-    "paths": {}
+    "paths": {
+      "@athena/shared/service-worker": [
+        "packages/shared/service-worker/src/index.ts"
+      ]
+    }
   },
   "exclude": ["node_modules", "tmp"]
 }

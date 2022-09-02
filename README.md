@@ -7,7 +7,7 @@ https://docs.google.com/document/d/1yYs_DpihNry7s5gMlIveZMjwnDlYOWgG1kRJCNedhQM/
 
 ## Nx Workspace
 
-This repo is an Nx workspace, which you can lean more about
+This repo is an Nx workspace, which you can learn more about
 [here](https://nx.dev).
 
 Use the following commands to manage and run the packages in this project:

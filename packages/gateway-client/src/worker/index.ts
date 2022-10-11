@@ -37,7 +37,7 @@ declare const self: {
 // Their URLs are injected into the manifest variable below.
 // This variable must be present somewhere in your service worker file,
 // even if you decide not to use precaching. See https://cra.link/PWA
-precacheAndRoute(self.__WB_MANIFEST);
+//precacheAndRoute(self.__WB_MANIFEST);
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 //@ts-ignore
@@ -422,6 +422,8 @@ async function main() {
 }
 
 self.addEventListener('fetch', function (event) {
+    console.log('Received fetch: ', event);
+
     if (event?.request.method !== 'GET') {
         // default service worker only handles GET
         event?.respondWith(fetch(event.request));

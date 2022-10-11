@@ -10,6 +10,13 @@ module.exports = (config, _context) => {
     // then override your config.
     return {
         ...config,
+        devServer: {
+            ...config.devServer,
+            headers: {
+                ...config.devServer.headers,
+                'Service-Worker-Allowed': '/',
+            },
+        },
         module: {
             ...config.module,
             rules: [

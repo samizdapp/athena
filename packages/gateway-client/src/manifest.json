@@ -1,6 +1,6 @@
 {
-  "short_name": "Gateway Client",
-  "name": "Gateway Client",
+  "short_name": "SamizdApp",
+  "name": "SamizdApp",
   "icons": [
     {
       "src": "favicon.ico",

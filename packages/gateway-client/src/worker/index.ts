@@ -16,7 +16,7 @@ import { decode, encode } from 'lob-enc';
 import localforage from 'localforage';
 import Multiaddr from 'multiaddr';
 //import { precacheAndRoute } from 'workbox-precaching';
-import { PersistentPeerStore } from '@libp2p/peer-store'
+import { PersistentPeerStore } from '@libp2p/peer-store';
 
 // type Window = {
 //     localStorage: {
@@ -112,7 +112,7 @@ async function normalizeBody(body: unknown) {
 async function getStream(protocol = '/samizdapp-proxy') {
     let streamOrNull: Stream | null = null;
     do {
-        const start = Date.now()
+        const start = Date.now();
         streamOrNull = await Promise.race([
             self.node.dialProtocol(self.serverPeer, protocol).catch(e => {
                 console.log('dialProtocol error, retry', e, Date.now() - start);
@@ -123,7 +123,7 @@ async function getStream(protocol = '/samizdapp-proxy') {
             ),
         ]);
         if (!streamOrNull) {
-            console.log('reset libp2p')
+            console.log('reset libp2p');
             await self.node.stop();
             await self.node.start();
             const relays =
@@ -161,10 +161,10 @@ async function p2Fetch(
     const body = reqObj.body
         ? reqObj.body
         : reqInit.body
-            ? reqInit.body
-            : reqObj.arrayBuffer
-                ? await reqObj.arrayBuffer()
-                : null;
+        ? reqInit.body
+        : reqObj.arrayBuffer
+        ? await reqObj.arrayBuffer()
+        : null;
 
     reqObj = patched.reqObj;
     reqInit = patched.reqInit;
@@ -316,7 +316,7 @@ async function openRelayStream(cb: () => unknown) {
                         );
                         console.error(e);
                     });
-                cb()
+                cb();
             }
         }).catch(e => {
             console.log('error in pipe', e);
@@ -336,11 +336,11 @@ async function main() {
                 return id;
             }));
 
-    console.debug('got bootstrap addr', bootstrapaddr)
+    console.debug('got bootstrap addr', bootstrapaddr);
     const relay_addrs =
         (await localforage.getItem<string[]>('libp2p.relays').catch(_ => [])) ??
         [];
-    console.debug('got relay addrs', relay_addrs)
+    console.debug('got relay addrs', relay_addrs);
     const { hostname } = new URL(self.origin);
     const [_, _proto, _ip, ...rest] = bootstrapaddr?.split('/') ?? [];
     const hostaddr = `/dns4/${hostname}/${rest.join('/')}`;
@@ -384,7 +384,7 @@ async function main() {
                 enabled: true, // Allows you to bind to relays with HOP enabled for improving node dialability
                 maxListeners: 5, // Configure maximum number of HOP relays to use
             },
-        }
+        },
     });
     // Listen for new peers
     let foundServer = false;
@@ -442,13 +442,13 @@ async function main() {
         const connection = evt.detail;
         console.log(`Disconnected from ${connection.remotePeer.toString()}`);
     });
-    console.debug('starting libp2p')
+    console.debug('starting libp2p');
 
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     //@ts-ignore
-    node.components.setPeerStore(new PersistentPeerStore())
+    node.components.setPeerStore(new PersistentPeerStore());
     await node.start();
-    console.debug('started libp2p')
+    console.debug('started libp2p');
     self.libp2p = self.node = node;
     return connectPromise;
 }
@@ -498,7 +498,6 @@ self.addEventListener('activate', async _event => {
     //     self.fetch = self.stashedFetch.bind(self)
     // });
 
-
     // self.fetch = async (...args) => {
     //     if (typeof args[0] === 'string') {
     //         return self.stashedFetch(...args);
@@ -513,14 +512,15 @@ self.addEventListener('activate', async _event => {
 
 self.stashedFetch = self.fetch;
 
-self.deferral = main().then(() => {
-    console.log('patching fetch');
-    self.fetch = p2Fetch.bind(self);
-}).catch(e => {
-    console.error(e)
-    self.fetch = self.stashedFetch.bind(self)
-});
-
+self.deferral = main()
+    .then(() => {
+        console.log('patching fetch');
+        self.fetch = p2Fetch.bind(self);
+    })
+    .catch(e => {
+        console.error(e);
+        self.fetch = self.stashedFetch.bind(self);
+    });
 
 self.fetch = async (...args) => {
     if (typeof args[0] === 'string') {
@@ -544,7 +544,5 @@ async function navToRoot() {
         });
     }
 }
-
-
 
 console.log('end of worker/index.js');

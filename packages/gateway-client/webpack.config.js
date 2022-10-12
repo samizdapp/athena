@@ -10,8 +10,6 @@ module.exports = (config, _context) => {
     // then override your config.
     return {
         ...config,
-<<<<<<< Updated upstream
-=======
         devServer: {
             ...(config.devServer || {}),
             headers: {
@@ -40,7 +38,6 @@ module.exports = (config, _context) => {
                 }),
             ],
         },
->>>>>>> Stashed changes
         node: {
             ...config.node,
             global: true,
@@ -56,7 +53,9 @@ module.exports = (config, _context) => {
             },
         },
         plugins: [
-            ...config.plugins,
+            ...config.plugins.filter(
+                it => it.constructor.name !== 'ReactRefreshPlugin'
+            ),
             new NodePolyfillPlugin(),
             new InjectManifest({
                 swSrc: 'packages/gateway-client/src/worker/index.ts',

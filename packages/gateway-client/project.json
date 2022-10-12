@@ -11,7 +11,7 @@
         "compiler": "babel",
         "outputPath": "dist/packages/gateway-client",
         "index": "packages/gateway-client/src/index.html",
-        "baseHref": "/",
+        "baseHref": "/pwa/",
         "main": "packages/gateway-client/src/main.tsx",
         "polyfills": "packages/gateway-client/src/polyfills.ts",
         "tsConfig": "packages/gateway-client/tsconfig.app.json",

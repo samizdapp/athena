@@ -1,6 +1,8 @@
 {
-  "short_name": "Gateway Client",
-  "name": "Gateway Client",
+  "short_name": "SamizdApp",
+  "name": "SamizdApp",
+  "scope": "/",
+  "start_url": "/pwa",
   "icons": [
     {
       "src": "favicon.ico",
@@ -18,7 +20,6 @@
       "sizes": "512x512"
     }
   ],
-  "start_url": ".",
   "display": "standalone",
   "theme_color": "#000000",
   "background_color": "#ffffff"

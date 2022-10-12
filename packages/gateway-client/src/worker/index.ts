@@ -8,7 +8,6 @@ import { Mplex } from '@libp2p/mplex';
 import { WebSockets } from '@libp2p/websockets';
 import { all as filter } from '@libp2p/websockets/filters';
 import { Multiaddr as MultiaddrType } from '@multiformats/multiaddr';
-import { dnsaddrResolver } from '@multiformats/multiaddr/resolvers';
 import { Buffer } from 'buffer/';
 import { LevelDatastore } from 'datastore-level';
 import { pipe } from 'it-pipe';
@@ -16,16 +15,16 @@ import { createLibp2p, Libp2p } from 'libp2p';
 import { decode, encode } from 'lob-enc';
 import localforage from 'localforage';
 import Multiaddr from 'multiaddr';
-import { precacheAndRoute } from 'workbox-precaching';
+//import { precacheAndRoute } from 'workbox-precaching';
 import { PersistentPeerStore } from '@libp2p/peer-store'
- 
-type Window = {
-    localStorage: {
-        debug: string;
-    }
-}
 
-type Document = {}
+// type Window = {
+//     localStorage: {
+//         debug: string;
+//     }
+// }
+
+// type Document = {}
 
 declare const self: {
     client?: Client;
@@ -113,7 +112,7 @@ async function normalizeBody(body: unknown) {
 async function getStream(protocol = '/samizdapp-proxy') {
     let streamOrNull: Stream | null = null;
     do {
-        let start = Date.now()
+        const start = Date.now()
         streamOrNull = await Promise.race([
             self.node.dialProtocol(self.serverPeer, protocol).catch(e => {
                 console.log('dialProtocol error, retry', e, Date.now() - start);
@@ -284,7 +283,7 @@ function patchFetchArgs(_reqObj: Request, _reqInit: RequestInit = {}) {
     return { reqObj, reqInit };
 }
 
-async function openRelayStream(cb: Function) {
+async function openRelayStream(cb: () => unknown) {
     while (true) {
         const stream = await getStream('/samizdapp-relay').catch(e => {
             console.error('error getting stream', e);
@@ -445,6 +444,7 @@ async function main() {
     });
     console.debug('starting libp2p')
 
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     //@ts-ignore
     node.components.setPeerStore(new PersistentPeerStore())
     await node.start();

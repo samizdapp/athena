@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import Typography from "@mui/material/Typography";
 import Grid from "@mui/material/Grid";
 
-export default function Trust({}) {
+export default function Trust() {
   const [trusted, setTrusted] = useState(-1);
 
   useEffect(() => {
@@ -31,8 +31,8 @@ export default function Trust({}) {
       </Grid>
       <Grid item xs={12}>
         {trusted === -1 ? null : trusted === 0 ? (
-          <a href="chrome://flags" target="_blank">
-            put http://{location.host} into the textbox
+          <a href="chrome://flags" target="_blank" rel="noreferrer">
+            put http://{window.location.host} into the textbox
           </a>
         ) : (
           <p>this origin is trusted!</p>

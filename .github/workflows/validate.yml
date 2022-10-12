@@ -45,7 +45,7 @@ jobs:
         run: npm install
         
       - name: lint
-        run: npm run nx -- affected --target=lint --base=master
+        run: npm run nx -- affected --target=lint --base=origin/master
         
       - name: format:check
-        run: npm run nx -- affected --target=format:check --base=master
+        run: npm run nx -- affected --target=format:check --base=origin/master

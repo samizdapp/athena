@@ -10,6 +10,34 @@ module.exports = (config, _context) => {
     // then override your config.
     return {
         ...config,
+        devServer: {
+            ...config.devServer,
+            headers: {
+                ...(config.devServer?.headers ?? {}),
+                'Service-Worker-Allowed': '/',
+            },
+        },
+        module: {
+            ...config.module,
+            rules: [
+                // {
+                //     test: /\.([jt])sx?$/,
+                //     loader: require.resolve(
+                //         '@nrwl/web/src/utils/web-babel-loader'
+                //     ),
+                //     exclude: /node_modules/,
+                //     options: {
+                //         babelrc: true,
+                //     },
+                // },
+                ...config.module.rules.map(it => {
+                    if (it.loader?.includes('web-babel-loader')) {
+                        it.options.plugins = [];
+                    }
+                    return it;
+                }),
+            ],
+        },
         node: {
             ...config.node,
             global: true,
@@ -25,7 +53,9 @@ module.exports = (config, _context) => {
             },
         },
         plugins: [
-            ...config.plugins,
+            ...config.plugins.filter(
+                it => it.constructor.name !== 'ReactRefreshPlugin'
+            ),
             new NodePolyfillPlugin(),
             new InjectManifest({
                 swSrc: 'packages/gateway-client/src/worker/index.ts',

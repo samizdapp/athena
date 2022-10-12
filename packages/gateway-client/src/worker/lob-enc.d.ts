@@ -1,6 +1,10 @@
 type EnhancedBuffer = {
-    json: Record<string, unknown>;
-    body: Record<string, unknown>;
+    json: {
+        res: {
+            headers: HeadersInit | Headers;
+        } & Response;
+    } & Record<string, unknown>;
+    body: BodyInit;
 } & Buffer;
 
 declare module 'lob-enc' {

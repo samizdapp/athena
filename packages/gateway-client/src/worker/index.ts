@@ -18,7 +18,7 @@ import localforage from 'localforage';
 import Multiaddr from 'multiaddr';
 import { precacheAndRoute } from 'workbox-precaching';
 import { PersistentPeerStore } from '@libp2p/peer-store'
-
+ 
 type Window = {
     localStorage: {
         debug: string;

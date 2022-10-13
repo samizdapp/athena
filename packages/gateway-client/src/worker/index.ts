@@ -16,9 +16,9 @@ import { decode, encode } from 'lob-enc';
 import localforage from 'localforage';
 import Multiaddr from 'multiaddr';
 // the workbox-precaching import includes a type definition for
-// self.__WB_MANIFEST
+// <self dot __WB_MANIFEST>
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import precacheAndRoute from 'workbox-precaching';
+import { precacheAndRoute, PrecacheEntry } from 'workbox-precaching';
 import { PersistentPeerStore } from '@libp2p/peer-store';
 
 // type Window = {
@@ -49,6 +49,11 @@ declare const self: {
 
 self.localforage = localforage;
 
+const WB_MANIFEST = self.__WB_MANIFEST;
+// const wbManifestUrls = WB_MANIFEST.map(it =>
+//     (it as PrecacheEntry).revision ? (it as PrecacheEntry).url : it
+// );
+
 // self.window = { localStorage: { debug: '' } }
 // self.document = {}
 
@@ -56,8 +61,8 @@ self.localforage = localforage;
 // Their URLs are injected into the manifest variable below.
 // This variable must be present somewhere in your service worker file,
 // even if you decide not to use precaching. See https://cra.link/PWA
-//precacheAndRoute(<insert manifest here>);
-console.log(self.__WB_MANIFEST);
+//precacheAndRoute(WB_MANIFEST);
+console.log(WB_MANIFEST);
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 //@ts-ignore
@@ -461,10 +466,57 @@ async function main() {
 self.addEventListener('fetch', function (event) {
     console.log('Received fetch: ', event);
 
-    //if (event?.request.method !== 'GET') {
-    // default service worker only handles GET
-    event?.respondWith(fetch(event.request));
-    //}
+    // // if this url is in the manifest
+    // if (wbManifestUrls.includes(event.request.url)) {
+    //     // then use our default fetch to fetch it
+
+    // }
+
+    // if (event?.request.method === 'GET') {
+    //     //default service worker only handles GET
+    //     return;
+    // }
+
+    // Check if this is a request for a static asset
+    if (
+        [
+            'audio',
+            'audioworklet',
+            'document',
+            'font',
+            'image',
+            'paintworklet',
+            'report',
+            'script',
+            'style',
+            'track',
+            'video',
+            'xslt',
+        ].includes(event.request.destination)
+    ) {
+        event.respondWith(
+            caches.open('pwa-static-cache').then(cache => {
+                // Go to the cache first
+                return cache.match(event.request.url).then(cachedResponse => {
+                    // Return a cached response if we have one
+                    if (cachedResponse) {
+                        return cachedResponse;
+                    }
+
+                    // Otherwise, hit the network
+                    return fetch(event.request).then(fetchedResponse => {
+                        // Add the network response to the cache for later visits
+                        cache.put(event.request, fetchedResponse.clone());
+
+                        // Return the network response
+                        return fetchedResponse;
+                    });
+                });
+            })
+        );
+    } else {
+        event?.respondWith(fetch(event.request));
+    }
 });
 
 self.addEventListener('online', () => console.log('<<<<online'));
@@ -489,6 +541,7 @@ self.addEventListener('install', _event => {
     // Perform any other actions required for your
     // service worker to install, potentially inside
     // of event.waitUntil();
+    console.log('Skipped waiting');
 });
 
 self.addEventListener('activate', async _event => {
@@ -513,6 +566,7 @@ self.addEventListener('activate', async _event => {
     //     return self.fetch(...args);
     // };
     await self.clients.claim();
+    console.log('Finish clients claim');
 });
 
 self.stashedFetch = self.fetch;

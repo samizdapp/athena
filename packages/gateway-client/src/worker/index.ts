@@ -16,7 +16,7 @@ import { decode, encode } from 'lob-enc';
 import localforage from 'localforage';
 import Multiaddr from 'multiaddr';
 // the workbox-precaching import includes a type definition for
-// self.__WB_MANIFEST
+// <self dot __WB_MANIFEST>
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { precacheAndRoute, PrecacheEntry } from 'workbox-precaching';
 import { PersistentPeerStore } from '@libp2p/peer-store';
@@ -472,10 +472,51 @@ self.addEventListener('fetch', function (event) {
 
     // }
 
-    //if (event?.request.method !== 'GET') {
-    // default service worker only handles GET
-    event?.respondWith(fetch(event.request));
-    //}
+    // if (event?.request.method === 'GET') {
+    //     //default service worker only handles GET
+    //     return;
+    // }
+
+    // Check if this is a request for a static asset
+    if (
+        [
+            'audio',
+            'audioworklet',
+            'document',
+            'font',
+            'image',
+            'paintworklet',
+            'report',
+            'script',
+            'style',
+            'track',
+            'video',
+            'xslt',
+        ].includes(event.request.destination)
+    ) {
+        event.respondWith(
+            caches.open('pwa-static-cache').then(cache => {
+                // Go to the cache first
+                return cache.match(event.request.url).then(cachedResponse => {
+                    // Return a cached response if we have one
+                    if (cachedResponse) {
+                        return cachedResponse;
+                    }
+
+                    // Otherwise, hit the network
+                    return fetch(event.request).then(fetchedResponse => {
+                        // Add the network response to the cache for later visits
+                        cache.put(event.request, fetchedResponse.clone());
+
+                        // Return the network response
+                        return fetchedResponse;
+                    });
+                });
+            })
+        );
+    } else {
+        event?.respondWith(fetch(event.request));
+    }
 });
 
 self.addEventListener('online', () => console.log('<<<<online'));

@@ -4,27 +4,48 @@ name: validate
 
 # Controls when the workflow will run
 on:
-  pull_request:
-    branches: [ "master" ]
+    pull_request:
+        branches: ['master']
 
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
+    # Allows you to run this workflow manually from the Actions tab
+    workflow_dispatch:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
-    runs-on: ubuntu-latest
+    # This workflow contains a single job called "build"
+    build:
+        # The type of runner that the job will run on
+        runs-on: ubuntu-latest
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
-    steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v3
+        # Steps represent a sequence of tasks that will be executed as part of the job
+        steps:
+            # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+            - uses: actions/checkout@v3
 
-      # Runs a single command using the runners shell
-      - name: install
-        run: npm install
-        
-      - name: build
-        run: npm run build
+            # Runs a single command using the runners shell
+            - name: install
+              run: npm install
+
+            - name: build
+              run: npm run build
+
+    lint:
+        # The type of runner that the job will run on
+        runs-on: ubuntu-latest
+
+        # Steps represent a sequence of tasks that will be executed as part of the job
+        steps:
+            # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+            - uses: actions/checkout@v3
+              with:
+                  fetch-depth: 0
+
+            # Runs a single command using the runners shell
+            - name: install
+              run: npm install
+
+            - name: lint
+              run: npm run nx -- affected --target=lint --base=origin/master
+
+            - name: format:check
+              run: npm run nx -- format:check --base=origin/master

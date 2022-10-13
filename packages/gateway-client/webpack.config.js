@@ -11,9 +11,9 @@ module.exports = (config, _context) => {
     return {
         ...config,
         devServer: {
-            ...config.devServer,
+            ...(config.devServer || {}),
             headers: {
-                ...(config.devServer?.headers ?? {}),
+                ...(config.devServer?.headers || {}),
                 'Service-Worker-Allowed': '/',
             },
         },

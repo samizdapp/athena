@@ -33,6 +33,7 @@ npm-debug.log
 yarn-error.log
 testem.log
 /typings
+packages/gateway-client/src/assets/libp2p.bootstrap
 
 # System Files
 .DS_Store

@@ -342,8 +342,9 @@ async function main() {
         (await fetch('/pwa/assets/libp2p.bootstrap')
             .then(r => r.text())
             .then(async id => {
-                await localforage.setItem('libp2p.bootstrap', id);
-                return id;
+                const trimmed = id.trim() //newline protection
+                await localforage.setItem('libp2p.bootstrap', trimmed);
+                return trimmed;
             }));
 
     console.debug('got bootstrap addr', bootstrapaddr);

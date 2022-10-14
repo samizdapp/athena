@@ -342,7 +342,7 @@ async function main() {
         (await fetch('/pwa/assets/libp2p.bootstrap')
             .then(r => r.text())
             .then(async id => {
-                const trimmed = id.trim() //newline protection
+                const trimmed = id.trim(); //newline protection
                 await localforage.setItem('libp2p.bootstrap', trimmed);
                 return trimmed;
             }));
@@ -432,8 +432,30 @@ async function main() {
                         serverConnected = true;
                         self.serverPeer = connection.remotePeer;
                         openRelayStream(() => {
-                            resolve();
+                            /*
+                             * Don't wait for a relay before resolving.
+                             *
+                             * A relay is required in order to access the box
+                             * outside of the box's LAN. There are currently
+                             * two methods of obtaining a relay: a UPnP address
+                             * on the local network and a public UPnP address
+                             * on the SamizdApp network; however, both methods
+                             * are currently unreliable.
+                             *
+                             * Until we have a way of reliably obtaining a
+                             * public relay, do not wait for a public relay
+                             * before resolving.
+                             *
+                             * TODO: Strengthen one of the methods for
+                             * obtaining a public relay address.
+                             *
+                             */
+                            //resolve();
                         });
+
+                        // TODO: Don't resolve here once we have a reliable way
+                        // of obtaining a public relay
+                        resolve();
                     }
                     // while (true) {
                     //   await new Promise(r => setTimeout(r, 5000))

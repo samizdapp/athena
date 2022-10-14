@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { CircularIndeterminate } from '../components/loading/circular-indeterminate';
 import Trust from '../components/trust';
 import BasicLayout from '../layouts/basic';
-import { getSupportedPlatform, isPwa, isSupportedPlatform } from './support';
+import { getSupportedPlatform, isPwa, isSupportedPlatform } from '../support';
 
 async function reload() {
     if (document.visibilityState === 'visible') {

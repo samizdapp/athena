@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { CircularIndeterminate } from '../components/progress';
+import { CircularIndeterminate } from '../components/loading/circular-indeterminate';
 import Trust from '../components/trust';
 import BasicLayout from '../layouts/basic';
 import { getSupportedPlatform, isPwa, isSupportedPlatform } from './support';

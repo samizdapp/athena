@@ -547,13 +547,8 @@ self.addEventListener('offline', () => console.log('<<<<offline'));
 
 self.addEventListener('message', async function (evt) {
     console.log('postMessage received', evt);
-    if (evt.data.type === 'MDNS') {
-        const address = evt.data.address;
-        localforage.setItem('mdns', { address });
-    }
 
     localforage.setItem('started', { started: true });
-    await navToRoot();
 });
 
 self.addEventListener('install', _event => {
@@ -613,18 +608,5 @@ self.fetch = async (...args) => {
     console.log('fetch deferred', args[0]);
     return self.fetch(...args);
 };
-
-async function navToRoot() {
-    const clienttab = (await self.clients.matchAll()).filter(({ url }) => {
-        const u = new URL(url);
-        return u.pathname === '/pwa';
-    })[0] as WindowClient;
-
-    if (clienttab) {
-        clienttab.navigate('/').catch(_e => {
-            clienttab.postMessage('NAVIGATE');
-        });
-    }
-}
 
 console.log('end of worker/index.js');

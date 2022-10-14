@@ -2,45 +2,86 @@ import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
 import useTheme from '@mui/material/styles/useTheme';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import styled from 'styled-components';
 import { selectServiceWorker } from '../../redux/service-worker/serviceWorker.slice';
-import { isPwa } from '../../support';
+import {
+    getSupportedPlatform,
+    isPwa,
+    isSupportedPlatform,
+} from '../../support';
 
 import CircularIndeterminate from '../loading/circular-indeterminate';
+
+const StyledHome = styled.div``;
+
+const useReload = () => {
+    const [_, reload] = useState(0);
+    return () => {
+        reload(Date.now());
+    };
+};
 
 /* eslint-disable-next-line */
 export interface HomeProps {}
 
-const StyledHome = styled.div``;
-
 export function Home(_props: HomeProps) {
     const theme = useTheme();
+    const [recommended, setRecommended] = useState('');
     const { isControlling, status: workerStatus } =
         useSelector(selectServiceWorker);
+    const secureContext = window.isSecureContext;
     const [statusMessage, setStatusMessage] = useState('Loading...');
     const pwaOpen = isPwa();
 
-    const [time, setTime] = useState(0);
+    const reload = useReload();
+
+    const handleVisibilityChange = useCallback(() => {
+        reload();
+    }, [reload]);
 
     useEffect(() => {
-        console.log({ workerStatus, isControlling, pwaOpen });
+        if (!isSupportedPlatform()) {
+            setRecommended(getSupportedPlatform());
+        }
+    }, []);
+
+    useEffect(() => {
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () =>
+            document.removeEventListener(
+                'visibilitychange',
+                handleVisibilityChange
+            );
+    }, [handleVisibilityChange]);
+
+    useEffect(() => {
+        console.log({ workerStatus, isControlling, pwaOpen, secureContext });
+
+        // if we aren't in a secure context
+        if (!secureContext) {
+            // then there is no point in even trying
+            setStatusMessage(
+                'Missing secure context. (Is insecure origin flag set?)'
+            );
+            return;
+        } // else, we have a secure context
 
         // if we aren't activated and being controlled yet
         if (workerStatus !== 'activated' || !isControlling) {
             // then keep waiting
+            setStatusMessage('Installing...');
             return;
-        }
-        // else, we are now activated and are being controlled by the worker
+        } // else, we are now activated and are being controlled by the worker
 
         // if we aren't a PWA
         if (!pwaOpen) {
             // we need to be before we can continue
             setStatusMessage('Install the PWA to continue.');
             return;
-        }
-        // else, we are a PWA being controlled by an active worker
+        } // else, we are a PWA being controlled by an active worker
 
         // let the worker know we're up and running
         window.navigator.serviceWorker.controller?.postMessage({
@@ -48,16 +89,7 @@ export function Home(_props: HomeProps) {
         });
         // we've accomplished all we needed, time to go
         window.location.href = '/';
-    }, [isControlling, workerStatus, pwaOpen]);
-
-    // refresh this component periodically to check for external changes (like the PWA opening)
-    useEffect(() => {
-        const timeoutId = setTimeout(() => {
-            setTime(time + 1000);
-        });
-
-        return () => clearTimeout(timeoutId);
-    }, [time]);
+    }, [isControlling, workerStatus, pwaOpen, secureContext]);
 
     return (
         <StyledHome>
@@ -79,12 +111,24 @@ export function Home(_props: HomeProps) {
                             padding: theme.spacing(2),
                         }}
                     >
-                        <p>Status: {workerStatus ?? 'pending'}</p>
-                        <p>Controlling: {isControlling ? 'yes' : 'no'}</p>
+                        {recommended ? (
+                            <h1>Please open this page in {recommended}</h1>
+                        ) : (
+                            <>
+                                <p>Status: {workerStatus ?? 'pending'}</p>
+                                <p>
+                                    Controlling: {isControlling ? 'yes' : 'no'}
+                                </p>
+                                <p>
+                                    Secure context:{' '}
+                                    {secureContext ? 'yes' : 'no'}
+                                </p>
 
-                        <CircularIndeterminate />
+                                <CircularIndeterminate />
 
-                        <p>{statusMessage}</p>
+                                <p>{statusMessage}</p>
+                            </>
+                        )}
                     </Paper>
                 </Container>
             </Box>

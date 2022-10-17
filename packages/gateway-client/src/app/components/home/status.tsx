@@ -1,11 +1,11 @@
-import styled from 'styled-components';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import MuiDrawer from '@mui/material/Drawer';
 import * as React from 'react';
-
-import { ServerPeerStatus } from 'packages/gateway-client/src/service-worker';
+import styled from 'styled-components';
 import { useSelector } from 'react-redux';
+
+import { ServerPeerStatus } from '../../../service-worker';
 import {
     selectRelayAddresses,
     selectWorkerStatus,

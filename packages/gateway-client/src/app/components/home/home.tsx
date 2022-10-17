@@ -5,14 +5,15 @@ import useTheme from '@mui/material/styles/useTheme';
 import { useCallback, useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import styled from 'styled-components';
-import { selectServiceWorker } from '../../redux/service-worker/serviceWorker.slice';
+
+import { selectWorkerStatus } from '../../redux/service-worker/serviceWorker.slice';
 import {
     getSupportedPlatform,
     isPwa,
     isSupportedPlatform,
 } from '../../support';
-
 import CircularIndeterminate from '../loading/circular-indeterminate';
+import Status from './status';
 
 const StyledHome = styled.div``;
 
@@ -30,7 +31,7 @@ export function Home(_props: HomeProps) {
     const theme = useTheme();
     const [recommended, setRecommended] = useState('');
     const { isControlling, status: workerStatus } =
-        useSelector(selectServiceWorker);
+        useSelector(selectWorkerStatus);
     const secureContext = window.isSecureContext;
     const [statusMessage, setStatusMessage] = useState('Loading...');
     const pwaOpen = isPwa();
@@ -115,15 +116,6 @@ export function Home(_props: HomeProps) {
                             <h1>Please open this page in {recommended}</h1>
                         ) : (
                             <>
-                                <p>Status: {workerStatus ?? 'pending'}</p>
-                                <p>
-                                    Controlling: {isControlling ? 'yes' : 'no'}
-                                </p>
-                                <p>
-                                    Secure context:{' '}
-                                    {secureContext ? 'yes' : 'no'}
-                                </p>
-
                                 <CircularIndeterminate />
 
                                 <p>{statusMessage}</p>
@@ -132,6 +124,8 @@ export function Home(_props: HomeProps) {
                     </Paper>
                 </Container>
             </Box>
+
+            <Status />
         </StyledHome>
     );
 }

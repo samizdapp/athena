@@ -12,10 +12,37 @@ import {
     isPwa,
     isSupportedPlatform,
 } from '../../support';
-import CircularIndeterminate from '../loading/circular-indeterminate';
+import ErasablePen from '../loading/erasable-pen';
+import AnimatedCheck from './animated-check';
 import Status from './status';
 
-const StyledHome = styled.div``;
+const StyledHome = styled.div`
+    .status-graphic {
+        .loading,
+        svg {
+            margin-bottom: 20px;
+            width: 80%;
+        }
+
+        .loading {
+            margin-top: -100px;
+            height: 200px;
+        }
+
+        svg {
+            margin-top: 0;
+            height: 100px;
+        }
+    }
+
+    .status-message {
+        text-align: center;
+
+        a {
+            color: #00aaff;
+        }
+    }
+`;
 
 const useReload = () => {
     const [_, reload] = useState(0);
@@ -33,7 +60,9 @@ export function Home(_props: HomeProps) {
     const { isControlling, status: workerStatus } =
         useSelector(selectWorkerStatus);
     const secureContext = window.isSecureContext;
-    const [statusMessage, setStatusMessage] = useState('Loading...');
+    const workerActive = workerStatus === 'activated' && isControlling;
+    const [statusMessage, setStatusMessage] =
+        useState<React.ReactNode>('Loading...');
     const pwaOpen = isPwa();
 
     const reload = useReload();
@@ -59,7 +88,7 @@ export function Home(_props: HomeProps) {
     }, [handleVisibilityChange]);
 
     useEffect(() => {
-        console.log({ workerStatus, isControlling, pwaOpen, secureContext });
+        console.log({ workerActive, pwaOpen, secureContext });
 
         // if we aren't in a secure context
         if (!secureContext) {
@@ -71,7 +100,7 @@ export function Home(_props: HomeProps) {
         } // else, we have a secure context
 
         // if we aren't activated and being controlled yet
-        if (workerStatus !== 'activated' || !isControlling) {
+        if (!workerActive) {
             // then keep waiting
             setStatusMessage('Installing...');
             return;
@@ -80,7 +109,18 @@ export function Home(_props: HomeProps) {
         // if we aren't a PWA
         if (!pwaOpen) {
             // we need to be before we can continue
-            setStatusMessage('Install the PWA to continue.');
+            setStatusMessage(
+                <>
+                    <a
+                        href="https://samizdapp.github.io/docs/getting-started/setup-client"
+                        target="_blank"
+                        rel="noreferrer"
+                    >
+                        Install the PWA
+                    </a>{' '}
+                    to continue.'
+                </>
+            );
             return;
         } // else, we are a PWA being controlled by an active worker
 
@@ -90,7 +130,7 @@ export function Home(_props: HomeProps) {
         });
         // we've accomplished all we needed, time to go
         window.location.href = '/';
-    }, [isControlling, workerStatus, pwaOpen, secureContext]);
+    }, [pwaOpen, secureContext, workerActive]);
 
     return (
         <StyledHome>
@@ -115,11 +155,20 @@ export function Home(_props: HomeProps) {
                         {recommended ? (
                             <h1>Please open this page in {recommended}</h1>
                         ) : (
-                            <>
-                                <CircularIndeterminate />
+                            <div className="status-graphic">
+                                {!workerActive ? (
+                                    <ErasablePen
+                                        primary="#086be4"
+                                        secondary="#bfbfbf"
+                                    />
+                                ) : (
+                                    <AnimatedCheck />
+                                )}
 
-                                <p>{statusMessage}</p>
-                            </>
+                                <p className="status-message">
+                                    {statusMessage}
+                                </p>
+                            </div>
                         )}
                     </Paper>
                 </Container>

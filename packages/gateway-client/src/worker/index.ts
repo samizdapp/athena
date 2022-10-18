@@ -5,6 +5,7 @@ import { ConnectionEncrypter } from '@libp2p/interface-connection-encrypter';
 import { PeerId } from '@libp2p/interface-peer-id';
 import { StreamMuxerFactory } from '@libp2p/interface-stream-muxer';
 import { Mplex } from '@libp2p/mplex';
+import { PersistentPeerStore } from '@libp2p/peer-store';
 import { WebSockets } from '@libp2p/websockets';
 import { all as filter } from '@libp2p/websockets/filters';
 import { Multiaddr as MultiaddrType } from '@multiformats/multiaddr';
@@ -15,11 +16,15 @@ import { createLibp2p, Libp2p } from 'libp2p';
 import { decode, encode } from 'lob-enc';
 import localforage from 'localforage';
 import Multiaddr from 'multiaddr';
+import * as workboxPrecaching from 'workbox-precaching';
+
+import { MessageType, ServerPeerStatus } from '../service-worker';
+
 // the workbox-precaching import includes a type definition for
-// <self dot __WB_MANIFEST>
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { precacheAndRoute, PrecacheEntry } from 'workbox-precaching';
-import { PersistentPeerStore } from '@libp2p/peer-store';
+// <self dot __WB_MANIFEST>.
+// Import it even though we're not using any of the imports,
+// and mark the import as being used with this line:
+const _ = workboxPrecaching;
 
 // type Window = {
 //     localStorage: {
@@ -30,7 +35,7 @@ import { PersistentPeerStore } from '@libp2p/peer-store';
 // type Document = {}
 
 declare const self: {
-    client?: Client;
+    status: WorkerStatus;
     soapstore: LocalForage;
     DIAL_TIMEOUT: number;
     serverPeer: PeerId;
@@ -81,6 +86,60 @@ const CHUNK_SIZE = 1024 * 64;
 self.Buffer = Buffer;
 
 self._fetch = fetch;
+
+class WorkerStatus {
+    _serverPeer: ServerPeerStatus | null = null;
+    relays: string[] = [];
+
+    constructor() {
+        Reflect.defineProperty(this.relays, 'push', {
+            value: (...items: string[]): number => {
+                const ret = Array.prototype.push.call(this.relays, ...items);
+                getClient().then(client => {
+                    client?.postMessage({
+                        type: MessageType.LOADED_RELAYS,
+                        relays: this.relays,
+                    });
+                });
+                return ret;
+            },
+        });
+    }
+
+    get serverPeer() {
+        return this._serverPeer;
+    }
+
+    set serverPeer(status: ServerPeerStatus | null) {
+        this._serverPeer = status;
+        getClient().then(client => {
+            client?.postMessage({
+                type: MessageType.SERVER_PEER_STATUS,
+                status,
+            });
+        });
+    }
+
+    async sendCurrent() {
+        const client = await getClient();
+        client?.postMessage({
+            type: MessageType.LOADED_RELAYS,
+            relays: this.relays,
+        });
+        client?.postMessage({
+            type: MessageType.SERVER_PEER_STATUS,
+            status: this.serverPeer,
+        });
+    }
+}
+self.status = new WorkerStatus();
+
+const getClient = async (): Promise<WindowClient | undefined> => {
+    const allClients = await self.clients.matchAll();
+    return allClients.find(
+        it => it instanceof WindowClient && new URL(it.url).pathname === '/pwa'
+    ) as WindowClient;
+};
 
 async function normalizeBody(body: unknown) {
     try {
@@ -326,6 +385,10 @@ async function openRelayStream(cb: () => unknown) {
                         );
                         console.error(e);
                     });
+
+                // update status
+                self.status.relays.push(str_relay);
+
                 cb();
             }
         }).catch(e => {
@@ -352,6 +415,11 @@ async function main() {
         (await localforage.getItem<string[]>('libp2p.relays').catch(_ => [])) ??
         [];
     console.debug('got relay addrs', relay_addrs);
+
+    // update status
+    self.status.serverPeer = ServerPeerStatus.BOOTSTRAPPED;
+    self.status.relays.push(...relay_addrs);
+
     const { hostname } = new URL(self.origin);
     const [_, _proto, _ip, ...rest] = bootstrapaddr?.split('/') ?? [];
     const hostaddr = `/dns4/${hostname}/${rest.join('/')}`;
@@ -431,6 +499,10 @@ async function main() {
                     if (str_id === serverID && !serverConnected) {
                         serverConnected = true;
                         self.serverPeer = connection.remotePeer;
+
+                        // update status
+                        self.status.serverPeer = ServerPeerStatus.CONNECTED;
+
                         openRelayStream(() => {
                             /*
                              * Don't wait for a relay before resolving.
@@ -482,6 +554,10 @@ async function main() {
     node.components.setPeerStore(new PersistentPeerStore());
     await node.start();
     console.debug('started libp2p');
+
+    // update status
+    self.status.serverPeer = ServerPeerStatus.STARTED;
+
     self.libp2p = self.node = node;
     return connectPromise;
 }
@@ -547,13 +623,8 @@ self.addEventListener('offline', () => console.log('<<<<offline'));
 
 self.addEventListener('message', async function (evt) {
     console.log('postMessage received', evt);
-    if (evt.data.type === 'MDNS') {
-        const address = evt.data.address;
-        localforage.setItem('mdns', { address });
-    }
 
     localforage.setItem('started', { started: true });
-    await navToRoot();
 });
 
 self.addEventListener('install', _event => {
@@ -589,6 +660,10 @@ self.addEventListener('activate', async _event => {
     //     return self.fetch(...args);
     // };
     await self.clients.claim();
+
+    // send status update to our client
+    self.status.sendCurrent();
+
     console.log('Finish clients claim');
 });
 
@@ -613,18 +688,5 @@ self.fetch = async (...args) => {
     console.log('fetch deferred', args[0]);
     return self.fetch(...args);
 };
-
-async function navToRoot() {
-    const clienttab = (await self.clients.matchAll()).filter(({ url }) => {
-        const u = new URL(url);
-        return u.pathname === '/pwa';
-    })[0] as WindowClient;
-
-    if (clienttab) {
-        clienttab.navigate('/').catch(_e => {
-            clienttab.postMessage('NAVIGATE');
-        });
-    }
-}
 
 console.log('end of worker/index.js');

@@ -1,7 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import styled from 'styled-components';
 
-import Home from './pages';
+import Home from './components/home/home';
 
 const StyledApp = styled.div`
     // Your style here

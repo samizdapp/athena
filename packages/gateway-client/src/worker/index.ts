@@ -26,7 +26,6 @@ import { MessageType, ServerPeerStatus } from '../service-worker';
 // <self dot __WB_MANIFEST>.
 // Import it even though we're not using any of the imports,
 // and mark the import as being used with this line:
-// <self dot __WB_MANIFEST>
 const _ = workboxPrecaching;
 
 // slightly modified version of
@@ -554,6 +553,11 @@ async function main() {
         },
     });
 
+    node.addEventListener('peer:discovery', evt => {
+        const peer = evt.detail;
+        console.log(`Found peer ${peer.id.toString()}`);
+    });
+
     // Listen for new connections to peers
     let serverConnected = false;
     const connectPromise = new Promise<void>((resolve, reject) => {
@@ -665,6 +669,7 @@ self.addEventListener('fetch', function (event) {
             'video',
             'xslt',
         ].includes(event.request.destination) ||
+        // this directory doesn't have a usable destination string, but it's static assets
         event.request.url.includes('/packs/icons/')
     ) {
         event.respondWith(

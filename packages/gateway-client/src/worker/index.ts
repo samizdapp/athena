@@ -3,8 +3,12 @@ import { Bootstrap } from '@libp2p/bootstrap';
 import { Stream } from '@libp2p/interface-connection';
 import { ConnectionEncrypter } from '@libp2p/interface-connection-encrypter';
 import { PeerId } from '@libp2p/interface-peer-id';
+import type { Address } from '@libp2p/interface-peer-store';
 import { StreamMuxerFactory } from '@libp2p/interface-stream-muxer';
 import { Mplex } from '@libp2p/mplex';
+import { PersistentPeerStore } from '@libp2p/peer-store';
+import { isLoopback } from '@libp2p/utils/multiaddr/is-loopback';
+import { isPrivate } from '@libp2p/utils/multiaddr/is-private';
 import { WebSockets } from '@libp2p/websockets';
 import { all as filter } from '@libp2p/websockets/filters';
 import { Multiaddr as MultiaddrType } from '@multiformats/multiaddr';
@@ -16,19 +20,14 @@ import { decode, encode } from 'lob-enc';
 import localforage from 'localforage';
 import Multiaddr from 'multiaddr';
 import * as workboxPrecaching from 'workbox-precaching';
-
 import { MessageType, ServerPeerStatus } from '../service-worker';
 
 // the workbox-precaching import includes a type definition for
+// <self dot __WB_MANIFEST>.
+// Import it even though we're not using any of the imports,
+// and mark the import as being used with this line:
 // <self dot __WB_MANIFEST>
 const _ = workboxPrecaching;
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { precacheAndRoute, PrecacheEntry } from 'workbox-precaching';
-import { PersistentPeerStore } from '@libp2p/peer-store';
-import type { Address } from '@libp2p/interface-peer-store';
-import { isPrivate } from '@libp2p/utils/multiaddr/is-private';
-import { isLoopback } from '@libp2p/utils/multiaddr/is-loopback';
 
 // slightly modified version of
 // https://github.com/libp2p/js-libp2p-utils/blob/66e604cb0bfcf686eb68e44f278d62e3464c827c/src/address-sort.ts
@@ -94,7 +93,7 @@ declare const self: {
     _fetch: typeof fetch;
     getStream: typeof getStream;
     localforage: typeof localforage;
-    streamFactory: AsyncGenerator<Function, void, string | undefined>;
+    streamFactory: AsyncGenerator<StreamMaker, void, string | undefined>;
     // window: Window;
     // document: Document;
 } & ServiceWorkerGlobalScope;
@@ -134,65 +133,70 @@ self.Buffer = Buffer;
 
 self._fetch = fetch;
 
+type StreamMaker = (protocol: string) => Promise<Stream>;
+
 async function* streamFactoryGenerator(): AsyncGenerator<
-    Function,
+    StreamMaker,
     void,
     string | undefined
 > {
     let timeout = self.DIAL_TIMEOUT;
     let locked = false;
+
+    async function waitFor(t: number): Promise<void> {
+        return new Promise(r => setTimeout(r, t));
+    }
+
+    const makeStream: StreamMaker = async function (protocol) {
+        // console.log('get protocol stream', protocol)
+        let streamOrNull = null;
+        do {
+            const start = Date.now();
+            streamOrNull = await Promise.race([
+                self.node.dialProtocol(self.serverPeer, protocol).catch(_ => {
+                    // console.log('dialProtocol error, retry', Date.now() - start);
+                    return null;
+                }),
+                waitFor(timeout),
+            ]);
+            if (streamOrNull) {
+                timeout = Math.max(
+                    2000,
+                    Math.floor((Date.now() - start) * 1.5)
+                );
+                // console.log('got stream', protocol, streamOrNull)
+            } else {
+                timeout *= 4;
+                console.log('timeout, reset libp2p', timeout);
+                await self.node.stop();
+                await self.node.start();
+                const relays =
+                    (await localforage
+                        .getItem<Multiaddr.MultiaddrInput[]>('libp2p.relays')
+                        .then(str_array => {
+                            return str_array?.map(
+                                addr =>
+                                    Multiaddr.multiaddr(
+                                        addr
+                                    ) as unknown as MultiaddrType
+                            );
+                        })) ?? [];
+                await self.node.peerStore.addressBook.add(
+                    self.serverPeer,
+                    relays
+                );
+            }
+        } while (!streamOrNull);
+        locked = false;
+        return streamOrNull;
+    };
+
     while (true) {
         while (locked) {
             await new Promise(r => setTimeout(r, 100));
         }
         locked = true;
-        yield async function (protocol: string): Promise<Stream> {
-            // console.log('get protocol stream', protocol)
-            let streamOrNull = null;
-            do {
-                const start = Date.now();
-                streamOrNull = await Promise.race([
-                    self.node
-                        .dialProtocol(self.serverPeer, protocol)
-                        .catch(e => {
-                            // console.log('dialProtocol error, retry', Date.now() - start);
-                            return null;
-                        }),
-                    new Promise<null>(r => setTimeout(() => r(null), timeout)),
-                ]);
-                if (streamOrNull) {
-                    timeout = Math.max(
-                        2000,
-                        Math.floor((Date.now() - start) * 1.5)
-                    );
-                    // console.log('got stream', protocol, streamOrNull)
-                } else {
-                    timeout *= 4;
-                    console.log('timeout, reset libp2p', timeout);
-                    await self.node.stop();
-                    await self.node.start();
-                    const relays =
-                        (await localforage
-                            .getItem<Multiaddr.MultiaddrInput[]>(
-                                'libp2p.relays'
-                            )
-                            .then(str_array => {
-                                return str_array?.map(
-                                    addr =>
-                                        Multiaddr.multiaddr(
-                                            addr
-                                        ) as unknown as MultiaddrType
-                                );
-                            })) ?? [];
-                    await self.node.peerStore.addressBook.add(
-                        self.serverPeer,
-                        relays
-                    );
-                }
-            } while (!streamOrNull);
-            locked = false;
-            return streamOrNull;
-        };
+        yield makeStream;
     }
 }
 class WorkerStatus {
@@ -288,8 +292,8 @@ async function normalizeBody(body: unknown) {
 
 async function getStream(protocol = '/samizdapp-proxy') {
     const { value } = await self.streamFactory.next();
-    //@ts-ignore
-    const makeStream: Function = value;
+
+    const makeStream = value as StreamMaker;
     return makeStream(protocol);
 }
 
@@ -325,7 +329,6 @@ async function p2Fetch(
     // console.log('packet:', packet.toString('hex'))
 
     // console.log('packet?', packet)
-    //@ts-ignore we're using generators in a slightly funky way
     const stream: Stream = await getStream();
 
     let i = 0;
@@ -444,7 +447,6 @@ async function openRelayStream(cb: () => unknown) {
         // console.log('got relay stream');
         await pipe(stream.source, async function (source) {
             for await (const msg of source) {
-                //@ts-ignore
                 const str_relay = Buffer.from(msg.subarray()).toString();
                 const multiaddr = Multiaddr.multiaddr(
                     str_relay

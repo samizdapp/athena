@@ -314,7 +314,7 @@ function patchFetchArgs(_reqObj: Request, _reqInit: RequestInit = {}) {
 
     const rawHeaders = Object.fromEntries(_reqObj.headers.entries());
 
-    if (url.pathname !== '/manifest.json') {
+    if (url.pathname !== '/manifest.json' && !url.pathname.startsWith('/pwa')) {
         rawHeaders['X-Intercepted-Subdomain'] = 'pleroma';
     }
 

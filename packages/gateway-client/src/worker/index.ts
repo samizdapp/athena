@@ -26,24 +26,24 @@ const _ = workboxPrecaching;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { precacheAndRoute, PrecacheEntry } from 'workbox-precaching';
 import { PersistentPeerStore } from '@libp2p/peer-store';
-import type { Address } from '@libp2p/interface-peer-store'
-import { isPrivate } from '@libp2p/utils/multiaddr/is-private'
-import { isLoopback } from '@libp2p/utils/multiaddr/is-loopback'
+import type { Address } from '@libp2p/interface-peer-store';
+import { isPrivate } from '@libp2p/utils/multiaddr/is-private';
+import { isLoopback } from '@libp2p/utils/multiaddr/is-loopback';
 
-// slightly modified version of 
+// slightly modified version of
 // https://github.com/libp2p/js-libp2p-utils/blob/66e604cb0bfcf686eb68e44f278d62e3464c827c/src/address-sort.ts
 // the goal here is to couple prioritizing relays with parallelism
 function publicRelayAddressesFirst(a: Address, b: Address): -1 | 0 | 1 {
-    const isAPrivate = isPrivate(a.multiaddr)
-    const isBPrivate = isPrivate(b.multiaddr)
+    const isAPrivate = isPrivate(a.multiaddr);
+    const isBPrivate = isPrivate(b.multiaddr);
 
     if (isAPrivate && !isBPrivate) {
-        return 1
+        return 1;
     } else if (!isAPrivate && isBPrivate) {
-        return -1
+        return -1;
     } else if (!(isAPrivate || isBPrivate)) {
-        const isARelay = isRelay(a)
-        const isBRelay = isRelay(b)
+        const isARelay = isRelay(a);
+        const isBRelay = isRelay(b);
 
         if (isARelay && !isBRelay) {
             return -1;
@@ -53,8 +53,8 @@ function publicRelayAddressesFirst(a: Address, b: Address): -1 | 0 | 1 {
             return 0;
         }
     } else if (isAPrivate && isBPrivate) {
-        const isALoopback = isLoopback(a.multiaddr)
-        const isBLoopback = isLoopback(b.multiaddr)
+        const isALoopback = isLoopback(a.multiaddr);
+        const isBLoopback = isLoopback(b.multiaddr);
 
         if (isALoopback && !isBLoopback) {
             return 1;
@@ -65,12 +65,12 @@ function publicRelayAddressesFirst(a: Address, b: Address): -1 | 0 | 1 {
         }
     }
 
-    return 0
+    return 0;
 }
 
 function isRelay(ma: Address): boolean {
-    const parts = new Set(ma.multiaddr.toString().split('/'))
-    return parts.has('p2p-circuit')
+    const parts = new Set(ma.multiaddr.toString().split('/'));
+    return parts.has('p2p-circuit');
 }
 // type Window = {
 //     localStorage: {
@@ -134,30 +134,37 @@ self.Buffer = Buffer;
 
 self._fetch = fetch;
 
-async function* streamFactoryGenerator(): AsyncGenerator<Function, void, string | undefined> {
+async function* streamFactoryGenerator(): AsyncGenerator<
+    Function,
+    void,
+    string | undefined
+> {
     let timeout = self.DIAL_TIMEOUT;
     let locked = false;
     while (true) {
         while (locked) {
-            await new Promise(r => setTimeout(r, 100))
+            await new Promise(r => setTimeout(r, 100));
         }
         locked = true;
-        yield (async function (protocol: string): Promise<Stream> {
+        yield async function (protocol: string): Promise<Stream> {
             // console.log('get protocol stream', protocol)
             let streamOrNull = null;
             do {
                 const start = Date.now();
                 streamOrNull = await Promise.race([
-                    self.node.dialProtocol(self.serverPeer, protocol).catch(e => {
-                        // console.log('dialProtocol error, retry', Date.now() - start);
-                        return null;
-                    }),
-                    new Promise<null>(r =>
-                        setTimeout(() => r(null), timeout)
-                    ),
+                    self.node
+                        .dialProtocol(self.serverPeer, protocol)
+                        .catch(e => {
+                            // console.log('dialProtocol error, retry', Date.now() - start);
+                            return null;
+                        }),
+                    new Promise<null>(r => setTimeout(() => r(null), timeout)),
                 ]);
                 if (streamOrNull) {
-                    timeout = Math.max(2000, Math.floor((Date.now() - start) * 1.5));
+                    timeout = Math.max(
+                        2000,
+                        Math.floor((Date.now() - start) * 1.5)
+                    );
                     // console.log('got stream', protocol, streamOrNull)
                 } else {
                     timeout *= 4;
@@ -166,7 +173,9 @@ async function* streamFactoryGenerator(): AsyncGenerator<Function, void, string 
                     await self.node.start();
                     const relays =
                         (await localforage
-                            .getItem<Multiaddr.MultiaddrInput[]>('libp2p.relays')
+                            .getItem<Multiaddr.MultiaddrInput[]>(
+                                'libp2p.relays'
+                            )
                             .then(str_array => {
                                 return str_array?.map(
                                     addr =>
@@ -175,12 +184,15 @@ async function* streamFactoryGenerator(): AsyncGenerator<Function, void, string 
                                         ) as unknown as MultiaddrType
                                 );
                             })) ?? [];
-                    await self.node.peerStore.addressBook.add(self.serverPeer, relays);
+                    await self.node.peerStore.addressBook.add(
+                        self.serverPeer,
+                        relays
+                    );
                 }
             } while (!streamOrNull);
             locked = false;
             return streamOrNull;
-        })
+        };
     }
 }
 class WorkerStatus {
@@ -275,10 +287,10 @@ async function normalizeBody(body: unknown) {
 }
 
 async function getStream(protocol = '/samizdapp-proxy') {
-    const { value } = await self.streamFactory.next()
+    const { value } = await self.streamFactory.next();
     //@ts-ignore
     const makeStream: Function = value;
-    return makeStream(protocol)
+    return makeStream(protocol);
 }
 
 self.getStream = getStream;
@@ -298,10 +310,10 @@ async function p2Fetch(
     const body = reqObj.body
         ? reqObj.body
         : reqInit.body
-            ? reqInit.body
-            : reqObj.arrayBuffer
-                ? await reqObj.arrayBuffer()
-                : null;
+        ? reqInit.body
+        : reqObj.arrayBuffer
+        ? await reqObj.arrayBuffer()
+        : null;
 
     reqObj = patched.reqObj;
     reqInit = patched.reqInit;
@@ -441,7 +453,9 @@ async function openRelayStream(cb: () => unknown) {
                 await localforage
                     .getItem<string[]>('libp2p.relays')
                     .then(str_array => {
-                        const dedup = Array.from(new Set([str_relay, ...(str_array || [])]))
+                        const dedup = Array.from(
+                            new Set([str_relay, ...(str_array || [])])
+                        );
 
                         return localforage.setItem('libp2p.relays', dedup);
                     });
@@ -464,7 +478,7 @@ async function openRelayStream(cb: () => unknown) {
             console.log('error in pipe', e);
         });
         // we wan't fetch streams to have priority, so let's ease up this loop
-        await new Promise(r => setTimeout(r, 20000))
+        await new Promise(r => setTimeout(r, 20000));
     }
 }
 
@@ -606,7 +620,7 @@ async function main() {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     //@ts-ignore
     node.components.setPeerStore(new PersistentPeerStore());
-    self.streamFactory = streamFactoryGenerator()
+    self.streamFactory = streamFactoryGenerator();
     // await self.streamFactory.next();
     await node.start();
     console.debug('started libp2p');
@@ -648,7 +662,8 @@ self.addEventListener('fetch', function (event) {
             'track',
             'video',
             'xslt',
-        ].includes(event.request.destination) || event.request.url.includes('/packs/icons/')
+        ].includes(event.request.destination) ||
+        event.request.url.includes('/packs/icons/')
     ) {
         event.respondWith(
             caches.open('pwa-static-cache').then(cache => {

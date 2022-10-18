@@ -118,7 +118,7 @@ export function Home(_props: HomeProps) {
                     >
                         Install the PWA
                     </a>{' '}
-                    to continue.'
+                    to continue.
                 </>
             );
             return;

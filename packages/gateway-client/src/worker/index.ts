@@ -226,6 +226,12 @@ async function p2Fetch(
             `Patched service worker \`fetch()\` method expects a full request object, received ${reqObj.constructor.name}`
         );
     }
+    if (
+        process.env.NX_LOCAL === 'true' &&
+        new URL(reqObj.url).pathname.startsWith('/pwa')
+    ) {
+        return self.stashedFetch(reqObj, reqInit);
+    }
     const patched = patchFetchArgs(reqObj, reqInit);
     const body = reqObj.body
         ? reqObj.body

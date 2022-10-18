@@ -443,7 +443,7 @@ async function main() {
         ],
         connectionManager: {
             autoDial: true, // Auto connect to discovered peers (limited by ConnectionManager minConnections)
-            minConnections: 0,
+            minConnections: 2,
             maxDialsPerPeer: 10,
             // The `tag` property will be searched when creating the instance of your Peer Discovery service.
             // The associated object, will be passed to the service when it is instantiated.
@@ -466,16 +466,16 @@ async function main() {
         },
     });
     // Listen for new peers
-    let foundServer = false;
+    //let foundServer = false;
     node.addEventListener('peer:discovery', evt => {
         const peer = evt.detail;
         console.log(`Found peer ${peer.id.toString()}`);
         // peer.multiaddrs.forEach(ma => console.log(ma.toString()))
         // console.log(peer)
-        if (peer.id.toString() === serverID && !foundServer) {
-            foundServer = true;
-            node.ping(peer.id);
-        }
+        // if (peer.id.toString() === serverID && !foundServer) {
+        //     foundServer = true;
+        //     node.ping(peer.id);
+        // }
     });
     node.peerStore.addEventListener('change:multiaddrs', evt => {
         // Updated self multiaddrs?

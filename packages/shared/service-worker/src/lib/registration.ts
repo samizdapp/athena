@@ -56,15 +56,14 @@ export function register(config?: Config) {
             });
         } else {
             // Is not localhost. Just register service worker
-            registerValidSW(swUrl, config).catch(e => {
-                console.log('error', e);
-            });
+            // Is not localhost. Just register service worker
+            registerValidSW(swUrl, config);
         }
     });
 }
 
-async function registerValidSW(swUrl: string, config?: Config) {
-    return navigator.serviceWorker
+function registerValidSW(swUrl: string, config?: Config) {
+    navigator.serviceWorker
         .register(swUrl, {
             scope: '/',
         })
@@ -103,6 +102,9 @@ async function registerValidSW(swUrl: string, config?: Config) {
                     }
                 };
             };
+        })
+        .catch(error => {
+            console.error('Error during service worker registration:', error);
         });
 }
 

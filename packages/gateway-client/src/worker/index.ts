@@ -137,6 +137,9 @@ self.Buffer = Buffer;
 
 self._fetch = fetch;
 
+const waitFor = async (t: number): Promise<void> =>
+    new Promise(r => setTimeout(r, t));
+
 type StreamMaker = (protocol: string) => Promise<Stream>;
 
 async function* streamFactoryGenerator(): AsyncGenerator<
@@ -144,53 +147,97 @@ async function* streamFactoryGenerator(): AsyncGenerator<
     void,
     string | undefined
 > {
-    let timeout = self.DIAL_TIMEOUT;
     let locked = false;
-
-    async function waitFor(t: number): Promise<void> {
-        return new Promise(r => setTimeout(r, t));
-    }
 
     const makeStream: StreamMaker = async function (protocol) {
         // console.log('get protocol stream', protocol)
+        let dialTimeout = self.DIAL_TIMEOUT;
+        let retryTimeout = 0;
         let streamOrNull = null;
-        do {
+        while (!streamOrNull) {
+            // attempt to dial our peer, track the time it takes
             const start = Date.now();
             streamOrNull = await Promise.race([
                 self.node.dialProtocol(self.serverPeer, protocol).catch(_ => {
                     // console.log('dialProtocol error, retry', Date.now() - start);
                     return null;
                 }),
-                waitFor(timeout),
+                waitFor(dialTimeout),
             ]);
+
+            // if we successfully, dialed, we have a stream
             if (streamOrNull) {
-                timeout = Math.max(
+                // reset our timeouts
+                // use the time of the dial to calculate an
+                // appropriate dial timeout
+                dialTimeout = Math.max(
                     2000,
                     Math.floor((Date.now() - start) * 1.5)
                 );
+                retryTimeout = 0;
+                // if we were NOT previously connected
+                if (self.status.serverPeer !== ServerPeerStatus.CONNECTED) {
+                    // we are now
+                    self.status.serverPeer = ServerPeerStatus.CONNECTED;
+                }
+                // we have a stream, we can quit now
                 // console.log('got stream', protocol, streamOrNull)
-            } else {
-                timeout *= 4;
-                console.log('timeout, reset libp2p', timeout);
-                await self.node.stop();
-                await self.node.start();
-                const relays =
-                    (await localforage
-                        .getItem<Multiaddr.MultiaddrInput[]>('libp2p.relays')
-                        .then(str_array => {
-                            return str_array?.map(
-                                addr =>
-                                    Multiaddr.multiaddr(
-                                        addr
-                                    ) as unknown as MultiaddrType
-                            );
-                        })) ?? [];
-                await self.node.peerStore.addressBook.add(
-                    self.serverPeer,
-                    relays
-                );
+                break;
+            } // else, we were not able to successfully dial
+
+            // this is a connection error, if we were previously connected
+            if (self.status.serverPeer === ServerPeerStatus.CONNECTED) {
+                // we aren't anymore
+                self.status.serverPeer = ServerPeerStatus.CONNECTING;
             }
-        } while (!streamOrNull);
+
+            // if our retry timeout reaches 5 seconds, then we'll have
+            // been retrying for 15 seconds (triangle number of 5).
+            // By this point, we're probably offline.
+            if (
+                self.status.serverPeer !== ServerPeerStatus.OFFLINE &&
+                retryTimeout >= 5000
+            ) {
+                self.status.serverPeer = ServerPeerStatus.OFFLINE;
+            }
+
+            // wait before retrying
+            console.log('Dial timeout, waiting to reset...', {
+                dialTimeout,
+                retryTimeout,
+            });
+            await waitFor(retryTimeout);
+
+            // if our retry timeout reaches 30 seconds, then we'll have
+            // been retrying for 5 minutes 45 seconds
+            // (triangle number of 30)
+            // time to reset
+            if (retryTimeout >= 30000) {
+                retryTimeout = 0;
+            }
+            // increase our retry timeout
+            retryTimeout += 1000;
+            // increase our dial timeout, but never make it higher than
+            // 5 minutes
+            dialTimeout = Math.min(1000 * 60 * 5, dialTimeout * 4);
+
+            // now that we've waiting, we can retry
+            console.log('Resetting libp2p...');
+            await self.node.stop();
+            await self.node.start();
+            const relays =
+                (await localforage
+                    .getItem<Multiaddr.MultiaddrInput[]>('libp2p.relays')
+                    .then(str_array => {
+                        return str_array?.map(
+                            addr =>
+                                Multiaddr.multiaddr(
+                                    addr
+                                ) as unknown as MultiaddrType
+                        );
+                    })) ?? [];
+            await self.node.peerStore.addressBook.add(self.serverPeer, relays);
+        }
         locked = false;
         return streamOrNull;
     };
@@ -643,7 +690,13 @@ async function main() {
     console.debug('started libp2p');
 
     // update status
-    self.status.serverPeer = ServerPeerStatus.STARTED;
+    self.status.serverPeer = ServerPeerStatus.CONNECTING;
+
+    Promise.race([connectPromise, waitFor(15000)]).then(() => {
+        if (self.status.serverPeer === ServerPeerStatus.CONNECTING) {
+            self.status.serverPeer = ServerPeerStatus.OFFLINE;
+        }
+    });
 
     self.libp2p = self.node = node;
     return connectPromise;

@@ -224,6 +224,9 @@ export function Status() {
                             color={
                                 serverPeerStatus === ServerPeerStatus.CONNECTED
                                     ? 'online'
+                                    : serverPeerStatus ===
+                                      ServerPeerStatus.OFFLINE
+                                    ? 'offline'
                                     : 'connecting'
                             }
                         />

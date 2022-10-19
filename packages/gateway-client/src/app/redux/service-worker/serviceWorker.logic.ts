@@ -90,12 +90,21 @@ export class ServiceWorkerLogic {
         );
 
         // now get our worker
-        this.worker =
-            registration.installing ??
-            registration.waiting ??
-            registration.active;
-        // if we couldn't
+        // first, check for a worker that is controlling our page
+        // (even if we just registered a new one, we need to talk to the worker
+        // actually controlling us)
+        this.worker = navigator.serviceWorker.controller;
+        // if we don't have a worker yet
         if (!this.worker) {
+            // check for a worker that we just registered
+            this.worker =
+                registration.installing ??
+                registration.waiting ??
+                registration.active;
+        }
+        // if we still don't have a worker
+        if (!this.worker) {
+            // then give up
             throw new Error(
                 `Unable to retrieve service worker from registration.`
             );

@@ -95,7 +95,17 @@ export function Home(_props: HomeProps) {
         if (!secureContext) {
             // then there is no point in even trying
             setStatusMessage(
-                'Missing secure context. (Is insecure origin flag set?)'
+                <>
+                    Missing secure context. (Is the{' '}
+                    <a
+                        href="https://samizdapp.github.io/docs/getting-started/setup-client"
+                        target="_blank"
+                        rel="noreferrer"
+                    >
+                        insecure origin flag
+                    </a>{' '}
+                    set?)
+                </>
             );
             return;
         } // else, we have a secure context

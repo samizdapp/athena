@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import styled from 'styled-components';
 
+import { ClientMessageType } from '../../../service-worker';
 import { selectWorkerStatus } from '../../redux/service-worker/serviceWorker.slice';
 import {
     getSupportedPlatform,
@@ -126,7 +127,7 @@ export function Home(_props: HomeProps) {
 
         // let the worker know we're up and running
         window.navigator.serviceWorker.controller?.postMessage({
-            type: 'START',
+            type: ClientMessageType.OPENED,
         });
         // we've accomplished all we needed, time to go
         window.location.href = '/';

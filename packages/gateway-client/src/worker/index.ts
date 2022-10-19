@@ -20,7 +20,12 @@ import { decode, encode } from 'lob-enc';
 import localforage from 'localforage';
 import Multiaddr from 'multiaddr';
 import * as workboxPrecaching from 'workbox-precaching';
-import { MessageType, ServerPeerStatus } from '../service-worker';
+import {
+    WorkerMessageType,
+    ServerPeerStatus,
+    Message,
+    ClientMessageType,
+} from '../service-worker';
 
 // the workbox-precaching import includes a type definition for
 // <self dot __WB_MANIFEST>.
@@ -208,7 +213,7 @@ class WorkerStatus {
                 const ret = Array.prototype.push.call(this.relays, ...items);
                 getClient().then(client => {
                     client?.postMessage({
-                        type: MessageType.LOADED_RELAYS,
+                        type: WorkerMessageType.LOADED_RELAYS,
                         relays: this.relays,
                     });
                 });
@@ -225,7 +230,7 @@ class WorkerStatus {
         this._serverPeer = status;
         getClient().then(client => {
             client?.postMessage({
-                type: MessageType.SERVER_PEER_STATUS,
+                type: WorkerMessageType.SERVER_PEER_STATUS,
                 status,
             });
         });
@@ -234,11 +239,11 @@ class WorkerStatus {
     async sendCurrent() {
         const client = await getClient();
         client?.postMessage({
-            type: MessageType.LOADED_RELAYS,
+            type: WorkerMessageType.LOADED_RELAYS,
             relays: this.relays,
         });
         client?.postMessage({
-            type: MessageType.SERVER_PEER_STATUS,
+            type: WorkerMessageType.SERVER_PEER_STATUS,
             status: this.serverPeer,
         });
     }
@@ -706,10 +711,23 @@ self.addEventListener('fetch', function (event) {
 self.addEventListener('online', () => console.log('<<<<online'));
 self.addEventListener('offline', () => console.log('<<<<offline'));
 
-self.addEventListener('message', async function (evt) {
-    console.log('postMessage received', evt);
+const messageHandlers: Record<
+    ClientMessageType,
+    (msg: Message<ClientMessageType>) => void
+> = {
+    REQUEST_STATUS: () => self.status.sendCurrent(),
+    OPENED: () => localforage.setItem('started', { started: true }),
+};
 
-    localforage.setItem('started', { started: true });
+self.addEventListener('message', (e: ExtendableMessageEvent) => {
+    console.log('postMessage received', e);
+
+    const msg = e.data as Message<ClientMessageType>;
+    if (!ClientMessageType[msg.type]) {
+        console.warn('Ignoring client message with unknown type: ' + msg.type);
+        return;
+    }
+    messageHandlers[msg.type](msg);
 });
 
 self.addEventListener('install', _event => {

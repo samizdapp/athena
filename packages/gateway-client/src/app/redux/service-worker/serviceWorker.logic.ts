@@ -1,8 +1,10 @@
 import { register } from '@athena/shared/service-worker';
+
 import {
+    ClientMessageType,
     Message,
-    MessageType,
     ServerPeerStatus,
+    WorkerMessageType,
 } from '../../../service-worker';
 import { AppDispatch } from '../store';
 import {
@@ -18,13 +20,13 @@ export class ServiceWorkerLogic {
     private worker: ServiceWorker | null = null;
 
     private messageHandlers: Record<
-        MessageType,
-        (msg: Message, dispatch: AppDispatch) => void
+        WorkerMessageType,
+        (msg: Message<WorkerMessageType>, dispatch: AppDispatch) => void
     > = {
-        SERVER_PEER_STATUS: (msg: Message, dispatch: AppDispatch) => {
+        SERVER_PEER_STATUS: (msg, dispatch) => {
             dispatch(setServerPeerStatus(msg.status as ServerPeerStatus));
         },
-        LOADED_RELAYS: (msg: Message, dispatch: AppDispatch) => {
+        LOADED_RELAYS: (msg, dispatch) => {
             dispatch(setRelayAddresses(msg.relays as string[]));
         },
     };
@@ -40,12 +42,16 @@ export class ServiceWorkerLogic {
         );
     }
 
-    private handleMessage(e: MessageEvent<Message>, dispatch: AppDispatch) {
+    private handleMessage(
+        e: MessageEvent<Message<WorkerMessageType>>,
+        dispatch: AppDispatch
+    ) {
         const msg = e.data;
-        if (!MessageType[msg.type]) {
+        if (!WorkerMessageType[msg.type]) {
             console.warn(
                 'Ignoring service worker message with unknown type: ' + msg.type
             );
+            return;
         }
         this.messageHandlers[msg.type](msg, dispatch);
     }
@@ -102,6 +108,12 @@ export class ServiceWorkerLogic {
         // attach event listeners
         this.worker.addEventListener('statechange', () => {
             this.updateStatus(dispatch);
+        });
+
+        // request a status update (this may be an existing worker that won't
+        // otherwise send us its status)
+        this.worker.postMessage({
+            type: ClientMessageType.REQUEST_STATUS,
         });
     }
 }

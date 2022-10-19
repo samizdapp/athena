@@ -4,11 +4,16 @@ export enum ServerPeerStatus {
     CONNECTED = 'CONNECTED',
 }
 
-export enum MessageType {
+export enum WorkerMessageType {
     SERVER_PEER_STATUS = 'SERVER_PEER_STATUS',
     LOADED_RELAYS = 'LOADED_RELAYS',
 }
 
-export type Message = {
-    type: MessageType;
+export enum ClientMessageType {
+    REQUEST_STATUS = 'REQUEST_STATUS',
+    OPENED = 'OPENED',
+}
+
+export type Message<T extends WorkerMessageType | ClientMessageType> = {
+    type: T;
 } & Record<string, unknown>;

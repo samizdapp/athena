@@ -1,7 +1,8 @@
 export enum ServerPeerStatus {
     BOOTSTRAPPED = 'BOOTSTRAPPED',
-    STARTED = 'STARTED',
+    CONNECTING = 'CONNECTING',
     CONNECTED = 'CONNECTED',
+    OFFLINE = 'OFFLINE',
 }
 
 export enum WorkerMessageType {

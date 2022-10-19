@@ -137,6 +137,9 @@ self.Buffer = Buffer;
 
 self._fetch = fetch;
 
+const waitFor = async (t: number): Promise<void> =>
+    new Promise(r => setTimeout(r, t));
+
 type StreamMaker = (protocol: string) => Promise<Stream>;
 
 async function* streamFactoryGenerator(): AsyncGenerator<
@@ -145,10 +148,6 @@ async function* streamFactoryGenerator(): AsyncGenerator<
     string | undefined
 > {
     let locked = false;
-
-    async function waitFor(t: number): Promise<void> {
-        return new Promise(r => setTimeout(r, t));
-    }
 
     const makeStream: StreamMaker = async function (protocol) {
         // console.log('get protocol stream', protocol)
@@ -176,9 +175,30 @@ async function* streamFactoryGenerator(): AsyncGenerator<
                     Math.floor((Date.now() - start) * 1.5)
                 );
                 retryTimeout = 0;
+                // if we were NOT previously connected
+                if (self.status.serverPeer !== ServerPeerStatus.CONNECTED) {
+                    // we are now
+                    self.status.serverPeer = ServerPeerStatus.CONNECTED;
+                }
                 // we have a stream, we can quit now
                 // console.log('got stream', protocol, streamOrNull)
                 break;
+            } // else, we were not able to successfully dial
+
+            // this is a connection error, if we were previously connected
+            if (self.status.serverPeer === ServerPeerStatus.CONNECTED) {
+                // we aren't anymore
+                self.status.serverPeer = ServerPeerStatus.CONNECTING;
+            }
+
+            // if our retry timeout reaches 5 seconds, then we'll have
+            // been retrying for 15 seconds (triangle number of 5).
+            // By this point, we're probably offline.
+            if (
+                self.status.serverPeer !== ServerPeerStatus.OFFLINE &&
+                retryTimeout >= 5000
+            ) {
+                self.status.serverPeer = ServerPeerStatus.OFFLINE;
             }
 
             // wait before retrying
@@ -670,7 +690,13 @@ async function main() {
     console.debug('started libp2p');
 
     // update status
-    self.status.serverPeer = ServerPeerStatus.STARTED;
+    self.status.serverPeer = ServerPeerStatus.CONNECTING;
+
+    Promise.race([connectPromise, waitFor(15000)]).then(() => {
+        if (self.status.serverPeer === ServerPeerStatus.CONNECTING) {
+            self.status.serverPeer = ServerPeerStatus.OFFLINE;
+        }
+    });
 
     self.libp2p = self.node = node;
     return connectPromise;

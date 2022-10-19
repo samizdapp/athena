@@ -28,6 +28,7 @@ const isLocalhost = Boolean(
 type Config = {
     onSuccess?: (registration: ServiceWorkerRegistration) => void;
     onUpdate?: (registration: ServiceWorkerRegistration) => void;
+    onExisting?: (registration: ServiceWorkerRegistration) => void;
 };
 
 export function register(config?: Config) {
@@ -67,6 +68,15 @@ function registerValidSW(swUrl: string, config?: Config) {
             scope: '/',
         })
         .then(registration => {
+            // if this worker is already active and in control
+            if (
+                registration.active &&
+                registration.active ===
+                    window.navigator.serviceWorker.controller
+            ) {
+                // then resolve with our existing worker
+                config?.onExisting?.(registration);
+            }
             registration.onupdatefound = () => {
                 const installingWorker = registration.installing;
                 if (installingWorker == null) {

@@ -77,6 +77,8 @@ export class ServiceWorkerLogic {
             resolve => {
                 register({
                     onSuccess: resolve,
+                    onUpdate: resolve,
+                    onExisting: resolve,
                 });
             }
         );

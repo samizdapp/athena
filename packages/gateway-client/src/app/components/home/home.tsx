@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import styled from 'styled-components';
 
-import { ClientMessageType } from '../../../service-worker';
+import { ClientMessageType, ServerPeerStatus } from '../../../service-worker';
 import { selectWorkerStatus } from '../../redux/service-worker/serviceWorker.slice';
 import {
     getSupportedPlatform,
@@ -15,24 +15,32 @@ import {
 } from '../../support';
 import ErasablePen from '../loading/erasable-pen';
 import AnimatedCheck from './animated-check';
+import AnimatedConnection from './animated-connection';
 import Status from './status';
 
 const StyledHome = styled.div`
     .status-graphic {
-        .loading,
-        svg {
+        text-align: center;
+
+        .status-icon > * {
             margin-bottom: 20px;
             width: 80%;
         }
 
-        .loading {
+        .erasable-pen .loading {
             margin-top: -100px;
             height: 200px;
         }
 
-        svg {
+        .animated-check svg {
             margin-top: 0;
             height: 100px;
+        }
+
+        .animated-connection svg {
+            margin-top: -26px;
+            margin-bottom: -26px;
+            height: 150px;
         }
     }
 
@@ -44,6 +52,24 @@ const StyledHome = styled.div`
         }
     }
 `;
+
+const ErasablePenIcon = () => (
+    <div className="status-icon erasable-pen">
+        <ErasablePen primary="#086be4" secondary="#bfbfbf" />
+    </div>
+);
+
+const AnimatedCheckIcon = () => (
+    <div className="status-icon animated-check">
+        <AnimatedCheck />
+    </div>
+);
+
+const AnimatedConnectionIcon = () => (
+    <div className="status-icon animated-connection">
+        <AnimatedConnection />
+    </div>
+);
 
 const useReload = () => {
     const [_, reload] = useState(0);
@@ -58,13 +84,20 @@ export interface HomeProps {}
 export function Home(_props: HomeProps) {
     const theme = useTheme();
     const [recommended, setRecommended] = useState('');
-    const { isControlling, status: workerStatus } =
-        useSelector(selectWorkerStatus);
+    const {
+        isControlling,
+        status: workerStatus,
+        serverPeerStatus,
+    } = useSelector(selectWorkerStatus);
     const secureContext = window.isSecureContext;
     const workerActive = workerStatus === 'activated' && isControlling;
+    const pwaOpen = isPwa();
+
     const [statusMessage, setStatusMessage] =
         useState<React.ReactNode>('Loading...');
-    const pwaOpen = isPwa();
+    const [statusIcon, setStatusIcon] = useState<React.ReactNode>(
+        <ErasablePenIcon />
+    );
 
     const reload = useReload();
 
@@ -107,6 +140,7 @@ export function Home(_props: HomeProps) {
                     set?)
                 </>
             );
+            setStatusIcon(<ErasablePenIcon />);
             return;
         } // else, we have a secure context
 
@@ -114,6 +148,7 @@ export function Home(_props: HomeProps) {
         if (!workerActive) {
             // then keep waiting
             setStatusMessage('Installing...');
+            setStatusIcon(<ErasablePenIcon />);
             return;
         } // else, we are now activated and are being controlled by the worker
 
@@ -132,6 +167,7 @@ export function Home(_props: HomeProps) {
                     to continue.
                 </>
             );
+            setStatusIcon(<AnimatedCheckIcon />);
             return;
         } // else, we are a PWA being controlled by an active worker
 
@@ -140,9 +176,26 @@ export function Home(_props: HomeProps) {
             type: ClientMessageType.OPENED,
         });
 
-        // we've accomplished all we needed, time to go
-        window.location.href = '/timeline/fediverse';
-    }, [pwaOpen, secureContext, workerActive]);
+        // if our worker doesn't have a connection yet
+        if (serverPeerStatus === ServerPeerStatus.CONNECTING) {
+            setStatusMessage('Connecting to your box...');
+            setStatusIcon(<ErasablePenIcon />);
+            return;
+        }
+        // if our worker is offline
+        if (serverPeerStatus === ServerPeerStatus.OFFLINE) {
+            setStatusMessage('Unable to connect to your box. Are you offline?');
+            setStatusIcon(<AnimatedConnectionIcon />);
+            return;
+        }
+        // if we're connected
+        if (serverPeerStatus === ServerPeerStatus.CONNECTED) {
+            // we've accomplished all we needed, time to go
+            setStatusMessage('Redirecting to SamizdApp...');
+            setStatusIcon(<AnimatedCheckIcon />);
+            window.location.href = '/timeline/fediverse';
+        }
+    }, [pwaOpen, secureContext, serverPeerStatus, workerActive]);
 
     return (
         <StyledHome>
@@ -168,14 +221,7 @@ export function Home(_props: HomeProps) {
                             <h1>Please open this page in {recommended}</h1>
                         ) : (
                             <div className="status-graphic">
-                                {!workerActive ? (
-                                    <ErasablePen
-                                        primary="#086be4"
-                                        secondary="#bfbfbf"
-                                    />
-                                ) : (
-                                    <AnimatedCheck />
-                                )}
+                                {statusIcon}
 
                                 <p className="status-message">
                                     {statusMessage}

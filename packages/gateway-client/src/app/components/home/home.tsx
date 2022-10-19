@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import styled from 'styled-components';
 
+import { ClientMessageType } from '../../../service-worker';
 import { selectWorkerStatus } from '../../redux/service-worker/serviceWorker.slice';
 import {
     getSupportedPlatform,
@@ -94,7 +95,17 @@ export function Home(_props: HomeProps) {
         if (!secureContext) {
             // then there is no point in even trying
             setStatusMessage(
-                'Missing secure context. (Is insecure origin flag set?)'
+                <>
+                    Missing secure context. (Is the{' '}
+                    <a
+                        href="https://samizdapp.github.io/docs/getting-started/setup-client"
+                        target="_blank"
+                        rel="noreferrer"
+                    >
+                        insecure origin flag
+                    </a>{' '}
+                    set?)
+                </>
             );
             return;
         } // else, we have a secure context
@@ -126,10 +137,11 @@ export function Home(_props: HomeProps) {
 
         // let the worker know we're up and running
         window.navigator.serviceWorker.controller?.postMessage({
-            type: 'START',
+            type: ClientMessageType.OPENED,
         });
+
         // we've accomplished all we needed, time to go
-        window.location.href = '/';
+        window.location.href = '/timeline/fediverse';
     }, [pwaOpen, secureContext, workerActive]);
 
     return (

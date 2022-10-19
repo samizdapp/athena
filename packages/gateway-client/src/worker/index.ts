@@ -144,7 +144,6 @@ async function* streamFactoryGenerator(): AsyncGenerator<
     void,
     string | undefined
 > {
-    let timeout = self.DIAL_TIMEOUT;
     let locked = false;
 
     async function waitFor(t: number): Promise<void> {
@@ -153,44 +152,72 @@ async function* streamFactoryGenerator(): AsyncGenerator<
 
     const makeStream: StreamMaker = async function (protocol) {
         // console.log('get protocol stream', protocol)
+        let dialTimeout = self.DIAL_TIMEOUT;
+        let retryTimeout = 0;
         let streamOrNull = null;
-        do {
+        while (!streamOrNull) {
+            // attempt to dial our peer, track the time it takes
             const start = Date.now();
             streamOrNull = await Promise.race([
                 self.node.dialProtocol(self.serverPeer, protocol).catch(_ => {
                     // console.log('dialProtocol error, retry', Date.now() - start);
                     return null;
                 }),
-                waitFor(timeout),
+                waitFor(dialTimeout),
             ]);
+
+            // if we successfully, dialed, we have a stream
             if (streamOrNull) {
-                timeout = Math.max(
+                // reset our timeouts
+                // use the time of the dial to calculate an
+                // appropriate dial timeout
+                dialTimeout = Math.max(
                     2000,
                     Math.floor((Date.now() - start) * 1.5)
                 );
+                retryTimeout = 0;
+                // we have a stream, we can quit now
                 // console.log('got stream', protocol, streamOrNull)
-            } else {
-                timeout *= 4;
-                console.log('timeout, reset libp2p', timeout);
-                await self.node.stop();
-                await self.node.start();
-                const relays =
-                    (await localforage
-                        .getItem<Multiaddr.MultiaddrInput[]>('libp2p.relays')
-                        .then(str_array => {
-                            return str_array?.map(
-                                addr =>
-                                    Multiaddr.multiaddr(
-                                        addr
-                                    ) as unknown as MultiaddrType
-                            );
-                        })) ?? [];
-                await self.node.peerStore.addressBook.add(
-                    self.serverPeer,
-                    relays
-                );
+                break;
             }
-        } while (!streamOrNull);
+
+            // wait before retrying
+            console.log('Dial timeout, waiting to reset...', {
+                dialTimeout,
+                retryTimeout,
+            });
+            await waitFor(retryTimeout);
+
+            // if our retry timeout reaches 30 seconds, then we'll have
+            // been retrying for 5 minutes 45 seconds
+            // (triangle number of 30)
+            // time to reset
+            if (retryTimeout >= 30000) {
+                retryTimeout = 0;
+            }
+            // increase our retry timeout
+            retryTimeout += 1000;
+            // increase our dial timeout, but never make it higher than
+            // 5 minutes
+            dialTimeout = Math.min(1000 * 60 * 5, dialTimeout * 4);
+
+            // now that we've waiting, we can retry
+            console.log('Resetting libp2p...');
+            await self.node.stop();
+            await self.node.start();
+            const relays =
+                (await localforage
+                    .getItem<Multiaddr.MultiaddrInput[]>('libp2p.relays')
+                    .then(str_array => {
+                        return str_array?.map(
+                            addr =>
+                                Multiaddr.multiaddr(
+                                    addr
+                                ) as unknown as MultiaddrType
+                        );
+                    })) ?? [];
+            await self.node.peerStore.addressBook.add(self.serverPeer, relays);
+        }
         locked = false;
         return streamOrNull;
     };

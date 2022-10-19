@@ -139,8 +139,9 @@ export function Home(_props: HomeProps) {
         window.navigator.serviceWorker.controller?.postMessage({
             type: ClientMessageType.OPENED,
         });
+
         // we've accomplished all we needed, time to go
-        window.location.href = '/';
+        window.location.href = '/timeline/fediverse';
     }, [pwaOpen, secureContext, workerActive]);
 
     return (

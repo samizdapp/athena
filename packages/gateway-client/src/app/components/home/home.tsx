@@ -19,6 +19,14 @@ import AnimatedConnection from './animated-connection';
 import Status from './status';
 
 const StyledHome = styled.div`
+    overflow: hidden;
+    height: 100%;
+
+    .mui-box {
+        overflow: hidden;
+        height: 100%;
+    }
+
     .status-graphic {
         text-align: center;
 
@@ -200,6 +208,7 @@ export function Home(_props: HomeProps) {
     return (
         <StyledHome>
             <Box
+                className="mui-box"
                 sx={{
                     width: '100%',
                     backgroundColor: theme.palette.grey[200],

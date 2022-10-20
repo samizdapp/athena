@@ -4,7 +4,9 @@ import styled from 'styled-components';
 import Home from './components/home/home';
 
 const StyledApp = styled.div`
-    // Your style here
+    overflow: hidden;
+    position: relative;
+    height: 100%;
 `;
 
 export function App() {

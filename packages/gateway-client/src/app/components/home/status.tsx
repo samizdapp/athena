@@ -19,9 +19,9 @@ const StyledDrawer = styled(MuiDrawer)`
     transition: all 0.3s ease;
     bottom: 20px;
     right: 20px;
-    width: 33%;
-    min-width: 600px;
-    height: 160px;
+    width: calc(100% - 40px);
+    height: 170px;
+    max-width: 600px;
 
     .MuiDrawer-paper {
         background: none;
@@ -48,22 +48,21 @@ const StyledDrawer = styled(MuiDrawer)`
 
     .status {
         overflow: auto;
+        overflow-x: hidden;
         padding-right: 5px;
 
         .properties {
             display: flex;
+            flex-wrap: wrap;
 
             .property {
                 margin-bottom: 10px;
-
-                &:last-child {
-                    margin-bottom: 0;
-                }
             }
 
             dl {
                 flex: 1;
                 margin: 0;
+                min-width: 280px;
             }
 
             dt {
@@ -112,8 +111,9 @@ const StyledDrawer = styled(MuiDrawer)`
     }
 
     &.open {
-        width: 55%;
-        height: 500px;
+        height: calc(100% - 40px);
+        max-height: 500px;
+        max-width: 800px;
 
         .status {
             .relay {

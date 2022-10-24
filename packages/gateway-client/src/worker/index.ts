@@ -17,7 +17,7 @@ import { LevelDatastore } from 'datastore-level';
 import { pipe } from 'it-pipe';
 import { createLibp2p, Libp2p } from 'libp2p';
 import { decode, encode } from 'lob-enc';
-import localforage from 'localforage';
+import localforage, { iterate } from 'localforage';
 import Multiaddr from 'multiaddr';
 import * as workboxPrecaching from 'workbox-precaching';
 import {
@@ -36,6 +36,9 @@ const _ = workboxPrecaching;
 // slightly modified version of
 // https://github.com/libp2p/js-libp2p-utils/blob/66e604cb0bfcf686eb68e44f278d62e3464c827c/src/address-sort.ts
 // the goal here is to couple prioritizing relays with parallelism
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+//@ts-ignore
+self.addrSort = publicRelayAddressesFirst;
 function publicRelayAddressesFirst(a: Address, b: Address): -1 | 0 | 1 {
     const isAPrivate = isPrivate(a.multiaddr);
     const isBPrivate = isPrivate(b.multiaddr);
@@ -98,6 +101,7 @@ declare const self: {
     getStream: typeof getStream;
     localforage: typeof localforage;
     streamFactory: AsyncGenerator<StreamMaker, void, string | undefined>;
+    messageHandlers: MessageHandlers;
     // window: Window;
     // document: Document;
 } & ServiceWorkerGlobalScope;
@@ -141,6 +145,14 @@ const waitFor = async (t: number): Promise<void> =>
     new Promise(r => setTimeout(r, t));
 
 type StreamMaker = (protocol: string) => Promise<Stream>;
+
+type MessageHandlers = Record<
+    ClientMessageType,
+    (
+        msg: Message<ClientMessageType>,
+        port: readonly MessagePort[] | undefined
+    ) => void
+>;
 
 async function* streamFactoryGenerator(): AsyncGenerator<
     StreamMaker,
@@ -494,56 +506,52 @@ function patchFetchArgs(_reqObj: Request, _reqInit: RequestInit = {}) {
 }
 
 async function openRelayStream(cb: () => unknown) {
-    while (true) {
-        const stream = await getStream('/samizdapp-relay').catch(e => {
-            console.error('error getting stream', e);
-        });
-        if (!stream) {
-            return;
-        }
-        // console.log('got relay stream');
-        await pipe(stream.source, async function (source) {
-            for await (const msg of source) {
-                const str_relay = Buffer.from(msg.subarray()).toString();
-                const multiaddr = Multiaddr.multiaddr(
-                    str_relay
-                ) as unknown as MultiaddrType;
-                console.log('got relay multiaddr', multiaddr.toString());
-                await localforage
-                    .getItem<string[]>('libp2p.relays')
-                    .then(str_array => {
-                        const dedup = Array.from(
-                            new Set([str_relay, ...(str_array || [])])
-                        );
-
-                        return localforage.setItem('libp2p.relays', dedup);
-                    });
-                await self.node.peerStore.addressBook
-                    .add(self.serverPeer, [multiaddr])
-                    .catch(e => {
-                        console.warn(
-                            'error adding multiaddr',
-                            multiaddr.toString()
-                        );
-                        console.error(e);
-                    });
-
-                // update status
-                self.status.relays.push(str_relay);
-
-                cb();
-            }
-        }).catch(e => {
-            console.log('error in pipe', e);
-        });
-        // we wan't fetch streams to have priority, so let's ease up this loop
-        await new Promise(r => setTimeout(r, 20000));
+    const stream = await getStream('/samizdapp-relay').catch(e => {
+        console.error('error getting stream', e);
+    });
+    if (!stream) {
+        return;
     }
+    // console.log('got relay stream');
+    await pipe(stream.source, async function (source) {
+        for await (const msg of source) {
+            const str_relay = Buffer.from(msg.subarray()).toString();
+            const multiaddr = Multiaddr.multiaddr(
+                str_relay
+            ) as unknown as MultiaddrType;
+            console.log('got relay multiaddr', multiaddr.toString());
+            await localforage
+                .getItem<string[]>('libp2p.relays')
+                .then(str_array => {
+                    const dedup = Array.from(
+                        new Set([str_relay, ...(str_array || [])])
+                    );
+
+                    return localforage.setItem('libp2p.relays', dedup);
+                });
+            await self.node.peerStore.addressBook
+                .add(self.serverPeer, [multiaddr])
+                .catch(e => {
+                    console.warn(
+                        'error adding multiaddr',
+                        multiaddr.toString()
+                    );
+                    console.error(e);
+                });
+
+            // update status
+            self.status.relays.push(str_relay);
+
+            cb();
+        }
+    }).catch(e => {
+        console.log('error in pipe', e);
+    });
+    // we wan't fetch streams to have priority, so let's ease up this loop
+    await new Promise(r => setTimeout(r, 20000));
 }
 
-async function main() {
-    // self.window.localStorage.debug = (await localforage.getItem('debug')) || ""
-
+async function getBootstrapList() {
     const bootstrapaddr =
         (await localforage.getItem<string>('libp2p.bootstrap')) ||
         (await fetch('/pwa/assets/libp2p.bootstrap')
@@ -560,17 +568,24 @@ async function main() {
         [];
     console.debug('got relay addrs', relay_addrs);
 
-    // update status
-    self.status.serverPeer = ServerPeerStatus.BOOTSTRAPPED;
-    self.status.relays.push(...relay_addrs);
-
     const { hostname } = new URL(self.origin);
     const [_, _proto, _ip, ...rest] = bootstrapaddr?.split('/') ?? [];
     const hostaddr = `/dns4/${hostname}/${rest.join('/')}`;
-    const bootstraplist = [bootstrapaddr ?? '', hostaddr, ...relay_addrs];
+    return [bootstrapaddr ?? '', hostaddr, ...relay_addrs];
+}
+
+async function main() {
+    // self.window.localStorage.debug = (await localforage.getItem('debug')) || ""
+
+    const bootstraplist = await getBootstrapList();
+    // update status
+    self.status.serverPeer = ServerPeerStatus.BOOTSTRAPPED;
+
+    self.status.relays.push(...bootstraplist.slice(2));
+
     const datastore = new LevelDatastore('./libp2p');
     await datastore.open(); // level database must be ready before node boot
-    const serverID = bootstrapaddr?.split('/').pop();
+    const serverID = bootstraplist[0].split('/').pop();
     const node = await createLibp2p({
         datastore,
         transports: [
@@ -589,6 +604,7 @@ async function main() {
             autoDial: true, // Auto connect to discovered peers (limited by ConnectionManager minConnections)
             minConnections: 3,
             maxDialsPerPeer: 10,
+            maxParallelDials: 10,
             addressSorter: publicRelayAddressesFirst,
             // The `tag` property will be searched when creating the instance of your Peer Discovery service.
             // The associated object, will be passed to the service when it is instantiated.
@@ -617,7 +633,6 @@ async function main() {
     });
 
     // Listen for new connections to peers
-    let serverConnected = false;
     const connectPromise = new Promise<void>((resolve, reject) => {
         try {
             node.connectionManager.addEventListener(
@@ -625,14 +640,10 @@ async function main() {
                 async evt => {
                     const connection = evt.detail;
                     const str_id = connection.remotePeer.toString();
-                    console.log(
-                        `Connected to ${str_id}, check ${serverID}, serverConnected ${serverConnected}`
-                    );
-                    if (str_id === serverID && !serverConnected) {
-                        serverConnected = true;
-                        self.serverPeer = connection.remotePeer;
-
+                    console.log(`Connected to ${str_id}, check ${serverID}`);
+                    if (str_id === serverID) {
                         // update status
+                        self.serverPeer = connection.remotePeer;
                         self.status.serverPeer = ServerPeerStatus.CONNECTED;
 
                         openRelayStream(() => {
@@ -661,13 +672,6 @@ async function main() {
                         // of obtaining a public relay
                         resolve();
                     }
-                    // while (true) {
-                    //   await new Promise(r => setTimeout(r, 5000))
-                    //   await node.ping(connection.remotePeer).catch(async e => {
-                    //     await node.stop()
-                    //     await node.start()
-                    //   })
-                    // }
                 }
             );
         } catch (e) {
@@ -764,10 +768,7 @@ self.addEventListener('fetch', function (event) {
 self.addEventListener('online', () => console.log('<<<<online'));
 self.addEventListener('offline', () => console.log('<<<<offline'));
 
-const messageHandlers: Record<
-    ClientMessageType,
-    (msg: Message<ClientMessageType>) => void
-> = {
+self.messageHandlers = {
     REQUEST_STATUS: () => self.status.sendCurrent(),
     OPENED: () => localforage.setItem('started', { started: true }),
 };
@@ -780,7 +781,7 @@ self.addEventListener('message', (e: ExtendableMessageEvent) => {
         console.warn('Ignoring client message with unknown type: ' + msg.type);
         return;
     }
-    messageHandlers[msg.type](msg);
+    self.messageHandlers[msg.type](msg, e.ports);
 });
 
 self.addEventListener('install', _event => {
@@ -840,7 +841,19 @@ self.fetch = async (...args) => {
         return self.stashedFetch(...args);
     }
     console.log('fetch waiting for deferral', args[0]);
+
+    // Safari iOS needs a kick in the pants when PWA is installed
+    // very hard to debug what's going wrong because impossible
+    // to attach devtools to the service worker of an installed PWA
+    // but this seems to fix it
+    const whip = setTimeout(async () => {
+        const bootstraplist = await getBootstrapList();
+        for (const ma of bootstraplist) {
+            await self.libp2p.dial(ma as unknown as PeerId).catch(e => null);
+        }
+    }, 100);
     await self.deferral;
+    clearTimeout(whip);
     console.log('fetch deferred', args[0]);
     return self.fetch(...args);
 };

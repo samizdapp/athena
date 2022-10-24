@@ -768,23 +768,6 @@ self.addEventListener('fetch', function (event) {
 self.addEventListener('online', () => console.log('<<<<online'));
 self.addEventListener('offline', () => console.log('<<<<offline'));
 
-const readNextLob = async (port: MessagePort): Promise<EnhancedBuffer> =>
-    new Promise(
-        r =>
-            (port.onmessage = ({ data, ...json }) => {
-                console.log('ws port got data', data, json);
-                r(encode(json, Buffer.from(data)));
-            })
-    );
-
-const writeNextLob = (port: MessagePort, lob: Buffer) => {
-    const { json, body } = decode(lob);
-    console.log('got lob', json, body.toString());
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    //@ts-ignore
-    port.postMessage(body, json);
-};
-
 self.messageHandlers = {
     REQUEST_STATUS: () => self.status.sendCurrent(),
     OPENED: () => localforage.setItem('started', { started: true }),

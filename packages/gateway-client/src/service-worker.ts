@@ -15,9 +15,6 @@ export enum ClientMessageType {
     OPENED = 'OPENED',
 }
 
-export enum WebSocketMe
 export type Message<T extends WorkerMessageType | ClientMessageType> = {
     type: T;
-    url: string | undefined;
-    protocols: string | undefined;
 } & Record<string, unknown>;

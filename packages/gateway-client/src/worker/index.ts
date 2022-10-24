@@ -12,12 +12,13 @@ import { isPrivate } from '@libp2p/utils/multiaddr/is-private';
 import { WebSockets } from '@libp2p/websockets';
 import { all as filter } from '@libp2p/websockets/filters';
 import { Multiaddr as MultiaddrType } from '@multiformats/multiaddr';
+import { AsyncThunkPayloadCreatorReturnValue } from '@reduxjs/toolkit';
 import { Buffer } from 'buffer/';
 import { LevelDatastore } from 'datastore-level';
 import { pipe } from 'it-pipe';
 import { createLibp2p, Libp2p } from 'libp2p';
 import { decode, encode } from 'lob-enc';
-import localforage from 'localforage';
+import localforage, { iterate } from 'localforage';
 import Multiaddr from 'multiaddr';
 import * as workboxPrecaching from 'workbox-precaching';
 import {
@@ -25,6 +26,7 @@ import {
     ServerPeerStatus,
     Message,
     ClientMessageType,
+    WebSocketMessageType,
 } from '../service-worker';
 
 // the workbox-precaching import includes a type definition for
@@ -101,6 +103,7 @@ declare const self: {
     getStream: typeof getStream;
     localforage: typeof localforage;
     streamFactory: AsyncGenerator<StreamMaker, void, string | undefined>;
+    messageHandlers: MessageHandlers;
     // window: Window;
     // document: Document;
 } & ServiceWorkerGlobalScope;
@@ -144,6 +147,14 @@ const waitFor = async (t: number): Promise<void> =>
     new Promise(r => setTimeout(r, t));
 
 type StreamMaker = (protocol: string) => Promise<Stream>;
+
+type MessageHandlers = Record<
+    ClientMessageType,
+    (
+        msg: Message<ClientMessageType>,
+        port: readonly MessagePort[] | undefined
+    ) => void
+>;
 
 async function* streamFactoryGenerator(): AsyncGenerator<
     StreamMaker,
@@ -418,12 +429,18 @@ async function p2Fetch(
                         if (!resp.json.res) {
                             return reject(resp.json.error);
                         }
-                        resp.json.res.headers = new Headers(
-                            resp.json.res.headers
+                        console.log(
+                            'content-type',
+                            //@ts-ignore
+                            resp.json.res.headers['content-type']
+                        );
+                        const resp2 = await maybeInjectWSHandler(resp);
+                        resp2.json.res.headers = new Headers(
+                            resp2.json.res.headers
                         );
                         // alert("complete");
                         done = true;
-                        resolve(new Response(resp.body, resp.json.res));
+                        resolve(new Response(resp2.body, resp2.json.res));
                         stream?.close();
                     } else {
                         parts.push(buf);
@@ -438,6 +455,67 @@ async function p2Fetch(
         }
     });
 }
+
+//@ts-ignore
+const maybeInjectWSHandler = async resp => {
+    if (resp.json.res.headers['content-type'].indexOf('text/html') === 0) {
+        console.log('found html');
+        const body = resp.body.toString();
+        if (body.indexOf('<head>') > -1) {
+            console.log('inject script');
+            const [top, bottom] = body.split('<head>');
+            const parts = [
+                top,
+                '<head>',
+                `<script>class SWebSocket {
+    _url;
+    _id;
+    _channel;
+    _buffer = [];
+    _onmessage = evt => console.log('unimplemented', evt);
+
+    set onmessage(handler) {
+        this._onmessage = handler;
+    }
+
+    constructor(url, protocols) {
+        console.log('websocket', url, protocols);
+        this._channel = new MessageChannel();
+        navigator.serviceWorker.controller.postMessage(
+            { type: 'WEBSOCKET', url, protocols },
+            [this._channel.port2]
+        );
+        this._channel.port1.onmessage = event => {
+            console.log('onmessage, ', event);
+            switch (event.data.type) {
+                case 'MESSAGE':
+                    this._onmessage(
+                        new MessageEvent('message', { data: event.data })
+                    );
+                    break;
+                case 'STATE':
+                default:
+                    console.warn('unknown type', event);
+            }
+        };
+    }
+
+    send(data) {
+        console.log('send', data);
+        this._channel.port1.postMessage(data);
+    }
+}
+
+window.WebSocket = SWebSocket;</script>`,
+                bottom,
+            ];
+            console.log('parts', parts);
+            resp.body = Buffer.from(parts.join(''));
+        }
+    }
+
+    return resp;
+};
 
 const getHost = () => {
     try {
@@ -759,12 +837,56 @@ self.addEventListener('fetch', function (event) {
 self.addEventListener('online', () => console.log('<<<<online'));
 self.addEventListener('offline', () => console.log('<<<<offline'));
 
-const messageHandlers: Record<
-    ClientMessageType,
-    (msg: Message<ClientMessageType>) => void
-> = {
+const readNextLob = async (port: MessagePort): Promise<EnhancedBuffer> =>
+    new Promise(
+        r =>
+            (port.onmessage = ({ data, ...json }) => {
+                console.log('ws port got data', data, json);
+                r(encode(json, Buffer.from(data)));
+            })
+    );
+
+const writeNextLob = (port: MessagePort, lob: Buffer) => {
+    const { json, body } = decode(lob);
+    console.log('got lob', json, body.toString());
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    //@ts-ignore
+    port.postMessage(body, json);
+};
+
+async function* makePortReadStream(
+    port: MessagePort,
+    url: string,
+    protocols: string
+): AsyncGenerator<EnhancedBuffer> {
+    yield encode(
+        { type: WebSocketMessageType.URL, url, protocols },
+        Buffer.from([])
+    );
+    while (true) {
+        yield readNextLob(port);
+    }
+}
+
+self.messageHandlers = {
     REQUEST_STATUS: () => self.status.sendCurrent(),
     OPENED: () => localforage.setItem('started', { started: true }),
+    WEBSOCKET: async (msg, ports = []) => {
+        const portReadStream = makePortReadStream(
+            ports[0],
+            msg?.url || '',
+            msg?.protocols || ''
+        );
+
+        const stream = await getStream('/samizdapp-websocket');
+
+        pipe(stream.source, async source => {
+            for await (const msg of source) {
+                writeNextLob(ports[0], Buffer.from(msg.subarray()));
+            }
+        });
+        pipe(portReadStream, stream.sink);
+    },
 };
 
 self.addEventListener('message', (e: ExtendableMessageEvent) => {
@@ -775,7 +897,7 @@ self.addEventListener('message', (e: ExtendableMessageEvent) => {
         console.warn('Ignoring client message with unknown type: ' + msg.type);
         return;
     }
-    messageHandlers[msg.type](msg);
+    self.messageHandlers[msg.type](msg, e.ports);
 });
 
 self.addEventListener('install', _event => {

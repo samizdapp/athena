@@ -769,7 +769,7 @@ self.addEventListener('fetch', function (event) {
 self.addEventListener('online', () => console.log('<<<<online'));
 self.addEventListener('offline', () => console.log('<<<<offline'));
 
-self.messageHandlers = {
+const messageHandlers: MessageHandlers = {
     REQUEST_STATUS: () => self.status.sendCurrent(),
     OPENED: () => localforage.setItem('started', { started: true }),
 };
@@ -782,7 +782,7 @@ self.addEventListener('message', (e: ExtendableMessageEvent) => {
         console.warn('Ignoring client message with unknown type: ' + msg.type);
         return;
     }
-    self.messageHandlers[msg.type](msg, e.ports);
+    messageHandlers[msg.type](msg, e.ports);
 });
 
 self.addEventListener('install', _event => {

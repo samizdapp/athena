@@ -846,14 +846,22 @@ self.fetch = async (...args) => {
     // very hard to debug what's going wrong because impossible
     // to attach devtools to the service worker of an installed PWA
     // but this seems to fix it
-    const whip = setTimeout(async () => {
-        const bootstraplist = await getBootstrapList();
-        for (const ma of bootstraplist) {
-            await self.libp2p.dial(ma as unknown as PeerId).catch(e => null);
-        }
-    }, 100);
+
+    // However, it unfortunately broke the worker on Chrome due to some sort
+    // of a race condition between libp2p being created and this loop firing,
+    // so it is being commented out for now.
+
+    // const whip = setTimeout(async () => {
+    //     const bootstraplist = await getBootstrapList();
+    //     for (const ma of bootstraplist) {
+    //         await self.libp2p.dial(ma as unknown as PeerId).catch(e => null);
+    //     }
+    // }, 100);
+
     await self.deferral;
-    clearTimeout(whip);
+
+    //clearTimeout(whip);
+    
     console.log('fetch deferred', args[0]);
     return self.fetch(...args);
 };

@@ -17,7 +17,7 @@ import { LevelDatastore } from 'datastore-level';
 import { pipe } from 'it-pipe';
 import { createLibp2p, Libp2p } from 'libp2p';
 import { decode, encode } from 'lob-enc';
-import localforage, { iterate } from 'localforage';
+import localforage from 'localforage';
 import Multiaddr from 'multiaddr';
 import * as workboxPrecaching from 'workbox-precaching';
 import {
@@ -32,6 +32,34 @@ import {
 // Import it even though we're not using any of the imports,
 // and mark the import as being used with this line:
 const _ = workboxPrecaching;
+
+// type Window = {
+//     localStorage: {
+//         debug: string;
+//     }
+// }
+
+// type Document = {}
+
+declare const self: {
+    status: WorkerStatus;
+    soapstore: LocalForage;
+    DIAL_TIMEOUT: number;
+    serverPeer: PeerId;
+    node: Libp2p;
+    libp2p: Libp2p;
+    deferral: Promise<unknown>;
+    stashedFetch: typeof fetch;
+    Buffer: typeof Buffer;
+    Multiaddr: typeof Multiaddr;
+    _fetch: typeof fetch;
+    getStream: typeof getStream;
+    localforage: typeof localforage;
+    streamFactory: AsyncGenerator<StreamMaker, void, string | undefined>;
+    messageHandlers: MessageHandlers;
+    // window: Window;
+    // document: Document;
+} & ServiceWorkerGlobalScope;
 
 // slightly modified version of
 // https://github.com/libp2p/js-libp2p-utils/blob/66e604cb0bfcf686eb68e44f278d62e3464c827c/src/address-sort.ts
@@ -78,33 +106,6 @@ function isRelay(ma: Address): boolean {
     const parts = new Set(ma.multiaddr.toString().split('/'));
     return parts.has('p2p-circuit');
 }
-// type Window = {
-//     localStorage: {
-//         debug: string;
-//     }
-// }
-
-// type Document = {}
-
-declare const self: {
-    status: WorkerStatus;
-    soapstore: LocalForage;
-    DIAL_TIMEOUT: number;
-    serverPeer: PeerId;
-    node: Libp2p;
-    libp2p: Libp2p;
-    deferral: Promise<unknown>;
-    stashedFetch: typeof fetch;
-    Buffer: typeof Buffer;
-    Multiaddr: typeof Multiaddr;
-    _fetch: typeof fetch;
-    getStream: typeof getStream;
-    localforage: typeof localforage;
-    streamFactory: AsyncGenerator<StreamMaker, void, string | undefined>;
-    messageHandlers: MessageHandlers;
-    // window: Window;
-    // document: Document;
-} & ServiceWorkerGlobalScope;
 
 self.localforage = localforage;
 
@@ -846,14 +847,22 @@ self.fetch = async (...args) => {
     // very hard to debug what's going wrong because impossible
     // to attach devtools to the service worker of an installed PWA
     // but this seems to fix it
-    const whip = setTimeout(async () => {
-        const bootstraplist = await getBootstrapList();
-        for (const ma of bootstraplist) {
-            await self.libp2p.dial(ma as unknown as PeerId).catch(e => null);
-        }
-    }, 100);
+
+    // However, it unfortunately broke the worker on Chrome due to some sort
+    // of a race condition between libp2p being created and this loop firing,
+    // so it is being commented out for now.
+
+    // const whip = setTimeout(async () => {
+    //     const bootstraplist = await getBootstrapList();
+    //     for (const ma of bootstraplist) {
+    //         await self.libp2p.dial(ma as unknown as PeerId).catch(e => null);
+    //     }
+    // }, 100);
+
     await self.deferral;
-    clearTimeout(whip);
+
+    //clearTimeout(whip);
+
     console.log('fetch deferred', args[0]);
     return self.fetch(...args);
 };

@@ -3,6 +3,7 @@
   "version": 2,
   "projects": {
     "gateway-client": "packages/gateway-client",
+    "shared-api": "packages/shared/api",
     "shared-service-worker": "packages/shared/service-worker",
     "status-service": "packages/status-service"
   }

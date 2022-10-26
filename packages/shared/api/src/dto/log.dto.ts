@@ -9,19 +9,19 @@ export enum Status {
 
 export class Create {
     @IsString()
-    service: string;
+    service!: string;
 
     @IsEnum(Status)
-    status: Status;
+    status!: Status;
 
     @IsString()
-    message: string;
+    message!: string;
 }
 
 export class Update extends PartialType(Create) {}
 
 export class Log extends Create {
-    id: string;
-    createdAt: string;
-    updatedAt: string;
+    id!: string;
+    createdAt!: string;
+    updatedAt!: string;
 }

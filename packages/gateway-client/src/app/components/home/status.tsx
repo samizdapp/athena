@@ -2,8 +2,9 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import MuiDrawer from '@mui/material/Drawer';
 import * as React from 'react';
-import styled from 'styled-components';
 import { useSelector } from 'react-redux';
+import styled from 'styled-components';
+import { Link } from 'react-router-dom';
 
 import { ServerPeerStatus } from '../../../service-worker';
 import {
@@ -108,6 +109,10 @@ const StyledDrawer = styled(MuiDrawer)`
                 overflow: auto;
             }
         }
+
+        .service-status-link {
+            display: none;
+        }
     }
 
     &.open {
@@ -116,12 +121,24 @@ const StyledDrawer = styled(MuiDrawer)`
         max-width: 800px;
 
         .status {
+            min-height: calc(100% - 50px);
+
             .relay {
                 display: block;
+                min-height: calc(100% - 170px);
             }
 
             .property.relays {
                 display: none;
+            }
+
+            .service-status-link {
+                display: initial;
+                color: #08f;
+
+                &:hover {
+                    text-decoration: underline;
+                }
             }
         }
     }
@@ -247,6 +264,10 @@ export function Status() {
                         </code>
                     </pre>
                 </div>
+
+                <Link className="service-status-link" to="/pwa/status">
+                    SamizdApp Status
+                </Link>
             </div>
         </StyledDrawer>
     );

@@ -15,6 +15,7 @@
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
     "paths": {
+      "@athena/shared/api": ["packages/shared/api/src/index.ts"],
       "@athena/shared/service-worker": [
         "packages/shared/service-worker/src/index.ts"
       ]

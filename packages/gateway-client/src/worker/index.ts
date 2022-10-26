@@ -364,33 +364,52 @@ async function getStream(protocol = '/samizdapp-proxy') {
 self.getStream = getStream;
 
 async function p2Fetch(
-    reqObj: URL | RequestInfo,
-    reqInit: RequestInit | undefined = {},
+    givenReqObj: URL | RequestInfo,
+    givenReqInit: RequestInit | undefined = {},
     _xhr?: XMLHttpRequest
 ): Promise<Response> {
-    reqObj = reqObj as Request;
-    if (typeof reqObj.url != 'string') {
+    // assert that we were given a request
+    givenReqObj = givenReqObj as Request;
+
+    if (typeof givenReqObj.url != 'string') {
         throw new Error(
-            `Patched service worker \`fetch()\` method expects a full request object, received ${reqObj.constructor.name}`
+            `Patched service worker \`fetch()\` method expects a full request object, received ${givenReqObj.constructor.name}`
         );
     }
-    if (
-        process.env.NX_LOCAL === 'true' &&
-        new URL(reqObj.url).pathname.startsWith('/pwa')
-    ) {
-        return self.stashedFetch(reqObj, reqInit);
-    }
-    const patched = patchFetchArgs(reqObj, reqInit);
-    const body = reqObj.body
-        ? reqObj.body
-        : reqInit.body
-        ? reqInit.body
-        : reqObj.arrayBuffer
-        ? await reqObj.arrayBuffer()
-        : null;
 
-    reqObj = patched.reqObj;
-    reqInit = patched.reqInit;
+    // patch args
+    const body =
+        givenReqObj.body ??
+        givenReqInit.body ??
+        (await givenReqObj.arrayBuffer?.()) ??
+        null;
+    const { reqObj, reqInit } = patchFetchArgs(givenReqObj, givenReqInit);
+
+    // apply filtering to the request
+    const url = new URL(
+        reqObj.url.startsWith('http')
+            ? reqObj.url
+            : `http://localhost${reqObj.url}`
+    );
+
+    if (process.env.NX_LOCAL === 'true' && url.pathname.startsWith('/pwa')) {
+        return self.stashedFetch(givenReqObj, givenReqInit);
+    }
+
+    if (url.pathname.startsWith('/api' || url.pathname.startsWith('/pwa'))) {
+        reqObj.headers['X-Intercepted-Subdomain'] = 'samizdapp';
+    } else if (url.pathname !== '/manifest.json') {
+        reqObj.headers['X-Intercepted-Subdomain'] = 'pleroma';
+    }
+
+    if (url.host === getHost()) {
+        url.host = 'localhost';
+        url.protocol = 'http:';
+        url.port = '80';
+    }
+
+    reqObj.url = url.toString();
+
     // console.log("pocketFetch2", reqObj, reqInit, body);
     //delete (reqObj as Request).body;
     delete reqInit?.body;
@@ -443,7 +462,7 @@ async function p2Fetch(
         } catch (e) {
             console.warn(e);
             if (!done) {
-                p2Fetch(reqObj, reqInit).then(resolve).catch(reject);
+                p2Fetch(givenReqObj, givenReqInit).then(resolve).catch(reject);
             }
         }
     });
@@ -460,24 +479,7 @@ const getHost = () => {
 function patchFetchArgs(_reqObj: Request, _reqInit: RequestInit = {}) {
     // console.log("patch");
 
-    const url = new URL(
-        _reqObj.url.startsWith('http')
-            ? _reqObj.url
-            : `http://localhost${_reqObj.url}`
-    );
-
     const rawHeaders = Object.fromEntries(_reqObj.headers.entries());
-
-    if (url.pathname !== '/manifest.json') {
-        rawHeaders['X-Intercepted-Subdomain'] = 'pleroma';
-    }
-
-    if (url.host === getHost()) {
-        // console.log("subdomain", _reqInit);
-        url.host = 'localhost';
-        url.protocol = 'http:';
-        url.port = '80';
-    }
 
     const reqObj = {
         bodyUsed: _reqObj.bodyUsed,
@@ -495,8 +497,8 @@ function patchFetchArgs(_reqObj: Request, _reqInit: RequestInit = {}) {
         redirect: _reqObj.redirect,
         referrer: _reqObj.referrer,
         referrerPolicy: _reqObj.referrerPolicy,
-        url: url.toString(),
-    } as unknown as Request;
+        url: _reqObj.url,
+    };
 
     const reqInit = {
         ..._reqInit,

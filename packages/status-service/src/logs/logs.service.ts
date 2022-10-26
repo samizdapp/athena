@@ -6,8 +6,8 @@ import ObjectID from 'bson-objectid';
 export class LogsService {
     private logCache: Record<string, Dto.Log[]> = {};
 
-    constructor () {
-        this.logSelfStatus("Log cache initiated.")
+    constructor() {
+        this.logSelfStatus('Log cache initiated.');
     }
 
     private async createLog(newLog: Dto.Create) {
@@ -33,7 +33,7 @@ export class LogsService {
     }
 
     async create(newLog: Dto.Create) {
-        this.logSelfStatus("Receiving status updates.")
+        this.logSelfStatus('Receiving status updates.');
         const log = this.createLog(newLog);
         return log.id;
     }

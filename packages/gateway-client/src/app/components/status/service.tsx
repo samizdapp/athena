@@ -18,12 +18,9 @@ export const Service = React.forwardRef<HTMLDivElement, ServiceProps>(
         )} ${status?.toLowerCase()}`;
 
         return (
-            <div
-                className={className}
-                ref={ref}
-                onClick={onClick}
-            >
+            <div className={className} ref={ref} onClick={onClick}>
                 <ServerBox />
+
                 <section className="details">
                     <h3>{name}</h3>
                     <p className="status">{status}</p>

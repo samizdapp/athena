@@ -6,7 +6,11 @@ import ObjectID from 'bson-objectid';
 export class LogsService {
     private logCache: Record<string, Dto.Log[]> = {};
 
-    async create(newLog: Dto.Create) {
+    constructor () {
+        this.logSelfStatus("Log cache initiated.")
+    }
+
+    private async createLog(newLog: Dto.Create) {
         const log = {
             ...newLog,
             id: ObjectID().toHexString(),
@@ -17,6 +21,20 @@ export class LogsService {
             ...(this.logCache[newLog.service]?.slice(-4) ?? []),
             log,
         ];
+        return log;
+    }
+
+    private async logSelfStatus(message: string) {
+        return this.createLog({
+            service: 'status_service',
+            status: Dto.Status.ONLINE,
+            message,
+        });
+    }
+
+    async create(newLog: Dto.Create) {
+        this.logSelfStatus("Receiving status updates.")
+        const log = this.createLog(newLog);
         return log.id;
     }
 

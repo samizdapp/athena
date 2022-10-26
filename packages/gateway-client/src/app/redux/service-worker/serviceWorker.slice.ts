@@ -100,4 +100,4 @@ export const selectRelayAddresses = createSelector(
     state => state.relayAddresses
 );
 
-export default serviceWorkerSlice.reducer;
+export default serviceWorkerSlice;

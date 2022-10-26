@@ -555,15 +555,29 @@ async function openRelayStream(cb: () => unknown) {
 }
 
 async function getBootstrapList() {
-    const bootstrapaddr =
-        (await localforage.getItem<string>('libp2p.bootstrap')) ||
-        (await fetch('/pwa/assets/libp2p.bootstrap')
-            .then(r => r.text())
-            .then(async id => {
-                const trimmed = id.trim(); //newline protection
-                await localforage.setItem('libp2p.bootstrap', trimmed);
-                return trimmed;
-            }));
+    let newBootstrapAddress = null;
+    try {
+        newBootstrapAddress = await fetch('/pwa/assets/libp2p.bootstrap')
+            .then(res => {
+                if (res.status >= 400) {
+                    throw res;
+                }
+                return res.text();
+            })
+            .then(text => text.trim());
+    } catch (e) {
+        console.debug('Error while trying to fetch new bootstrap address: ', e);
+    }
+    const cachedBootstrapAddress =
+        (await localforage.getItem<string>('libp2p.bootstrap')) ?? null;
+    const bootstrapaddr = newBootstrapAddress ?? cachedBootstrapAddress;
+    if (bootstrapaddr !== cachedBootstrapAddress) {
+        console.debug(
+            'Detected updated bootstrap address, updating cache: ',
+            bootstrapaddr
+        );
+        await localforage.setItem('libp2p.bootstrap', bootstrapaddr);
+    }
 
     console.debug('got bootstrap addr', bootstrapaddr);
     const relay_addrs =

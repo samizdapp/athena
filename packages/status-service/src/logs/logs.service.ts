@@ -1,6 +1,6 @@
+import { LogDto as Dto } from '@athena/shared/api';
 import { Injectable } from '@nestjs/common';
 import ObjectID from 'bson-objectid';
-import * as Dto from './dto/log.dto';
 
 @Injectable()
 export class LogsService {

@@ -1,14 +1,15 @@
+import { LogDto as Dto } from '@athena/shared/api';
 import {
-    Controller,
-    Get,
-    Post,
     Body,
-    Patch,
-    Param,
+    Controller,
     Delete,
+    Get,
+    Param,
+    Patch,
+    Post,
 } from '@nestjs/common';
+
 import { LogsService } from './logs.service';
-import * as Dto from './dto/log.dto';
 
 @Controller('logs')
 export class LogsController {

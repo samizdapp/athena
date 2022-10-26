@@ -34,7 +34,7 @@ export class LogsService {
 
     async create(newLog: Dto.Create) {
         this.logSelfStatus('Receiving status updates.');
-        const log = this.createLog(newLog);
+        const log = await this.createLog(newLog);
         return log.id;
     }
 

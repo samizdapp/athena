@@ -105,10 +105,16 @@ self.libp2pSetLogLevel(LogLevel.INFO);
 //@ts-ignore
 self.addrSort = publicRelayAddressesFirst;
 function publicRelayAddressesFirst(a: Address, b: Address): -1 | 0 | 1 {
+    const isADNS = isDNS(a);
+    const isBDNS = isDNS(b);
     const isAPrivate = isPrivate(a.multiaddr);
     const isBPrivate = isPrivate(b.multiaddr);
 
-    if (isAPrivate && !isBPrivate) {
+    if (isADNS && !isBDNS) {
+        return 1;
+    } else if (!isADNS && isBDNS) {
+        return -1;
+    } else if (isAPrivate && !isBPrivate) {
         return 1;
     } else if (!isAPrivate && isBPrivate) {
         return -1;
@@ -143,7 +149,10 @@ function isRelay(ma: Address): boolean {
     const parts = new Set(ma.multiaddr.toString().split('/'));
     return parts.has('p2p-circuit');
 }
-
+function isDNS(ma: Address): boolean {
+    const parts = new Set(ma.multiaddr.toString().split('/'));
+    return parts.has('dns4');
+}
 self.localforage = localforage;
 
 const WB_MANIFEST = self.__WB_MANIFEST;
@@ -591,6 +600,19 @@ async function openRelayStream(cb: () => unknown) {
     await new Promise(r => setTimeout(r, 20000));
 }
 
+function getHostAddrs(hostname: string, tail: string[]): string[] {
+    const res = [`/dns4/${hostname}/${tail.join('/')}`];
+    if (hostname.endsWith('localhost')) {
+        res.push(
+            `/dns4/${hostname.substring(0, hostname.length - 4)}/${tail.join(
+                '/'
+            )}`
+        );
+    }
+    console.log('getHostAddrs', res);
+    return res;
+}
+
 async function getBootstrapList() {
     let newBootstrapAddress = null;
     try {
@@ -624,8 +646,8 @@ async function getBootstrapList() {
 
     const { hostname } = new URL(self.origin);
     const [_, _proto, _ip, ...rest] = bootstrapaddr?.split('/') ?? [];
-    const hostaddr = `/dns4/${hostname}/${rest.join('/')}`;
-    return [bootstrapaddr ?? '', hostaddr, ...relay_addrs];
+    const hostaddrs = getHostAddrs(hostname, rest);
+    return [bootstrapaddr ?? '', ...hostaddrs, ...relay_addrs];
 }
 
 async function main() {
@@ -657,7 +679,7 @@ async function main() {
         connectionManager: {
             autoDial: true, // Auto connect to discovered peers (limited by ConnectionManager minConnections)
             minConnections: 3,
-            maxDialsPerPeer: 10,
+            maxDialsPerPeer: 20,
             maxParallelDials: 10,
             addressSorter: publicRelayAddressesFirst,
             // The `tag` property will be searched when creating the instance of your Peer Discovery service.
@@ -908,7 +930,7 @@ self.fetch = async (...args) => {
     // const whip = setTimeout(async () => {
     //     const bootstraplist = await getBootstrapList();
     //     for (const ma of bootstraplist) {
-    //         await self.libp2p.dial(ma as unknown as PeerId).catch(e => null);
+    //         await self.libp2p?.dial(ma as unknown as PeerId).catch(e => null);
     //     }
     // }, 100);
 

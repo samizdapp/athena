@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { LogDto } from '@athena/shared/api';
+
 import { createApiDataSelector, GenericOptions } from './rtk-api';
 
 // Define a service using a base URL and expected endpoints
@@ -9,6 +10,12 @@ export const statusLogsApi = createApi({
     endpoints: builder => ({
         getStatusLogs: builder.query<LogDto.Log[], string>({
             query: () => `/logs`,
+            transformResponse: (response: LogDto.Log[]) => {
+                return response.filter(
+                    log =>
+                        Date.parse(log.createdAt) >= Date.now() - 1000 * 60 * 5
+                );
+            },
         }),
     }),
 });

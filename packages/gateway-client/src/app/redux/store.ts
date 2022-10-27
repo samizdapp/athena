@@ -1,12 +1,17 @@
 import { configureStore, ThunkAction, Action } from '@reduxjs/toolkit';
-import serviceWorkerReducer from './service-worker/serviceWorker.slice';
+import serviceWorkerSlice from './service-worker/serviceWorker.slice';
+import statusLogApi from './status-log/statusLog.api';
 
 export const createStore = () => {
     const store = configureStore({
         reducer: {
-            serviceWorker: serviceWorkerReducer,
+            [serviceWorkerSlice.name]: serviceWorkerSlice.reducer,
+            [statusLogApi.reducerPath]: statusLogApi.reducer,
         },
+        middleware: getDefaultMiddleware =>
+            getDefaultMiddleware().concat(statusLogApi.middleware),
     });
+
     return store;
 };
 

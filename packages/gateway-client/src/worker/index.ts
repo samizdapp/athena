@@ -17,7 +17,7 @@ import { LevelDatastore } from 'datastore-level';
 import { pipe } from 'it-pipe';
 import { createLibp2p, Libp2p } from 'libp2p';
 import { decode, encode } from 'lob-enc';
-import localforage, { iterate } from 'localforage';
+import localforage from 'localforage';
 import Multiaddr from 'multiaddr';
 import * as workboxPrecaching from 'workbox-precaching';
 import {
@@ -32,6 +32,34 @@ import {
 // Import it even though we're not using any of the imports,
 // and mark the import as being used with this line:
 const _ = workboxPrecaching;
+
+// type Window = {
+//     localStorage: {
+//         debug: string;
+//     }
+// }
+
+// type Document = {}
+
+declare const self: {
+    status: WorkerStatus;
+    soapstore: LocalForage;
+    DIAL_TIMEOUT: number;
+    serverPeer: PeerId;
+    node: Libp2p;
+    libp2p: Libp2p;
+    deferral: Promise<unknown>;
+    stashedFetch: typeof fetch;
+    Buffer: typeof Buffer;
+    Multiaddr: typeof Multiaddr;
+    _fetch: typeof fetch;
+    getStream: typeof getStream;
+    localforage: typeof localforage;
+    streamFactory: AsyncGenerator<StreamMaker, void, string | undefined>;
+    messageHandlers: MessageHandlers;
+    // window: Window;
+    // document: Document;
+} & ServiceWorkerGlobalScope;
 
 // slightly modified version of
 // https://github.com/libp2p/js-libp2p-utils/blob/66e604cb0bfcf686eb68e44f278d62e3464c827c/src/address-sort.ts
@@ -84,39 +112,10 @@ function isRelay(ma: Address): boolean {
     const parts = new Set(ma.multiaddr.toString().split('/'));
     return parts.has('p2p-circuit');
 }
-
 function isDNS(ma: Address): boolean {
     const parts = new Set(ma.multiaddr.toString().split('/'));
     return parts.has('dns4');
 }
-// type Window = {
-//     localStorage: {
-//         debug: string;
-//     }
-// }
-
-// type Document = {}
-
-declare const self: {
-    status: WorkerStatus;
-    soapstore: LocalForage;
-    DIAL_TIMEOUT: number;
-    serverPeer: PeerId;
-    node: Libp2p;
-    libp2p: Libp2p;
-    deferral: Promise<unknown>;
-    stashedFetch: typeof fetch;
-    Buffer: typeof Buffer;
-    Multiaddr: typeof Multiaddr;
-    _fetch: typeof fetch;
-    getStream: typeof getStream;
-    localforage: typeof localforage;
-    streamFactory: AsyncGenerator<StreamMaker, void, string | undefined>;
-    messageHandlers: MessageHandlers;
-    // window: Window;
-    // document: Document;
-} & ServiceWorkerGlobalScope;
-
 self.localforage = localforage;
 
 const WB_MANIFEST = self.__WB_MANIFEST;
@@ -374,33 +373,52 @@ async function getStream(protocol = '/samizdapp-proxy') {
 self.getStream = getStream;
 
 async function p2Fetch(
-    reqObj: URL | RequestInfo,
-    reqInit: RequestInit | undefined = {},
+    givenReqObj: URL | RequestInfo,
+    givenReqInit: RequestInit | undefined = {},
     _xhr?: XMLHttpRequest
 ): Promise<Response> {
-    reqObj = reqObj as Request;
-    if (typeof reqObj.url != 'string') {
+    // assert that we were given a request
+    givenReqObj = givenReqObj as Request;
+
+    if (typeof givenReqObj.url != 'string') {
         throw new Error(
-            `Patched service worker \`fetch()\` method expects a full request object, received ${reqObj.constructor.name}`
+            `Patched service worker \`fetch()\` method expects a full request object, received ${givenReqObj.constructor.name}`
         );
     }
-    if (
-        process.env.NX_LOCAL === 'true' &&
-        new URL(reqObj.url).pathname.startsWith('/pwa')
-    ) {
-        return self.stashedFetch(reqObj, reqInit);
-    }
-    const patched = patchFetchArgs(reqObj, reqInit);
-    const body = reqObj.body
-        ? reqObj.body
-        : reqInit.body
-        ? reqInit.body
-        : reqObj.arrayBuffer
-        ? await reqObj.arrayBuffer()
-        : null;
 
-    reqObj = patched.reqObj;
-    reqInit = patched.reqInit;
+    // patch args
+    const body =
+        givenReqObj.body ??
+        givenReqInit.body ??
+        (await givenReqObj.arrayBuffer?.()) ??
+        null;
+    const { reqObj, reqInit } = patchFetchArgs(givenReqObj, givenReqInit);
+
+    // apply filtering to the request
+    const url = new URL(
+        reqObj.url.startsWith('http')
+            ? reqObj.url
+            : `http://localhost${reqObj.url}`
+    );
+
+    if (process.env.NX_LOCAL === 'true' && url.pathname.startsWith('/pwa')) {
+        return self.stashedFetch(givenReqObj, givenReqInit);
+    }
+
+    if (url.pathname.startsWith('/api' || url.pathname.startsWith('/pwa'))) {
+        reqObj.headers['X-Intercepted-Subdomain'] = 'samizdapp';
+    } else if (url.pathname !== '/manifest.json') {
+        reqObj.headers['X-Intercepted-Subdomain'] = 'pleroma';
+    }
+
+    if (url.host === getHost()) {
+        url.host = 'localhost';
+        url.protocol = 'http:';
+        url.port = '80';
+    }
+
+    reqObj.url = url.toString();
+
     // console.log("pocketFetch2", reqObj, reqInit, body);
     //delete (reqObj as Request).body;
     delete reqInit?.body;
@@ -453,7 +471,7 @@ async function p2Fetch(
         } catch (e) {
             console.warn(e);
             if (!done) {
-                p2Fetch(reqObj, reqInit).then(resolve).catch(reject);
+                p2Fetch(givenReqObj, givenReqInit).then(resolve).catch(reject);
             }
         }
     });
@@ -470,24 +488,7 @@ const getHost = () => {
 function patchFetchArgs(_reqObj: Request, _reqInit: RequestInit = {}) {
     // console.log("patch");
 
-    const url = new URL(
-        _reqObj.url.startsWith('http')
-            ? _reqObj.url
-            : `http://localhost${_reqObj.url}`
-    );
-
     const rawHeaders = Object.fromEntries(_reqObj.headers.entries());
-
-    if (url.pathname !== '/manifest.json') {
-        rawHeaders['X-Intercepted-Subdomain'] = 'pleroma';
-    }
-
-    if (url.host === getHost()) {
-        // console.log("subdomain", _reqInit);
-        url.host = 'localhost';
-        url.protocol = 'http:';
-        url.port = '80';
-    }
 
     const reqObj = {
         bodyUsed: _reqObj.bodyUsed,
@@ -505,8 +506,8 @@ function patchFetchArgs(_reqObj: Request, _reqInit: RequestInit = {}) {
         redirect: _reqObj.redirect,
         referrer: _reqObj.referrer,
         referrerPolicy: _reqObj.referrerPolicy,
-        url: url.toString(),
-    } as unknown as Request;
+        url: _reqObj.url,
+    };
 
     const reqInit = {
         ..._reqInit,
@@ -576,15 +577,29 @@ function getHostAddrs(hostname: string, tail: string[]): string[] {
 }
 
 async function getBootstrapList() {
-    const bootstrapaddr =
-        (await localforage.getItem<string>('libp2p.bootstrap')) ||
-        (await fetch('/pwa/assets/libp2p.bootstrap')
-            .then(r => r.text())
-            .then(async id => {
-                const trimmed = id.trim(); //newline protection
-                await localforage.setItem('libp2p.bootstrap', trimmed);
-                return trimmed;
-            }));
+    let newBootstrapAddress = null;
+    try {
+        newBootstrapAddress = await fetch('/pwa/assets/libp2p.bootstrap')
+            .then(res => {
+                if (res.status >= 400) {
+                    throw res;
+                }
+                return res.text();
+            })
+            .then(text => text.trim());
+    } catch (e) {
+        console.debug('Error while trying to fetch new bootstrap address: ', e);
+    }
+    const cachedBootstrapAddress =
+        (await localforage.getItem<string>('libp2p.bootstrap')) ?? null;
+    const bootstrapaddr = newBootstrapAddress ?? cachedBootstrapAddress;
+    if (bootstrapaddr !== cachedBootstrapAddress) {
+        console.debug(
+            'Detected updated bootstrap address, updating cache: ',
+            bootstrapaddr
+        );
+        await localforage.setItem('libp2p.bootstrap', bootstrapaddr);
+    }
 
     console.debug('got bootstrap addr', bootstrapaddr);
     const relay_addrs =
@@ -870,14 +885,22 @@ self.fetch = async (...args) => {
     // very hard to debug what's going wrong because impossible
     // to attach devtools to the service worker of an installed PWA
     // but this seems to fix it
-    const whip = setTimeout(async () => {
-        const bootstraplist = await getBootstrapList();
-        for (const ma of bootstraplist) {
-            await self.libp2p?.dial(ma as unknown as PeerId).catch(e => null);
-        }
-    }, 100);
+
+    // However, it unfortunately broke the worker on Chrome due to some sort
+    // of a race condition between libp2p being created and this loop firing,
+    // so it is being commented out for now.
+
+    // const whip = setTimeout(async () => {
+    //     const bootstraplist = await getBootstrapList();
+    //     for (const ma of bootstraplist) {
+    //         await self.libp2p?.dial(ma as unknown as PeerId).catch(e => null);
+    //     }
+    // }, 100);
+
     await self.deferral;
-    clearTimeout(whip);
+
+    //clearTimeout(whip);
+
     console.log('fetch deferred', args[0]);
     return self.fetch(...args);
 };

@@ -5,6 +5,7 @@ import { ConnectionEncrypter } from '@libp2p/interface-connection-encrypter';
 import { PeerId } from '@libp2p/interface-peer-id';
 import type { Address } from '@libp2p/interface-peer-store';
 import { StreamMuxerFactory } from '@libp2p/interface-stream-muxer';
+import * as libp2pLogger from '@libp2p/logger';
 import { Mplex } from '@libp2p/mplex';
 import { PersistentPeerStore } from '@libp2p/peer-store';
 import { isLoopback } from '@libp2p/utils/multiaddr/is-loopback';
@@ -41,6 +42,15 @@ const _ = workboxPrecaching;
 
 // type Document = {}
 
+enum LogLevel {
+    OFF = 'OFF',
+    ERROR = 'ERROR',
+    WARN = 'WARN',
+    INFO = 'INFO',
+    DEBUG = 'DEBUG',
+    TRACE = 'TRACE',
+}
+
 declare const self: {
     status: WorkerStatus;
     soapstore: LocalForage;
@@ -59,7 +69,34 @@ declare const self: {
     messageHandlers: MessageHandlers;
     // window: Window;
     // document: Document;
+    libp2pSetLogLevel: (level: LogLevel) => void;
 } & ServiceWorkerGlobalScope;
+
+self.libp2pSetLogLevel = (level: LogLevel) => {
+    const levelHandlers: Record<LogLevel, (extra?: string) => void> = {
+        OFF: () => libp2pLogger.disable(),
+        ERROR: extra =>
+            libp2pLogger.enable(
+                'libp2p:circuit:error, libp2p:bootstrap:error, libp2p:upgrader:error, ' +
+                    extra
+            ),
+        WARN: extra => levelHandlers.ERROR('libp2p:websockets:error, ' + extra),
+        INFO: extra =>
+            levelHandlers.WARN(
+                'libp2p:dialer:error, libp2p:connection-manager:trace, ' + extra
+            ),
+        DEBUG: extra =>
+            levelHandlers.INFO(
+                'libp2p:peer-store:trace, libp2p:mplex:stream:trace, libp2p:*:error, ' +
+                    extra
+            ),
+        TRACE: extra => levelHandlers.DEBUG('libp2p:*:trace, ' + extra),
+    };
+
+    levelHandlers[level]();
+};
+
+self.libp2pSetLogLevel(LogLevel.INFO);
 
 // slightly modified version of
 // https://github.com/libp2p/js-libp2p-utils/blob/66e604cb0bfcf686eb68e44f278d62e3464c827c/src/address-sort.ts

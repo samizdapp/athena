@@ -6,7 +6,7 @@ import { createApiDataSelector, GenericOptions } from './rtk-api';
 // Define a service using a base URL and expected endpoints
 export const statusLogsApi = createApi({
     reducerPath: 'statusLogsApi',
-    baseQuery: fetchBaseQuery({ baseUrl: '/api/status' }),
+    baseQuery: fetchBaseQuery({ baseUrl: '/smz/api/status' }),
     endpoints: builder => ({
         getStatusLogs: builder.query<LogDto.Log[], string>({
             query: () => `/logs`,

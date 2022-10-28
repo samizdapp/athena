@@ -14,9 +14,9 @@ export function App() {
     return (
         <StyledApp>
             <Routes>
-                <Route path="/pwa" element={<Home />} />
-                <Route path="/pwa/status" element={<Status />} />
-                <Route path="*" element={<Navigate to="/pwa" replace />} />
+                <Route path="/smz" element={<Home />} />
+                <Route path="/smz/status" element={<Status />} />
+                <Route path="*" element={<Navigate to="/smz" replace />} />
             </Routes>
         </StyledApp>
     );

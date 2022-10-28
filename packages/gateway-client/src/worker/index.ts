@@ -322,7 +322,7 @@ self.status = new WorkerStatus();
 const getClient = async (): Promise<WindowClient | undefined> => {
     const allClients = await self.clients.matchAll();
     return allClients.find(
-        it => it instanceof WindowClient && new URL(it.url).pathname === '/pwa'
+        it => it instanceof WindowClient && new URL(it.url).pathname === '/smz'
     ) as WindowClient;
 };
 
@@ -401,11 +401,11 @@ async function p2Fetch(
             : `http://localhost${reqObj.url}`
     );
 
-    if (process.env.NX_LOCAL === 'true' && url.pathname.startsWith('/pwa')) {
+    if (process.env.NX_LOCAL === 'true' && url.pathname.startsWith('/smz')) {
         return self.stashedFetch(givenReqObj, givenReqInit);
     }
 
-    if (url.pathname.startsWith('/api' || url.pathname.startsWith('/pwa'))) {
+    if (url.pathname.startsWith('/smz')) {
         reqObj.headers['X-Intercepted-Subdomain'] = 'samizdapp';
     } else if (url.pathname !== '/manifest.json') {
         reqObj.headers['X-Intercepted-Subdomain'] = 'pleroma';
@@ -579,7 +579,7 @@ function getHostAddrs(hostname: string, tail: string[]): string[] {
 async function getBootstrapList() {
     let newBootstrapAddress = null;
     try {
-        newBootstrapAddress = await fetch('/pwa/assets/libp2p.bootstrap')
+        newBootstrapAddress = await fetch('/smz/assets/libp2p.bootstrap')
             .then(res => {
                 if (res.status >= 400) {
                     throw res;

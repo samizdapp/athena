@@ -66,7 +66,6 @@ declare const self: {
     getStream: typeof getStream;
     localforage: typeof localforage;
     streamFactory: AsyncGenerator<StreamMaker, void, string | undefined>;
-    messageHandlers: MessageHandlers;
     // window: Window;
     // document: Document;
     libp2pSetLogLevel: (level: LogLevel) => void;
@@ -192,14 +191,6 @@ const waitFor = async (t: number): Promise<void> =>
     new Promise(r => setTimeout(r, t));
 
 type StreamMaker = (protocol: string) => Promise<Stream>;
-
-type MessageHandlers = Record<
-    ClientMessageType,
-    (
-        msg: Message<ClientMessageType>,
-        port: readonly MessagePort[] | undefined
-    ) => void
->;
 
 async function* streamFactoryGenerator(): AsyncGenerator<
     StreamMaker,
@@ -843,6 +834,14 @@ self.addEventListener('fetch', function (event) {
 
 self.addEventListener('online', () => console.log('<<<<online'));
 self.addEventListener('offline', () => console.log('<<<<offline'));
+
+type MessageHandlers = Record<
+    ClientMessageType,
+    (
+        msg: Message<ClientMessageType>,
+        port: readonly MessagePort[] | undefined
+    ) => void
+>;
 
 const messageHandlers: MessageHandlers = {
     REQUEST_STATUS: () => self.status.sendCurrent(),

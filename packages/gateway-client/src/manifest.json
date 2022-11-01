@@ -2,7 +2,7 @@
   "short_name": "SamizdApp",
   "name": "SamizdApp",
   "scope": "/",
-  "start_url": "/smz",
+  "start_url": "/smz/pwa",
   "icons": [
     {
       "src": "favicon.ico",

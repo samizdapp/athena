@@ -623,7 +623,7 @@ async function getBootstrapList() {
     }
     const cachedBootstrapAddress =
         (await localforage.getItem<string>('libp2p.bootstrap')) ?? null;
-    const bootstrapaddr = newBootstrapAddress ?? cachedBootstrapAddress;
+    const bootstrapaddr = newBootstrapAddress || cachedBootstrapAddress;
     if (bootstrapaddr !== cachedBootstrapAddress) {
         console.debug(
             'Detected updated bootstrap address, updating cache: ',

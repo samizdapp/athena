@@ -350,7 +350,9 @@ self.status = new WorkerStatus();
 const getClient = async (): Promise<WindowClient | undefined> => {
     const allClients = await self.clients.matchAll();
     return allClients.find(
-        it => it instanceof WindowClient && new URL(it.url).pathname === '/smz'
+        it =>
+            it instanceof WindowClient &&
+            new URL(it.url).pathname.startsWith('/smz')
     ) as WindowClient;
 };
 

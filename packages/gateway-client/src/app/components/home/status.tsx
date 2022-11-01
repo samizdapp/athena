@@ -265,7 +265,7 @@ export function Status() {
                     </pre>
                 </div>
 
-                <Link className="service-status-link" to="/smz/status">
+                <Link className="service-status-link" to="/smz/pwa/status">
                     SamizdApp Status
                 </Link>
             </div>

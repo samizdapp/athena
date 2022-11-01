@@ -347,12 +347,13 @@ class WorkerStatus {
 }
 self.status = new WorkerStatus();
 
+const isBootstrapAppUrl = (url: URL): boolean =>
+    url.pathname.startsWith('/smz/pwa');
+
 const getClient = async (): Promise<WindowClient | undefined> => {
     const allClients = await self.clients.matchAll();
     return allClients.find(
-        it =>
-            it instanceof WindowClient &&
-            new URL(it.url).pathname.startsWith('/smz')
+        it => it instanceof WindowClient && isBootstrapAppUrl(new URL(it.url))
     ) as WindowClient;
 };
 
@@ -431,7 +432,7 @@ async function p2Fetch(
             : `http://localhost${reqObj.url}`
     );
 
-    if (process.env.NX_LOCAL === 'true' && url.pathname.startsWith('/smz')) {
+    if (process.env.NX_LOCAL === 'true' && isBootstrapAppUrl(url)) {
         return self.stashedFetch(givenReqObj, givenReqInit);
     }
 
@@ -609,7 +610,7 @@ function getHostAddrs(hostname: string, tail: string[]): string[] {
 async function getBootstrapList() {
     let newBootstrapAddress = null;
     try {
-        newBootstrapAddress = await fetch('/smz/assets/libp2p.bootstrap')
+        newBootstrapAddress = await fetch('/smz/pwa/assets/libp2p.bootstrap')
             .then(res => {
                 if (res.status >= 400) {
                     throw res;

@@ -12,7 +12,7 @@ COPY packages/shared/service-worker packages/shared/service-worker
 RUN npm run build gateway-client
 
 
-FROM node:18-alpine as run
+FROM alpine as run
 
 RUN apk add --no-cache bash
 

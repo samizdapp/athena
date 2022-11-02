@@ -776,19 +776,24 @@ async function main() {
     return connectPromise;
 }
 
+const maybeNavigateToFediverse = async (event: FetchEvent) => {
+    const { pathname, searchParams } = new URL(event.request.url);
+    if (pathname === '/api/v1/timelines/public' && searchParams.get('local')) {
+        const allClients = await self.clients.matchAll();
+        const atPleromaPage = allClients.find(
+            it =>
+                it instanceof WindowClient &&
+                new URL(it.url).pathname === '/timeline/local'
+        ) as WindowClient;
+
+        if (atPleromaPage) {
+            atPleromaPage.navigate('/timeline/fediverse');
+        }
+    }
+};
+
 self.addEventListener('fetch', function (event) {
     // console.log('Received fetch: ', event);
-
-    // // if this url is in the manifest
-    // if (wbManifestUrls.includes(event.request.url)) {
-    //     // then use our default fetch to fetch it
-
-    // }
-
-    // if (event?.request.method === 'GET') {
-    //     //default service worker only handles GET
-    //     return;
-    // }
 
     // Check if this is a request for a static asset
     // console.log('destination', event.request.destination, event.request)
@@ -831,6 +836,7 @@ self.addEventListener('fetch', function (event) {
             })
         );
     } else {
+        maybeNavigateToFediverse(event);
         event?.respondWith(fetch(event.request));
     }
 });

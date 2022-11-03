@@ -29,10 +29,5 @@
       }
     }
   },
-  "pluginsConfig": {
-    "@nrwl/js": {
-      "analyzeSourceFiles": true
-    }
-  },
   "defaultProject": "gateway-client"
 }

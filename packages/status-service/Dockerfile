@@ -17,10 +17,11 @@ RUN apk add --no-cache bash
 
 WORKDIR /usr/src/athena
 
-RUN mkdir -p dist/packages/status-service
+COPY package.json .
+COPY package-lock.json .
 
-COPY --from=build /usr/src/athena/dist/packages/status-service dist/packages/status-service
+RUN NODE_ENV=production npm install
 
-RUN cd dist/packages/status-service && npm install
+COPY --from=build /usr/src/athena/dist/packages/status-service dist/packages/status-service 
 
 CMD [ "/usr/local/bin/node", "dist/packages/status-service/main.js"  ]

@@ -10,7 +10,6 @@
       "options": {
         "target": "node",
         "compiler": "tsc",
-        "generatePackageJson": true,
         "outputPath": "dist/packages/status-service",
         "main": "packages/status-service/src/main.ts",
         "tsConfig": "packages/status-service/tsconfig.app.json",

@@ -139,7 +139,7 @@ export function Home(_props: HomeProps) {
                 <>
                     Missing secure context. (Is the{' '}
                     <a
-                        href="https://samizdapp.github.io/docs/getting-started/setup-client"
+                        href="https://samizdapp.github.io/docs/getting-started/install-client"
                         target="_blank"
                         rel="noreferrer"
                     >
@@ -166,7 +166,7 @@ export function Home(_props: HomeProps) {
             setStatusMessage(
                 <>
                     <a
-                        href="https://samizdapp.github.io/docs/getting-started/setup-client"
+                        href="https://samizdapp.github.io/docs/getting-started/install-client"
                         target="_blank"
                         rel="noreferrer"
                     >

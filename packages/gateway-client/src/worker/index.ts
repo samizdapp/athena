@@ -607,17 +607,21 @@ function getHostAddrs(hostname: string, tail: string[]): string[] {
     return res;
 }
 
-async function getBootstrapList() {
+async function getBootstrapList(doFetch = true) {
     let newBootstrapAddress = null;
     try {
-        newBootstrapAddress = await fetch('/smz/pwa/assets/libp2p.bootstrap')
-            .then(res => {
-                if (res.status >= 400) {
-                    throw res;
-                }
-                return res.text();
-            })
-            .then(text => text.trim());
+        if (doFetch) {
+            newBootstrapAddress = await fetch(
+                '/smz/pwa/assets/libp2p.bootstrap'
+            )
+                .then(res => {
+                    if (res.status >= 400) {
+                        throw res;
+                    }
+                    return res.text();
+                })
+                .then(text => text.trim());
+        }
     } catch (e) {
         console.debug('Error while trying to fetch new bootstrap address: ', e);
     }
@@ -935,16 +939,22 @@ self.fetch = async (...args) => {
     // of a race condition between libp2p being created and this loop firing,
     // so it is being commented out for now.
 
-    // const whip = setTimeout(async () => {
-    //     const bootstraplist = await getBootstrapList();
-    //     for (const ma of bootstraplist) {
-    //         await self.libp2p?.dial(ma as unknown as PeerId).catch(e => null);
-    //     }
-    // }, 100);
+    const whip = setTimeout(async () => {
+        try {
+            const bootstraplist = await getBootstrapList(false);
+            for (const ma of bootstraplist) {
+                await self.libp2p
+                    ?.dial(ma as unknown as PeerId)
+                    .catch(e => null);
+            }
+        } catch (_e) {
+            // console.trace(_e)
+        }
+    }, 100);
 
     await self.deferral;
 
-    //clearTimeout(whip);
+    clearTimeout(whip);
 
     console.log('fetch deferred', args[0]);
     return self.fetch(...args);

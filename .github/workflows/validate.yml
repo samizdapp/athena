@@ -46,11 +46,6 @@ jobs:
 
         # The type of runner that the job will run on
         runs-on: ubuntu-latest
-        container: ghcr.io/samizdapp/athena:${{ github.sha }}
-
-        defaults:
-            run:
-                working-directory: /usr/src/athena
 
         # Steps represent a sequence of tasks that will be executed as part of the job
         steps:
@@ -59,16 +54,20 @@ jobs:
               with:
                   fetch-depth: 0
 
-            - name: Copy checkout
-              run: |
-                  cp -r ${{ github.workspace }} /usr/src/athena
-
-            - name: Install Git
-              run: |
-                  apk add git
+            - name: Build job image
+              uses: docker/build-push-action@v3
+              with:
+                  tags: samizdapp/athena-build:latest
+                  file: .github/workflows/build.Dockerfile
+                  build-args: |
+                      VERSION=${{ github.sha }}
+                      BASE=${{ github.event.pull_request.base.sha }}
+                  push: false
 
             - name: affected:build
-              run: npm run nx -- affected --target=build --base=${{ github.event.pull_request.base.sha }}
+              uses: addnab/docker-run-action@v3
+              with:
+                  image: samizdapp/athena-build:latest
 
     lint:
         needs: install

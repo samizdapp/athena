@@ -41,7 +41,7 @@ jobs:
                   docker build . \
                     -f .github/workflows/validate.Dockerfile \
                     --build-arg VERSION=${{ github.sha }} \
-                    --tag ghcr.io/samizdapp/athena-validate:${{ github.sha }}
+                    --tag ghcr.io/samizdapp/athena-validate:${{ github.sha }} \
                     --output type=docker,dest=/tmp/images/athena-validate.tar
 
             - name: Upload image artifacts

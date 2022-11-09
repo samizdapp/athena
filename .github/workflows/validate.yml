@@ -76,6 +76,10 @@ jobs:
         runs-on: ubuntu-latest
         container: ghcr.io/samizdapp/athena-validate:${{ github.sha }}
 
+        defaults:
+            run:
+                working-directory: /usr/src/athena
+
         # Steps represent a sequence of tasks that will be executed as part of the job
         steps:
             - name: lint
@@ -86,7 +90,7 @@ jobs:
 
         # The type of runner that the job will run on
         runs-on: ubuntu-latest
-        container: ghcr.io/samizdapp/athena:${{ github.sha }}
+        container: ghcr.io/samizdapp/athena-validate:${{ github.sha }}
 
         defaults:
             run:
@@ -94,10 +98,5 @@ jobs:
 
         # Steps represent a sequence of tasks that will be executed as part of the job
         steps:
-            # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-            - uses: actions/checkout@v3
-              with:
-                  fetch-depth: 0
-
             - name: format:check
               run: npm run nx -- format:check  --base=${{ github.event.pull_request.base.sha }}

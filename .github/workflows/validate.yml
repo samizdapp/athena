@@ -28,7 +28,6 @@ jobs:
 
             - name: Build athena image
               run: |
-                  mkdir -p /tmp/images
                   /usr/bin/docker buildx build \
                     --cache-from type=registry,ref=ghcr.io/samizdapp/athena:${{ github.event.before }} \
                     --cache-from type=registry,ref=ghcr.io/samizdapp/athena:develop \
@@ -38,11 +37,13 @@ jobs:
 
             - name: Build and export validate image
               run: |
+                  mkdir -p /tmp/images
                   docker build . \
                     -f .github/workflows/validate.Dockerfile \
                     --build-arg VERSION=${{ github.sha }} \
                     --tag ghcr.io/samizdapp/athena-validate:${{ github.sha }} \
                     --output type=docker,dest=/tmp/images/athena-validate.tar
+                  ls -la /tmp/images
 
             - name: Upload image artifacts
               uses: actions/upload-artifact@v3

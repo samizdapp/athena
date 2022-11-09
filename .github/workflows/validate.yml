@@ -65,9 +65,8 @@ jobs:
                   push: false
 
             - name: affected:build
-              uses: addnab/docker-run-action@v3
-              with:
-                  image: samizdapp/athena-build:latest
+              run: |
+                  docker run --rm samizdapp/athena-build:latest
 
     lint:
         needs: install

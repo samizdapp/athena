@@ -26,9 +26,9 @@ runs:
                 --cache-from type=registry,ref=ghcr.io/samizdapp/athena:${{ github.event.before }} \
                 --cache-from type=registry,ref=ghcr.io/samizdapp/athena:develop \
                 --tag ghcr.io/samizdapp/athena:${{ github.sha }} \
-                --push \
                 --load \
                 .
+              docker push ghcr.io/samizdapp/athena:${{ github.sha }}
         - name: Build and export validate image
           shell: bash
           run: |

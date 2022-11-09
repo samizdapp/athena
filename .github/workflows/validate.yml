@@ -38,7 +38,7 @@ jobs:
             - name: Build and export validate image
               run: |
                   mkdir -p /tmp/images
-                  docker build . \
+                  DOCKER_BUILDKIT=1 docker build . \
                     -f .github/workflows/validate.Dockerfile \
                     --build-arg VERSION=${{ github.sha }} \
                     --tag ghcr.io/samizdapp/athena-validate:${{ github.sha }} \

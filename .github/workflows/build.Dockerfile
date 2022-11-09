@@ -8,5 +8,6 @@ RUN apk add git
 COPY . .
 
 ARG BASE=origin/master
+ENV BASE=$BASE
 
-CMD [ "/bin/bash", "npm", "run", "nx", "--", "affected", "--target=build", "--base=$BASE"  ]
+ENTRYPOINT [ "npm", "run", "nx", "--", "affected", "--target=build", "--base=$BASE"  ]

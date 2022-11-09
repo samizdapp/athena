@@ -28,11 +28,10 @@ jobs:
 
             - name: Build athena image
               run: |
-                  /usr/bin/docker buildx build \
+                  docker build \
                     --cache-from type=registry,ref=ghcr.io/samizdapp/athena:${{ github.event.before }} \
                     --cache-from type=registry,ref=ghcr.io/samizdapp/athena:develop \
                     --tag ghcr.io/samizdapp/athena:${{ github.sha }} \
-                    --load \
                     .
 
             - name: Build and export validate image

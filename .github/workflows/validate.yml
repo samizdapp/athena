@@ -67,7 +67,7 @@ jobs:
 
             - name: affected:build
               run: |
-                  docker run --rm --entrypoint ls samizdapp/athena-build:latest -la
+                  docker run --rm samizdapp/athena-build:latest
 
     lint:
         needs: install

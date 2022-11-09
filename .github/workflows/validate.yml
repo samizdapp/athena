@@ -33,24 +33,29 @@ jobs:
                   username: ${{ github.repository_owner }}
                   password: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: Build and push athena image
+            - name: Build and export athena image
               run: |
+                  mkdir -p /tmp/images
                   /usr/bin/docker buildx build \
                     --cache-from type=registry,ref=ghcr.io/samizdapp/athena:${{ github.event.before }} \
                     --cache-from type=registry,ref=ghcr.io/samizdapp/athena:develop \
                     --cache-to type=inline \
                     --tag ghcr.io/samizdapp/athena:${{ github.sha }} \
-                    --push \
                     .
 
-            - name: Build and push validate image
+            - name: Build and export validate image
               run: |
                   docker build . \
                     -f .github/workflows/validate.Dockerfile \
                     --build-arg VERSION=${{ github.sha }} \
                     --tag ghcr.io/samizdapp/athena-validate:${{ github.sha }}
+                    --output type=docker,dest=/tmp/images/athena-validate.tar
 
-                  docker push ghcr.io/samizdapp/athena-validate:${{ github.sha }}
+            - name: Upload image artifacts
+              uses: actions/upload-artifact@v3
+              with:
+                  name: athena-images
+                  path: /tmp/images
 
     # This workflow contains a single job called "build"
     build:
@@ -61,6 +66,16 @@ jobs:
 
         # Steps represent a sequence of tasks that will be executed as part of the job
         steps:
+            - name: Download image artifacts
+              uses: actions/download-artifact@v3
+              with:
+                  name: athena-images
+                  path: /tmp/images
+
+            - name: Load images
+              run: |
+                  docker load --input /tmp/images/athena-validate.tar
+
             - name: affected:build
               run: |
                   docker run \

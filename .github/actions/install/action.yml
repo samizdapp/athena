@@ -1,6 +1,11 @@
 name: install
-
 description: install
+
+inputs:
+    github_token:
+        description: GITHUB_TOKEN
+        required: true
+
 runs:
     using: 'composite'
     steps:
@@ -12,7 +17,7 @@ runs:
           with:
               registry: ghcr.io
               username: ${{ github.repository_owner }}
-              password: ${{ secrets.GITHUB_TOKEN }}
+              password: ${{ inputs.github_token }}
 
         - name: Build athena image
           shell: bash

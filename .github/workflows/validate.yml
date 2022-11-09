@@ -46,7 +46,9 @@ jobs:
                   docker build . \
                     -f .github/workflows/validate.Dockerfile \
                     --build-arg VERSION=${{ github.sha }} \
-                    --tag samizdapp/athena-validate:latest
+                    --tag ghcr.io/samizdapp/athena-validate:${{ github.sha }}
+
+                  docker push ghcr.io/samizdapp/athena-validate:${{ github.sha }}
 
     # This workflow contains a single job called "build"
     build:
@@ -62,7 +64,7 @@ jobs:
                   docker run \
                     --rm \
                     --entrypoint npm \
-                    samizdapp/athena-build:latest \
+                    ghcr.io/samizdapp/athena-validate:${{ github.sha }} \
                     run nx -- affected --target=build --base=${{ github.event.pull_request.base.sha }}
 
     lint:
@@ -70,7 +72,7 @@ jobs:
 
         # The type of runner that the job will run on
         runs-on: ubuntu-latest
-        container: samizdapp/athena-validate:latest
+        container: ghcr.io/samizdapp/athena-validate:${{ github.sha }}
 
         # Steps represent a sequence of tasks that will be executed as part of the job
         steps:

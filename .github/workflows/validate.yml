@@ -25,9 +25,9 @@ jobs:
 
             - name: Build athena image
               run: |
+                  docker pull ghcr.io/samizdapp/athena:${{ github.event.before }}
+                  docker pull ghcr.io/samizdapp/athena:develop
                   docker build \
-                    --cache-from type=registry,ref=ghcr.io/samizdapp/athena:${{ github.event.before }} \
-                    --cache-from type=registry,ref=ghcr.io/samizdapp/athena:develop \
                     --tag ghcr.io/samizdapp/athena:${{ github.sha }} \
                     .
 

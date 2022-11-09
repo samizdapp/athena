@@ -20,8 +20,8 @@ runs:
           shell: bash
           run: |
               DOCKER_BUILDKIT=1 docker build \
-                --cache-from type=registry,ref=ghcr.io/samizdapp/athena:${{ github.event.before }} \
-                --cache-from type=registry,ref=ghcr.io/samizdapp/athena:develop \
+                --cache-from ghcr.io/samizdapp/athena:${{ github.event.before }} \
+                --cache-from ghcr.io/samizdapp/athena:develop \
                 --tag ghcr.io/samizdapp/athena:${{ github.sha }} \
                 .
               docker push ghcr.io/samizdapp/athena:${{ github.sha }}

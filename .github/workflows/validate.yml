@@ -58,14 +58,12 @@ jobs:
               run: ls -la
 
             - name: Build job image
-              uses: docker/build-push-action@v3
-              with:
-                  tags: samizdapp/athena-build:latest
-                  file: .github/workflows/build.Dockerfile
-                  build-args: |
-                      VERSION=${{ github.sha }}
-                      BASE=${{ github.event.pull_request.base.sha }}
-                  push: false
+              run: |
+                  docker build . \
+                    -f .github/workflows/build.Dockerfile \
+                    --build-arg VERSION=${{ github.sha }} \
+                    --build-arg BASE=${{ github.event.pull_request.base.sha }} \
+                    --tag samizdapp/athena-build:latest
 
             - name: affected:build
               run: |

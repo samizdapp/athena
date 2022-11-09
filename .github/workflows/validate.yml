@@ -33,15 +33,15 @@ jobs:
                   username: ${{ github.repository_owner }}
                   password: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: Build and export athena image
+            - name: Build athena image
               run: |
                   mkdir -p /tmp/images
                   /usr/bin/docker buildx build \
                     --cache-from type=registry,ref=ghcr.io/samizdapp/athena:${{ github.event.before }} \
                     --cache-from type=registry,ref=ghcr.io/samizdapp/athena:develop \
-                    --cache-to type=inline \
                     --tag ghcr.io/samizdapp/athena:${{ github.sha }} \
                     .
+                    --load
 
             - name: Build and export validate image
               run: |

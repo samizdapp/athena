@@ -72,5 +72,19 @@ jobs:
             - name: lint
               run: npm run nx -- affected --target=lint  --base=${{ github.event.pull_request.base.sha }} --max-warnings=0
 
+    format-check:
+        needs: install
+
+        # The type of runner that the job will run on
+        runs-on: ubuntu-latest
+        container: ghcr.io/samizdapp/athena:${{ github.sha }}
+
+        # Steps represent a sequence of tasks that will be executed as part of the job
+        steps:
+            # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+            - uses: actions/checkout@v3
+              with:
+                  fetch-depth: 0
+
             - name: format:check
               run: npm run nx -- format:check  --base=${{ github.event.pull_request.base.sha }}

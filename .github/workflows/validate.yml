@@ -61,7 +61,7 @@ jobs:
 
             - name: Copy checkout
               run: |
-                  cp -r ${{ env.GITHUB_WORKSPACE }} /usr/src/athena
+                  cp -r ${{ github.workspace }} /usr/src/athena
 
             - name: Install Git
               run: |

@@ -11,7 +11,7 @@ import { PersistentPeerStore } from '@libp2p/peer-store';
 import { isLoopback } from '@libp2p/utils/multiaddr/is-loopback';
 import { isPrivate } from '@libp2p/utils/multiaddr/is-private';
 import { WebSockets } from '@libp2p/websockets';
-import { all as filter } from '@libp2p/websockets/filters';
+import { all as WSAllfilter } from '@libp2p/websockets/filters';
 import { Multiaddr as MultiaddrType } from '@multiformats/multiaddr';
 import { Buffer } from 'buffer/';
 import { LevelDatastore } from 'datastore-level';
@@ -69,7 +69,12 @@ declare const self: {
     // window: Window;
     // document: Document;
     libp2pSetLogLevel: (level: LogLevel) => void;
+    latencyMap: Map<string, number>;
+    latencySet: Set<string>;
 } & ServiceWorkerGlobalScope;
+
+self.latencyMap = new Map();
+self.latencySet = new Set();
 
 self.libp2pSetLogLevel = (level: LogLevel) => {
     const levelHandlers: Record<LogLevel, (extra?: string) => void> = {
@@ -95,7 +100,7 @@ self.libp2pSetLogLevel = (level: LogLevel) => {
     levelHandlers[level]();
 };
 
-self.libp2pSetLogLevel(LogLevel.INFO);
+// self.libp2pSetLogLevel(LogLevel.INFO);
 
 // slightly modified version of
 // https://github.com/libp2p/js-libp2p-utils/blob/66e604cb0bfcf686eb68e44f278d62e3464c827c/src/address-sort.ts
@@ -104,6 +109,47 @@ self.libp2pSetLogLevel(LogLevel.INFO);
 //@ts-ignore
 self.addrSort = publicRelayAddressesFirst;
 function publicRelayAddressesFirst(a: Address, b: Address): -1 | 0 | 1 {
+    // console.log('spam sort', a.multiaddr.toString(), b.multiaddr.toString());
+    const haveLatencyA = self.latencyMap.has(a.multiaddr.toString());
+    const haveLatencyB = self.latencyMap.has(b.multiaddr.toString());
+
+    // if we only have one latency, it's the one we want
+    if (haveLatencyA && !haveLatencyB) {
+        return -1;
+    }
+    if (!haveLatencyA && haveLatencyB) {
+        return 1;
+    }
+
+    if (haveLatencyA && haveLatencyB) {
+        // if we have latency info for both, prefer non relay
+        const isARelay = isRelay(a);
+        const isBRelay = isRelay(b);
+        if (isARelay && !isBRelay) {
+            return 1;
+        }
+        if (!isARelay && isBRelay) {
+            return -1;
+        }
+        // if both/neither are relays, prefer the one with lower latency
+        const latencyA =
+            self.latencyMap.get(a.multiaddr.toString()) || Infinity;
+        const latencyB =
+            self.latencyMap.get(b.multiaddr.toString()) || Infinity;
+        if (latencyA < latencyB) {
+            return -1;
+        }
+        if (latencyA > latencyB) {
+            return 1;
+        }
+
+        // if both have the same latency, return 0
+        return 0;
+    }
+
+    // we should never get here, but not sure on where this vs filter
+    // is called, so leaving old logic just in case;
+
     const isADNS = isDNS(a);
     const isBDNS = isDNS(b);
     const isAPrivate = isPrivate(a.multiaddr);
@@ -154,6 +200,44 @@ function isDNS(ma: Address): boolean {
 }
 self.localforage = localforage;
 
+async function getWSOpenLatency(ma: string): Promise<number> {
+    return new Promise(resolve => {
+        try {
+            const [_nil, _type, host, _tcp, port, _ws, _p2p, id] =
+                ma.split('/');
+            const start = Date.now();
+            const ws = new WebSocket(`ws://${host}:${port}/p2p/${id}`);
+            ws.onopen = () => {
+                ws.close();
+                resolve(Date.now() - start);
+            };
+            ws.onerror = () => resolve(Infinity);
+        } catch (e) {
+            console.error(e);
+            resolve(Infinity);
+        }
+    });
+}
+
+async function checkAddress(address: string): Promise<void> {
+    const latency = await getWSOpenLatency(address);
+    // console.log('spam latency', address, latency);
+    if (latency < Infinity) {
+        self.latencyMap.set(address, latency);
+        self.latencySet.add(address.split('/p2p-circuit')[0]);
+    } else {
+        self.latencyMap.delete(address);
+        self.latencySet.delete(address.split('/p2p-circuit')[0]);
+        await new Promise(r => setTimeout(r, 100000000));
+    }
+}
+
+async function initCheckAddresses(addresses: string[]): Promise<void> {
+    self.latencyMap = new Map();
+    self.latencySet = new Set();
+    await Promise.race(addresses.map(checkAddress));
+}
+
 const WB_MANIFEST = self.__WB_MANIFEST;
 // const wbManifestUrls = WB_MANIFEST.map(it =>
 //     (it as PrecacheEntry).revision ? (it as PrecacheEntry).url : it
@@ -178,7 +262,7 @@ self.setImmediate = (fn: () => void) => self.setTimeout(fn, 0);
 //
 // self.__WB_DISABLE_DEV_LOGS = true
 
-self.DIAL_TIMEOUT = 5000;
+self.DIAL_TIMEOUT = 1000;
 
 self.Multiaddr = Multiaddr;
 
@@ -198,10 +282,10 @@ async function* streamFactoryGenerator(): AsyncGenerator<
     string | undefined
 > {
     let locked = false;
+    let dialTimeout = self.DIAL_TIMEOUT;
 
     const makeStream: StreamMaker = async function (protocol) {
         // console.log('get protocol stream', protocol)
-        let dialTimeout = self.DIAL_TIMEOUT;
         let retryTimeout = 0;
         let streamOrNull = null;
         while (!streamOrNull) {
@@ -221,7 +305,7 @@ async function* streamFactoryGenerator(): AsyncGenerator<
                 // use the time of the dial to calculate an
                 // appropriate dial timeout
                 dialTimeout = Math.max(
-                    2000,
+                    self.DIAL_TIMEOUT,
                     Math.floor((Date.now() - start) * 1.5)
                 );
                 retryTimeout = 0;
@@ -256,37 +340,45 @@ async function* streamFactoryGenerator(): AsyncGenerator<
                 dialTimeout,
                 retryTimeout,
             });
-            await waitFor(retryTimeout);
 
-            // if our retry timeout reaches 30 seconds, then we'll have
-            // been retrying for 5 minutes 45 seconds
-            // (triangle number of 30)
-            // time to reset
-            if (retryTimeout >= 30000) {
-                retryTimeout = 0;
+            if (!locked) {
+                await waitFor(retryTimeout);
+
+                // if our retry timeout reaches 30 seconds, then we'll have
+                // been retrying for 5 minutes 45 seconds
+                // (triangle number of 30)
+                // time to reset
+                if (retryTimeout >= 30000) {
+                    retryTimeout = 0;
+                }
+                // increase our retry timeout
+                retryTimeout += 1000;
+                // increase our dial timeout, but never make it higher than
+                // 5 minutes
+                dialTimeout = Math.min(1000 * 60 * 5, dialTimeout * 4);
+
+                // now that we've waiting, we can retry
+                locked = true;
+                console.log('Resetting libp2p...');
+                const _s = Date.now();
+                const bootstraplist = await getBootstrapList(true);
+                initCheckAddresses(bootstraplist);
+                await self.node.stop();
+                await self.node.start();
+                const relays = bootstraplist.map(
+                    s => Multiaddr.multiaddr(s) as unknown as MultiaddrType
+                );
+                await self.node.peerStore.addressBook.add(
+                    self.serverPeer,
+                    relays
+                );
+
+                console.log('reset time', Date.now() - _s);
+            } else {
+                while (locked) {
+                    await waitFor(100);
+                }
             }
-            // increase our retry timeout
-            retryTimeout += 1000;
-            // increase our dial timeout, but never make it higher than
-            // 5 minutes
-            dialTimeout = Math.min(1000 * 60 * 5, dialTimeout * 4);
-
-            // now that we've waiting, we can retry
-            console.log('Resetting libp2p...');
-            await self.node.stop();
-            await self.node.start();
-            const relays =
-                (await localforage
-                    .getItem<Multiaddr.MultiaddrInput[]>('libp2p.relays')
-                    .then(str_array => {
-                        return str_array?.map(
-                            addr =>
-                                Multiaddr.multiaddr(
-                                    addr
-                                ) as unknown as MultiaddrType
-                        );
-                    })) ?? [];
-            await self.node.peerStore.addressBook.add(self.serverPeer, relays);
         }
         locked = false;
         return streamOrNull;
@@ -296,7 +388,6 @@ async function* streamFactoryGenerator(): AsyncGenerator<
         while (locked) {
             await new Promise(r => setTimeout(r, 100));
         }
-        locked = true;
         yield makeStream;
     }
 }
@@ -563,6 +654,9 @@ async function openRelayStream(cb: () => unknown) {
                 str_relay
             ) as unknown as MultiaddrType;
             console.log('got relay multiaddr', multiaddr.toString());
+            if (!self.latencyMap.has(multiaddr.toString())) {
+                checkAddress(multiaddr.toString());
+            }
             await localforage
                 .getItem<string[]>('libp2p.relays')
                 .then(str_array => {
@@ -607,17 +701,20 @@ function getHostAddrs(hostname: string, tail: string[]): string[] {
     return res;
 }
 
-async function getBootstrapList() {
+async function getBootstrapList(skipFetch = false) {
     let newBootstrapAddress = null;
     try {
-        newBootstrapAddress = await fetch('/smz/pwa/assets/libp2p.bootstrap')
-            .then(res => {
-                if (res.status >= 400) {
-                    throw res;
-                }
-                return res.text();
-            })
-            .then(text => text.trim());
+        if (!skipFetch) {
+            newBootstrapAddress = await self
+                .stashedFetch('/smz/pwa/assets/libp2p.bootstrap')
+                .then(res => {
+                    if (res.status >= 400) {
+                        throw res;
+                    }
+                    return res.text();
+                })
+                .then(text => text.trim());
+        }
     } catch (e) {
         console.debug('Error while trying to fetch new bootstrap address: ', e);
     }
@@ -641,13 +738,27 @@ async function getBootstrapList() {
     const { hostname } = new URL(self.origin);
     const [_, _proto, _ip, ...rest] = bootstrapaddr?.split('/') ?? [];
     const hostaddrs = getHostAddrs(hostname, rest);
-    return [bootstrapaddr ?? '', ...hostaddrs, ...relay_addrs];
+    const res = [bootstrapaddr ?? '', ...hostaddrs, ...relay_addrs].filter(
+        notEmpty => notEmpty
+    );
+    return res;
+}
+
+function websocketAddressFilter(addresses: MultiaddrType[]) {
+    const res = WSAllfilter(addresses);
+    // .filter((addr: MultiaddrType) => {
+    //     console.log('filter?', addr.toString());
+    //     return self.latencySet.has(addr.toString());
+    // });
+    console.log('ran filter', res);
+    return res;
 }
 
 async function main() {
     // self.window.localStorage.debug = (await localforage.getItem('debug')) || ""
 
     const bootstraplist = await getBootstrapList();
+    initCheckAddresses(bootstraplist);
     // update status
     self.status.serverPeer = ServerPeerStatus.BOOTSTRAPPED;
 
@@ -660,7 +771,7 @@ async function main() {
         datastore,
         transports: [
             new WebSockets({
-                filter,
+                filter: websocketAddressFilter,
             }),
         ],
         connectionEncryption: [new Noise() as unknown as ConnectionEncrypter],
@@ -776,19 +887,24 @@ async function main() {
     return connectPromise;
 }
 
+const maybeNavigateToFediverse = async (event: FetchEvent) => {
+    const { pathname, searchParams } = new URL(event.request.url);
+    if (pathname === '/api/v1/timelines/public' && searchParams.get('local')) {
+        const allClients = await self.clients.matchAll();
+        const atPleromaPage = allClients.find(
+            it =>
+                it instanceof WindowClient &&
+                new URL(it.url).pathname === '/timeline/local'
+        ) as WindowClient;
+
+        if (atPleromaPage) {
+            atPleromaPage.navigate('/timeline/fediverse');
+        }
+    }
+};
+
 self.addEventListener('fetch', function (event) {
     // console.log('Received fetch: ', event);
-
-    // // if this url is in the manifest
-    // if (wbManifestUrls.includes(event.request.url)) {
-    //     // then use our default fetch to fetch it
-
-    // }
-
-    // if (event?.request.method === 'GET') {
-    //     //default service worker only handles GET
-    //     return;
-    // }
 
     // Check if this is a request for a static asset
     // console.log('destination', event.request.destination, event.request)
@@ -831,6 +947,7 @@ self.addEventListener('fetch', function (event) {
             })
         );
     } else {
+        maybeNavigateToFediverse(event);
         event?.respondWith(fetch(event.request));
     }
 });

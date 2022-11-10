@@ -5,31 +5,38 @@ name: validate
 # Controls when the workflow will run
 on:
     pull_request:
-        branches: ['develop']
 
     # Allows you to run this workflow manually from the Actions tab
     workflow_dispatch:
 
+permissions:
+    packages: write
+
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-    # This workflow contains a single job called "build"
-    build:
+    format-check:
         # The type of runner that the job will run on
         runs-on: ubuntu-latest
 
         # Steps represent a sequence of tasks that will be executed as part of the job
         steps:
-            # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-            - uses: actions/checkout@v3
+            - name: Checkout
+              uses: actions/checkout@v3
               with:
                   fetch-depth: 0
 
-            # Runs a single command using the runners shell
-            - name: install
-              run: npm install
+            - name: Install
+              uses: ./.github/actions/install
+              with:
+                  github_token: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: build
-              run: npm run nx -- affected --target=build --base=origin/master
+            - name: format:check
+              run: |
+                  docker run \
+                    --rm \
+                    --entrypoint npm \
+                    ghcr.io/samizdapp/athena-validate:${{ github.sha }} \
+                    run nx -- format:check  --base=${{ github.event.pull_request.base.sha }}
 
     lint:
         # The type of runner that the job will run on
@@ -37,17 +44,45 @@ jobs:
 
         # Steps represent a sequence of tasks that will be executed as part of the job
         steps:
-            # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-            - uses: actions/checkout@v3
+            - name: Checkout
+              uses: actions/checkout@v3
               with:
                   fetch-depth: 0
 
-            # Runs a single command using the runners shell
-            - name: install
-              run: npm install
+            - name: Install
+              uses: ./.github/actions/install
+              with:
+                  github_token: ${{ secrets.GITHUB_TOKEN }}
 
             - name: lint
-              run: npm run nx -- affected --target=lint --base=origin/master --max-warnings=0
+              run: |
+                  docker run \
+                    --rm \
+                    --entrypoint npm \
+                    ghcr.io/samizdapp/athena-validate:${{ github.sha }} \
+                    run nx -- affected --target=lint  --base=${{ github.event.pull_request.base.sha }} --max-warnings=0
 
-            - name: format:check
-              run: npm run nx -- format:check --base=origin/master
+    # This workflow contains a single job called "build"
+    build:
+        # The type of runner that the job will run on
+        runs-on: ubuntu-latest
+
+        # Steps represent a sequence of tasks that will be executed as part of the job
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v3
+              with:
+                  fetch-depth: 0
+
+            - name: Install
+              uses: ./.github/actions/install
+              with:
+                  github_token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: affected:build
+              run: |
+                  docker run \
+                    --rm \
+                    --entrypoint npm \
+                    ghcr.io/samizdapp/athena-validate:${{ github.sha }} \
+                    run nx -- affected --target=build --base=${{ github.event.pull_request.base.sha }}

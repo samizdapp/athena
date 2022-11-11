@@ -842,47 +842,62 @@ async function main() {
             node.connectionManager.addEventListener(
                 'peer:connect',
                 async evt => {
+                    // log connection details
                     const connection = evt.detail;
                     const str_id = connection.remotePeer.toString();
-                    console.log(`Connected to ${str_id}, check ${serverID}`);
+                    console.log(`Connected to: `, {
+                        server: str_id,
+                        via: connection.remoteAddr.toString(),
+                    });
+                    // set keep-alive on connection
                     await node.peerStore
                         .tagPeer(connection.remotePeer, KEEP_ALIVE)
                         .catch(_ => null);
-                    if (str_id === serverID) {
-                        // update status
 
-                        self.serverPeer = connection.remotePeer;
-                        self.status.serverPeer = ServerPeerStatus.CONNECTED;
+                    // if this is not our server
+                    const serverMatch = str_id === serverID;
+                    console.log(
+                        `Server match: ${serverMatch} (${str_id} ${
+                            serverMatch ? '=' : '!'
+                        }== ${serverID})`
+                    );
+                    if (!serverMatch) {
+                        // then there is no more to do
+                        return;
+                    } // else, we've connected to our server
 
-                        if (Date.now() - relayDebounce > 60000) {
-                            relayDebounce = Date.now();
-                            openRelayStream(() => {
-                                /*
-                                 * Don't wait for a relay before resolving.
-                                 *
-                                 * A relay is required in order to access the box
-                                 * outside of the box's LAN. There are currently
-                                 * two methods of obtaining a relay: a UPnP address
-                                 * on the local network and a public UPnP address
-                                 * on the SamizdApp network; however, both methods
-                                 * are currently unreliable.
-                                 *
-                                 * Until we have a way of reliably obtaining a
-                                 * public relay, do not wait for a public relay
-                                 * before resolving.
-                                 *
-                                 * TODO: Strengthen one of the methods for
-                                 * obtaining a public relay address.
-                                 *
-                                 */
-                                //resolve();
-                            });
-                        }
+                    // update status
+                    self.serverPeer = connection.remotePeer;
+                    self.status.serverPeer = ServerPeerStatus.CONNECTED;
 
-                        // TODO: Don't resolve here once we have a reliable way
-                        // of obtaining a public relay
-                        resolve();
+                    if (Date.now() - relayDebounce > 60000) {
+                        relayDebounce = Date.now();
+                        openRelayStream(() => {
+                            /*
+                             * Don't wait for a relay before resolving.
+                             *
+                             * A relay is required in order to access the box
+                             * outside of the box's LAN. There are currently
+                             * two methods of obtaining a relay: a UPnP address
+                             * on the local network and a public UPnP address
+                             * on the SamizdApp network; however, both methods
+                             * are currently unreliable.
+                             *
+                             * Until we have a way of reliably obtaining a
+                             * public relay, do not wait for a public relay
+                             * before resolving.
+                             *
+                             * TODO: Strengthen one of the methods for
+                             * obtaining a public relay address.
+                             *
+                             */
+                            //resolve();
+                        });
                     }
+
+                    // TODO: Don't resolve here once we have a reliable way
+                    // of obtaining a public relay
+                    resolve();
                 }
             );
         } catch (e) {

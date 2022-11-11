@@ -950,10 +950,10 @@ async function main() {
     await node.start();
     console.debug('started libp2p');
 
-    // const path = getQuickestPath();
-    // if (path) {
-    //     node.dial(path as unknown as MultiaddrType);
-    // }
+    const path = getQuickestPath();
+    if (path) {
+        node.dial(path as unknown as MultiaddrType);
+    }
 
     // update status
     self.status.serverPeer = ServerPeerStatus.CONNECTING;

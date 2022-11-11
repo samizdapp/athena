@@ -563,7 +563,7 @@ async function p2Fetch(
 
     // console.log('parts:')
     // parts.forEach(p => console.log(p.toString('hex')))
-    let j = 0;
+    // let j = 0;
     let done = false;
     let res_parts: Buffer[] = [];
 

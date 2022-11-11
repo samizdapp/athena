@@ -29,8 +29,6 @@ import {
     Message,
     ClientMessageType,
 } from '../service-worker';
-import { connect } from 'http2';
-import { Duplex } from 'stream';
 
 // the workbox-precaching import includes a type definition for
 // <self dot __WB_MANIFEST>.

@@ -559,12 +559,11 @@ async function p2Fetch(
 
     parts.push(Buffer.from([0x00]));
     // console.log('packet?', packet)
-    console.log('get fetch stream');
-    console.log('got fetch stream');
+    // console.log('get fetch stream');
 
     // console.log('parts:')
     // parts.forEach(p => console.log(p.toString('hex')))
-    let j = 0;
+    // let j = 0;
     let done = false;
     let res_parts: Buffer[] = [];
 
@@ -580,7 +579,7 @@ async function p2Fetch(
             async function gatherResponse(source) {
                 for await (const msg of source) {
                     float = Math.max(float, Date.now() - t);
-                    console.log('piper float', float);
+                    // console.log('piper float', float);
                     t = Date.now();
                     const buf = Buffer.from(msg.subarray());
                     if (msg.subarray().length === 1 && buf[0] === 0x00) {
@@ -593,7 +592,7 @@ async function p2Fetch(
         );
 
         while (!done && (!float || Date.now() - t < float * 2)) {
-            console.log('piper wait', done, float, Date.now() - t, float * 2);
+            // console.log('piper wait', done, float, Date.now() - t, float * 2);
             await waitFor(100);
             if (!float && Date.now() - t > 10000) {
                 break;
@@ -604,14 +603,14 @@ async function p2Fetch(
         }
 
         stream.close();
-        console.log('piper finish');
+        // console.log('piper finish');
     }
 
     while (!done) {
-        console.log('try', j++, reqObj.url);
+        // console.log('try', j++, reqObj.url);
         res_parts = [];
         await piper();
-        console.log('piper finished', done);
+        // console.log('piper finished', done);
     }
 
     const resp = decode(Buffer.concat(res_parts));

@@ -21,12 +21,16 @@ import { decode, encode } from 'lob-enc';
 import localforage from 'localforage';
 import Multiaddr from 'multiaddr';
 import * as workboxPrecaching from 'workbox-precaching';
+import { KEEP_ALIVE } from '@libp2p/interface-peer-store/tags';
+import type * as it from 'it-stream-types';
 import {
     WorkerMessageType,
     ServerPeerStatus,
     Message,
     ClientMessageType,
 } from '../service-worker';
+import { connect } from 'http2';
+import { Duplex } from 'stream';
 
 // the workbox-precaching import includes a type definition for
 // <self dot __WB_MANIFEST>.
@@ -100,7 +104,7 @@ self.libp2pSetLogLevel = (level: LogLevel) => {
     levelHandlers[level]();
 };
 
-// self.libp2pSetLogLevel(LogLevel.INFO);
+self.libp2pSetLogLevel(LogLevel.ERROR);
 
 // slightly modified version of
 // https://github.com/libp2p/js-libp2p-utils/blob/66e604cb0bfcf686eb68e44f278d62e3464c827c/src/address-sort.ts
@@ -225,17 +229,16 @@ async function checkAddress(address: string): Promise<void> {
     if (latency < Infinity) {
         self.latencyMap.set(address, latency);
         self.latencySet.add(address.split('/p2p-circuit')[0]);
-    } else {
-        self.latencyMap.delete(address);
-        self.latencySet.delete(address.split('/p2p-circuit')[0]);
-        await new Promise(r => setTimeout(r, 100000000));
     }
 }
 
 async function initCheckAddresses(addresses: string[]): Promise<void> {
     self.latencyMap = new Map();
     self.latencySet = new Set();
-    await Promise.race(addresses.map(checkAddress));
+    await Promise.race([
+        Promise.all(addresses.map(checkAddress)),
+        waitFor(1000),
+    ]);
 }
 
 const WB_MANIFEST = self.__WB_MANIFEST;
@@ -262,11 +265,11 @@ self.setImmediate = (fn: () => void) => self.setTimeout(fn, 0);
 //
 // self.__WB_DISABLE_DEV_LOGS = true
 
-self.DIAL_TIMEOUT = 1000;
+self.DIAL_TIMEOUT = 2000;
 
 self.Multiaddr = Multiaddr;
 
-const CHUNK_SIZE = 1024 * 64;
+const CHUNK_SIZE = 1024 * 8;
 self.Buffer = Buffer;
 
 self._fetch = fetch;
@@ -282,13 +285,16 @@ async function* streamFactoryGenerator(): AsyncGenerator<
     string | undefined
 > {
     let locked = false;
-    let dialTimeout = self.DIAL_TIMEOUT;
 
     const makeStream: StreamMaker = async function (protocol) {
         // console.log('get protocol stream', protocol)
+        let dialTimeout = self.DIAL_TIMEOUT;
         let retryTimeout = 0;
         let streamOrNull = null;
         while (!streamOrNull) {
+            while (locked) {
+                await waitFor(100);
+            }
             // attempt to dial our peer, track the time it takes
             const start = Date.now();
             streamOrNull = await Promise.race([
@@ -341,28 +347,30 @@ async function* streamFactoryGenerator(): AsyncGenerator<
                 retryTimeout,
             });
 
+            await waitFor(retryTimeout);
+
+            // if our retry timeout reaches 30 seconds, then we'll have
+            // been retrying for 5 minutes 45 seconds
+            // (triangle number of 30)
+            // time to reset
+            if (retryTimeout >= 30000) {
+                retryTimeout = 0;
+            }
+            // increase our retry timeout
+            retryTimeout += 1000;
+            // increase our dial timeout, but never make it higher than
+            // 5 minutes
+            dialTimeout = Math.min(1000 * 60 * 5, dialTimeout * 4);
+
+            // now that we've waiting, we can retry
+            // locked = true;
+            console.log('Resetting libp2p...');
             if (!locked) {
-                await waitFor(retryTimeout);
-
-                // if our retry timeout reaches 30 seconds, then we'll have
-                // been retrying for 5 minutes 45 seconds
-                // (triangle number of 30)
-                // time to reset
-                if (retryTimeout >= 30000) {
-                    retryTimeout = 0;
-                }
-                // increase our retry timeout
-                retryTimeout += 1000;
-                // increase our dial timeout, but never make it higher than
-                // 5 minutes
-                dialTimeout = Math.min(1000 * 60 * 5, dialTimeout * 4);
-
-                // now that we've waiting, we can retry
                 locked = true;
-                console.log('Resetting libp2p...');
                 const _s = Date.now();
                 const bootstraplist = await getBootstrapList(true);
-                initCheckAddresses(bootstraplist);
+                await initCheckAddresses(bootstraplist);
+
                 await self.node.stop();
                 await self.node.start();
                 const relays = bootstraplist.map(
@@ -372,22 +380,15 @@ async function* streamFactoryGenerator(): AsyncGenerator<
                     self.serverPeer,
                     relays
                 );
-
                 console.log('reset time', Date.now() - _s);
-            } else {
-                while (locked) {
-                    await waitFor(100);
-                }
+                locked = false;
             }
         }
-        locked = false;
         return streamOrNull;
     };
 
     while (true) {
-        while (locked) {
-            await new Promise(r => setTimeout(r, 100));
-        }
+        // locked = true;
         yield makeStream;
     }
 }
@@ -547,10 +548,6 @@ async function p2Fetch(
     const pbody = await normalizeBody(body);
     const packet = encode({ reqObj, reqInit }, pbody);
     // console.log('packet:', packet.toString('hex'))
-
-    // console.log('packet?', packet)
-    const stream: Stream = await getStream();
-
     let i = 0;
     const parts: Buffer[] = [];
     for (; i <= Math.floor(packet.length / CHUNK_SIZE); i++) {
@@ -563,40 +560,69 @@ async function p2Fetch(
     }
 
     parts.push(Buffer.from([0x00]));
+    // console.log('packet?', packet)
+    console.log('get fetch stream');
+    console.log('got fetch stream');
+
     // console.log('parts:')
     // parts.forEach(p => console.log(p.toString('hex')))
+    let j = 0;
+    let done = false;
+    let res_parts: Buffer[] = [];
 
-    return new Promise((resolve, reject) => {
-        let done = false;
-        try {
-            pipe(parts, stream, async function (source) {
-                const parts = [];
+    async function piper() {
+        const stream = await getStream();
+
+        let float = 0,
+            t = Date.now();
+        // console.log('piper parts', parts);
+        pipe(
+            parts,
+            stream as unknown as it.Duplex<Buffer, Buffer>,
+            async function gatherResponse(source) {
                 for await (const msg of source) {
+                    float = Math.max(float, Date.now() - t);
+                    console.log('piper float', float);
+                    t = Date.now();
                     const buf = Buffer.from(msg.subarray());
                     if (msg.subarray().length === 1 && buf[0] === 0x00) {
-                        const resp = decode(Buffer.concat(parts));
-                        if (!resp.json.res) {
-                            return reject(resp.json.error);
-                        }
-                        resp.json.res.headers = new Headers(
-                            resp.json.res.headers
-                        );
-                        // alert("complete");
                         done = true;
-                        resolve(new Response(resp.body, resp.json.res));
-                        stream?.close();
                     } else {
-                        parts.push(buf);
+                        res_parts.push(buf);
                     }
                 }
-            });
-        } catch (e) {
-            console.warn(e);
-            if (!done) {
-                p2Fetch(givenReqObj, givenReqInit).then(resolve).catch(reject);
+            }
+        );
+
+        while (!done && (!float || Date.now() - t < float * 2)) {
+            console.log('piper wait', done, float, Date.now() - t, float * 2);
+            await waitFor(100);
+            if (!float && Date.now() - t > 10000) {
+                break;
+            }
+            if (self.status.serverPeer !== ServerPeerStatus.CONNECTED) {
+                break;
             }
         }
-    });
+
+        stream.close();
+        console.log('piper finish');
+    }
+
+    while (!done) {
+        console.log('try', j++, reqObj.url);
+        res_parts = [];
+        await piper();
+        console.log('piper finished', done);
+    }
+
+    const resp = decode(Buffer.concat(res_parts));
+    if (!resp.json.res) {
+        throw resp.json.error;
+    }
+    resp.json.res.headers = new Headers(resp.json.res.headers);
+    // alert("complete");
+    return new Response(resp.body, resp.json.res);
 }
 
 const getHost = () => {
@@ -655,7 +681,7 @@ async function openRelayStream(cb: () => unknown) {
             ) as unknown as MultiaddrType;
             console.log('got relay multiaddr', multiaddr.toString());
             if (!self.latencyMap.has(multiaddr.toString())) {
-                checkAddress(multiaddr.toString());
+                await checkAddress(multiaddr.toString());
             }
             await localforage
                 .getItem<string[]>('libp2p.relays')
@@ -745,12 +771,11 @@ async function getBootstrapList(skipFetch = false) {
 }
 
 function websocketAddressFilter(addresses: MultiaddrType[]) {
-    const res = WSAllfilter(addresses);
-    // .filter((addr: MultiaddrType) => {
-    //     console.log('filter?', addr.toString());
-    //     return self.latencySet.has(addr.toString());
-    // });
-    console.log('ran filter', res);
+    const res = WSAllfilter(addresses).filter((addr: MultiaddrType) => {
+        // console.log('filter?', addr.toString());
+        return self.latencySet.has(addr.toString());
+    });
+    // console.log('ran filter', res);
     return res;
 }
 
@@ -785,7 +810,7 @@ async function main() {
             autoDial: true, // Auto connect to discovered peers (limited by ConnectionManager minConnections)
             minConnections: 3,
             maxDialsPerPeer: 20,
-            maxParallelDials: 10,
+            maxParallelDials: 20,
             addressSorter: publicRelayAddressesFirst,
             // The `tag` property will be searched when creating the instance of your Peer Discovery service.
             // The associated object, will be passed to the service when it is instantiated.
@@ -814,6 +839,7 @@ async function main() {
     });
 
     // Listen for new connections to peers
+    let relayDebounce = 0;
     const connectPromise = new Promise<void>((resolve, reject) => {
         try {
             node.connectionManager.addEventListener(
@@ -822,32 +848,39 @@ async function main() {
                     const connection = evt.detail;
                     const str_id = connection.remotePeer.toString();
                     console.log(`Connected to ${str_id}, check ${serverID}`);
+                    await node.peerStore
+                        .tagPeer(connection.remotePeer, KEEP_ALIVE)
+                        .catch(_ => null);
                     if (str_id === serverID) {
                         // update status
+
                         self.serverPeer = connection.remotePeer;
                         self.status.serverPeer = ServerPeerStatus.CONNECTED;
 
-                        openRelayStream(() => {
-                            /*
-                             * Don't wait for a relay before resolving.
-                             *
-                             * A relay is required in order to access the box
-                             * outside of the box's LAN. There are currently
-                             * two methods of obtaining a relay: a UPnP address
-                             * on the local network and a public UPnP address
-                             * on the SamizdApp network; however, both methods
-                             * are currently unreliable.
-                             *
-                             * Until we have a way of reliably obtaining a
-                             * public relay, do not wait for a public relay
-                             * before resolving.
-                             *
-                             * TODO: Strengthen one of the methods for
-                             * obtaining a public relay address.
-                             *
-                             */
-                            //resolve();
-                        });
+                        if (Date.now() - relayDebounce > 60000) {
+                            relayDebounce = Date.now();
+                            openRelayStream(() => {
+                                /*
+                                 * Don't wait for a relay before resolving.
+                                 *
+                                 * A relay is required in order to access the box
+                                 * outside of the box's LAN. There are currently
+                                 * two methods of obtaining a relay: a UPnP address
+                                 * on the local network and a public UPnP address
+                                 * on the SamizdApp network; however, both methods
+                                 * are currently unreliable.
+                                 *
+                                 * Until we have a way of reliably obtaining a
+                                 * public relay, do not wait for a public relay
+                                 * before resolving.
+                                 *
+                                 * TODO: Strengthen one of the methods for
+                                 * obtaining a public relay address.
+                                 *
+                                 */
+                                //resolve();
+                            });
+                        }
 
                         // TODO: Don't resolve here once we have a reliable way
                         // of obtaining a public relay

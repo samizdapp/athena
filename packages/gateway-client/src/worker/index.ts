@@ -288,7 +288,7 @@ async function* streamFactoryGenerator(): AsyncGenerator<
     let dialTimeout = self.DIAL_TIMEOUT;
     let retryTimeout = 0;
 
-    const makeStream: StreamMaker = async function (protocol, piperId) {
+    const makeStream: StreamMaker = async function (protocol, _piperId) {
         // console.log('get protocol stream', protocol)
         let streamOrNull = null;
         while (!streamOrNull) {
@@ -950,10 +950,10 @@ async function main() {
     await node.start();
     console.debug('started libp2p');
 
-    const path = getQuickestPath();
-    if (path) {
-        node.dial(path as unknown as MultiaddrType);
-    }
+    // const path = getQuickestPath();
+    // if (path) {
+    //     node.dial(path as unknown as MultiaddrType);
+    // }
 
     // update status
     self.status.serverPeer = ServerPeerStatus.CONNECTING;

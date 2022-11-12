@@ -1,27 +1,19 @@
-import { render } from '@testing-library/react';
-
 import { BrowserRouter } from 'react-router-dom';
+import 'whatwg-fetch';
 
 import App from './app';
+import { renderWithProviders } from './redux/testing';
+
+jest.mock('./support');
 
 describe('App', () => {
     it('should render successfully', () => {
-        const { baseElement } = render(
+        const { baseElement } = renderWithProviders(
             <BrowserRouter>
                 <App />
             </BrowserRouter>
         );
 
         expect(baseElement).toBeTruthy();
-    });
-
-    it('should have a greeting as the title', () => {
-        const { getByText } = render(
-            <BrowserRouter>
-                <App />
-            </BrowserRouter>
-        );
-
-        expect(getByText(/Welcome gateway-client/gi)).toBeTruthy();
     });
 });

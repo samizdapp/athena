@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import styled from 'styled-components';
 
-import { ClientMessageType, ServerPeerStatus } from '../../../service-worker';
+import { ClientMessageType, ServerPeerStatus } from '../../../worker-messaging';
 import { selectWorkerStatus } from '../../redux/service-worker/serviceWorker.slice';
 import {
     getSupportedPlatform,

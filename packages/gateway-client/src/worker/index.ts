@@ -26,7 +26,7 @@ import {
     ServerPeerStatus,
     Message,
     ClientMessageType,
-} from '../service-worker';
+} from '../worker-messaging';
 
 // the workbox-precaching import includes a type definition for
 // <self dot __WB_MANIFEST>.

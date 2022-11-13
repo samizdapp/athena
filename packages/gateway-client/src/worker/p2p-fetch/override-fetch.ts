@@ -278,11 +278,13 @@ export const overrideFetch = (clientConnected: Promise<void>) => {
     self.fetch = async (...args) => {
         // if we are connected, use p2p fetch
         if (connectionStatus === 'connected') {
+            log.trace('Using p2p fetch: ', args[0]);
             return p2Fetch(...args);
         }
 
         // else, if we are disconnected, use native fetch
         if (connectionStatus === 'disconnected') {
+            log.trace('Using native fetch: ', args[0]);
             return nativeFetch(...args);
         }
 

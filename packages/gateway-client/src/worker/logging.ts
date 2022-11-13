@@ -1,4 +1,4 @@
-import logger, { LogLevelDesc, levels, Logger } from 'loglevel';
+import logger, { LogLevelDesc, levels } from 'loglevel';
 
 // get level names
 const levelNames = Object.keys(levels) as (keyof typeof levels)[];
@@ -28,7 +28,7 @@ export const getLoggers = (name?: string) => {
     const regexp = new RegExp(name?.replaceAll('*', '.*') ?? '.*');
     // get all loggers
     return (
-        Object.entries(logger.getLoggers())
+        Object.entries({ ...logger.getLoggers(), root: logger })
             // filter by name
             .filter(([name]) => regexp.test(name))
     );

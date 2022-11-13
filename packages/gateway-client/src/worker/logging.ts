@@ -1,6 +1,27 @@
-import logger, { LogLevelDesc, levels } from 'loglevel';
+import logger, { LogLevelDesc, levels, Logger } from 'loglevel';
+
+// get level names
+const levelNames = Object.keys(levels) as (keyof typeof levels)[];
 
 logger.setDefaultLevel(levels.INFO);
+
+// format our logging output
+const originalFactory = logger.methodFactory;
+logger.methodFactory = function (methodName, logLevel, loggerName) {
+    const rawMethod = originalFactory(methodName, logLevel, loggerName);
+
+    const color = `hsl(${Math.random() * 360}, 100%, 40%)`;
+
+    return function (...args) {
+        rawMethod(
+            `%c${levelNames[logLevel]} [${loggerName?.toString() ?? 'root'}]`,
+            `color: ${color}`,
+            ...args
+        );
+    };
+};
+// Be sure to call setLevel method in order to apply plugin
+logger.setLevel(logger.getLevel());
 
 export const getLoggers = (name?: string) => {
     // construct regexp from given name to match loggers with

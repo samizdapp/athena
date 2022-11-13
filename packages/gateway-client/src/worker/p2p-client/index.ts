@@ -659,5 +659,5 @@ export default async () => {
     });
 
     globalSelf.libp2p = globalSelf.node = node;
-    return connectPromise;
+    return { connectPromise, libp2p: node };
 };

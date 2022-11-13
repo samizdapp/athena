@@ -1,6 +1,7 @@
 import localforage from 'localforage';
 
 import { ClientMessageType } from '../worker-messaging';
+import { SamizdAppDevTools } from './devtools';
 import { logger } from './logging';
 import messenger from './messenger';
 import p2pClient from './p2p-client';
@@ -44,7 +45,9 @@ export default async () => {
 
     messenger.init();
 
-    const clientConnected = p2pClient();
+    const { connectPromise: clientConnected, libp2p } = await p2pClient();
 
     overrideFetch(clientConnected);
+
+    new SamizdAppDevTools(libp2p);
 };

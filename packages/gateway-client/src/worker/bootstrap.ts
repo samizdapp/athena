@@ -1,3 +1,6 @@
+import localforage from 'localforage';
+
+import { ClientMessageType } from '../worker-messaging';
 import { logger } from './logging';
 import messenger from './messenger';
 import p2pClient from './p2p-client';
@@ -33,6 +36,10 @@ export default async () => {
         status.sendCurrent();
 
         log.debug('Finish clients claim');
+    });
+
+    messenger.addListener(ClientMessageType.OPENED, () => {
+        localforage.setItem('started', { started: true });
     });
 
     messenger.init();

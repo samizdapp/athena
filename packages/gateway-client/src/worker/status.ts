@@ -1,4 +1,8 @@
-import { ServerPeerStatus, WorkerMessageType } from '../worker-messaging';
+import {
+    ClientMessageType,
+    ServerPeerStatus,
+    WorkerMessageType,
+} from '../worker-messaging';
 import messenger from './messenger';
 
 class Status {
@@ -6,6 +10,10 @@ class Status {
     relays: string[] = [];
 
     constructor() {
+        messenger.addListener(ClientMessageType.REQUEST_STATUS, () => {
+            this.sendCurrent();
+        });
+
         Reflect.defineProperty(this.relays, 'push', {
             value: (...items: string[]): number => {
                 const ret = Array.prototype.push.call(this.relays, ...items);

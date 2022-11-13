@@ -6,7 +6,7 @@ import { useSelector } from 'react-redux';
 import styled from 'styled-components';
 import { Link } from 'react-router-dom';
 
-import { ServerPeerStatus } from '../../../service-worker';
+import { ServerPeerStatus } from '../../../worker-messaging';
 import {
     selectRelayAddresses,
     selectWorkerStatus,

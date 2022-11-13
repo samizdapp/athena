@@ -5,7 +5,7 @@ import {
     Message,
     ServerPeerStatus,
     WorkerMessageType,
-} from '../../../service-worker';
+} from '../../../worker-messaging';
 import { AppDispatch } from '../store';
 import {
     setIsControlling,

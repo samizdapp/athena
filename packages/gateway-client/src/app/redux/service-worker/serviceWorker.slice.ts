@@ -1,5 +1,5 @@
 import { createSelector, createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { ServerPeerStatus } from '../../../service-worker';
+import { ServerPeerStatus } from '../../../worker-messaging';
 
 import { RootState } from '../store';
 

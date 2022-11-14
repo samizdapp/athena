@@ -4,15 +4,17 @@ import { ClientMessageType } from '../worker-messaging';
 import { SamizdAppDevTools } from './devtools';
 import { logger } from './logging';
 import messenger from './messenger';
-import p2pClient from './p2p-client';
+import { P2pClient } from './p2p-client';
 import { overrideFetch } from './p2p-fetch/override-fetch';
 import status from './status';
 
 declare const self: ServiceWorkerGlobalScope;
 
 export default async () => {
+    // create our bootstrap logger
     const log = logger.getLogger('worker/bootstrap');
 
+    // setup event handlers
     self.addEventListener('online', () => log.debug('<<<<online'));
     self.addEventListener('offline', () => log.debug('<<<<offline'));
 
@@ -43,11 +45,16 @@ export default async () => {
         localforage.setItem('started', { started: true });
     });
 
+    // init messenger
     messenger.init();
 
-    const { connectPromise: clientConnected, libp2p } = await p2pClient();
+    // create and start p2p client
+    const p2pClient = new P2pClient();
+    p2pClient.start();
 
-    overrideFetch(clientConnected);
+    // initialize fetch override
+    overrideFetch(p2pClient);
 
-    new SamizdAppDevTools(libp2p);
+    // create dev tools
+    new SamizdAppDevTools(p2pClient);
 };

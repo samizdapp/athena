@@ -6,7 +6,7 @@ import { decode, encode } from 'lob-enc';
 import { ServerPeerStatus } from '../../worker-messaging';
 import { isBootstrapAppUrl } from '../client';
 import { logger } from '../logging';
-import { getStream } from '../p2p-client';
+import { P2pClient } from '../p2p-client';
 import status from '../status';
 
 const log = logger.getLogger('worker/p2p-fetch/override-fetch');
@@ -22,6 +22,8 @@ type GlobalSelf = {
     latencySet: Set<string>;
     pipersInProgress: Map<string, Promise<void>>;
 };
+
+let p2pClient: P2pClient;
 
 const CHUNK_SIZE = 1024 * 64;
 
@@ -146,7 +148,7 @@ async function p2Fetch(
 
     async function piper(piperId: string) {
         const st = Date.now();
-        const stream = await getStream('/samizdapp-proxy', piperId);
+        const stream = await p2pClient.getStream('/samizdapp-proxy', piperId);
         console.log('time to stream', Date.now() - st);
 
         let float = 0,
@@ -260,19 +262,20 @@ function patchFetchArgs(_reqObj: Request, _reqInit: RequestInit = {}) {
 
 export const nativeFetch = self.fetch;
 
-export const overrideFetch = (clientConnected: Promise<void>) => {
+export const overrideFetch = (client: P2pClient) => {
+    p2pClient = client;
+
     // track client connection
     type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
     let connectionStatus: ConnectionStatus = 'connecting';
-    clientConnected
-        .then(() => {
-            connectionStatus = 'connected';
-            log.info('Client connected');
-        })
-        .catch(e => {
-            connectionStatus = 'disconnected';
-            log.error('Client connection error: ', e);
-        });
+    p2pClient.addEventListener('connected', () => {
+        connectionStatus = 'connected';
+        log.info('Client connected');
+    });
+    p2pClient.addEventListener('connectionerror', e => {
+        connectionStatus = 'disconnected';
+        log.error('Client connection error: ', e.detail);
+    });
 
     // override fetch
     self.fetch = async (...args) => {
@@ -290,10 +293,14 @@ export const overrideFetch = (clientConnected: Promise<void>) => {
 
         // else, we are still connecting, wait for connection
         log.info('Waiting for client connection, fetch deferred...', args[0]);
-        await clientConnected;
-
-        // try again
-        log.info('Retrying deferred fetch...', args[0]);
-        return self.fetch(...args);
+        return new Promise(resolve => {
+            const handler = () => {
+                p2pClient.removeEventListener('connected', handler);
+                // try again
+                log.info('Retrying deferred fetch...', args[0]);
+                resolve(self.fetch(...args));
+            };
+            p2pClient.addEventListener('connected', handler);
+        });
     };
 };

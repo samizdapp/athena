@@ -1,7 +1,7 @@
-import { Libp2p } from 'libp2p';
 import localforage from 'localforage';
 
 import * as logging from '../logging';
+import { P2pClient } from '../p2p-client';
 import status from '../status';
 
 declare const self: {
@@ -13,7 +13,7 @@ export class SamizdAppDevTools {
     public status = status;
     public localforage = localforage;
 
-    constructor(public libp2p: Libp2p) {
+    constructor(public p2pClient: P2pClient) {
         // attach to window
         self.SamizdAppDevTools = this;
     }

@@ -58,7 +58,7 @@ module.exports = (config, _context) => {
             ),
             new NodePolyfillPlugin(),
             new InjectManifest({
-                swSrc: 'packages/gateway-client/src/worker/index.ts',
+                swSrc: 'packages/gateway-client/src/worker/service-worker.ts',
                 swDest: 'service-worker.js',
             }),
         ],

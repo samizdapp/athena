@@ -111,6 +111,11 @@ export class P2pClient {
                     maxListeners: 5, // Configure maximum number of HOP relays to use
                 },
             },
+            identify: {
+                host: {
+                    agentVersion: `${AGENT_VERSION} UserAgent=${self.navigator.userAgent}`,
+                },
+            },
         });
 
         initLibp2pLogging();

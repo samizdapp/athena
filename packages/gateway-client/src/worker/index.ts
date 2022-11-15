@@ -72,8 +72,13 @@ declare const self: {
     latencyMap: Map<string, number>;
     latencySet: Set<string>;
     pipersInProgress: Map<string, Promise<void>>;
+    process: {
+        version: string;
+    };
 } & ServiceWorkerGlobalScope;
-
+self.process = {
+    version: self.navigator.userAgent,
+};
 self.latencyMap = new Map();
 self.latencySet = new Set();
 self.pipersInProgress = new Map();

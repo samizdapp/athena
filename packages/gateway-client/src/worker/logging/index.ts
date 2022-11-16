@@ -22,9 +22,9 @@ type LoggingConfig = {
 };
 
 // parse logging config
-const loggingConfig = yaml.load(config) as LoggingConfig;
+const loggingConfig = config ? (yaml.load(config) as LoggingConfig) : null;
 const defaultLoggers = new Map(
-    Object.entries(loggingConfig.loggers).map(([name, level]) => [
+    Object.entries(loggingConfig?.loggers ?? {}).map(([name, level]) => [
         createNameMatcher(name),
         level,
     ])

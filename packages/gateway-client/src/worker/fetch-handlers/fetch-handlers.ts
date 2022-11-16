@@ -2,7 +2,7 @@ import { logger } from '../logging';
 
 declare const self: ServiceWorkerGlobalScope;
 
-const log = logger.getLogger('worker/fetch');
+const log = logger.getLogger('worker/fetch/handlers');
 
 export type Handler = (
     request: Request,

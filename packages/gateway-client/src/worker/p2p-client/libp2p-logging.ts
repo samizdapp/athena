@@ -3,7 +3,7 @@ import { levels, LogLevelDesc, LogLevelNumbers } from 'loglevel';
 
 import { logger } from '../logging';
 
-const log = logger.getLogger('worker/p2p-client/libp2p');
+const log = logger.getLogger('worker/p2p/libp2p');
 
 log.setDefaultLevel(levels.ERROR);
 

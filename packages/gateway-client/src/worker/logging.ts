@@ -7,6 +7,10 @@ logger.setDefaultLevel(levels.INFO);
 const originalFactory = logger.methodFactory;
 logger.methodFactory = function (methodName, logLevel, loggerName) {
     const originalMethodName = methodName;
+    // don't use console.trace()
+    if (originalMethodName === 'trace') {
+        methodName = 'debug';
+    }
     const rawMethod = originalFactory(methodName, logLevel, loggerName);
 
     const color = `hsl(${Math.random() * 360}, 100%, 40%)`;

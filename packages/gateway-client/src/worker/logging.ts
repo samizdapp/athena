@@ -1,20 +1,21 @@
 import logger, { LogLevelDesc, levels } from 'loglevel';
 
-// get level names
-const levelNames = Object.keys(levels) as (keyof typeof levels)[];
 
 logger.setDefaultLevel(levels.INFO);
 
 // format our logging output
 const originalFactory = logger.methodFactory;
 logger.methodFactory = function (methodName, logLevel, loggerName) {
+    const originalMethodName = methodName;
     const rawMethod = originalFactory(methodName, logLevel, loggerName);
 
     const color = `hsl(${Math.random() * 360}, 100%, 40%)`;
 
     return function (...args) {
         rawMethod(
-            `%c${levelNames[logLevel]} [${loggerName?.toString() ?? 'root'}]`,
+            `%c${originalMethodName.toUpperCase()} [${
+                loggerName?.toString() ?? 'root'
+            }]`,
             `color: ${color}`,
             ...args
         );

@@ -36,6 +36,10 @@ module.exports = (config, _context) => {
                     }
                     return it;
                 }),
+                {
+                    test: /\.yaml$/,
+                    type: 'asset/source',
+                },
             ],
         },
         node: {

@@ -5,8 +5,6 @@ import { logger } from '../logging';
 
 const log = logger.getLogger('worker/p2p/libp2p');
 
-log.setDefaultLevel(levels.ERROR);
-
 // pass logger levels down to libp2p logger
 const levelHandlers: Record<LogLevelNumbers, (extra?: string) => void> = {
     [levels.SILENT]: () => libp2pLogger.disable(),

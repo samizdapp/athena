@@ -1,7 +1,34 @@
 import localforage from 'localforage';
 import logger, { LogLevelDesc, levels, Logger } from 'loglevel';
+import yaml from 'js-yaml';
+
+import config from './logging.yaml';
 
 const DEFAULT_LEVEL = levels.INFO;
+
+const getDefaultLevel = (name: string) => {
+    for (const [matcher, level] of [...defaultLoggers.entries()].reverse()) {
+        if (matcher.test(name)) {
+            return level;
+        }
+    }
+    return DEFAULT_LEVEL;
+};
+
+const createNameMatcher = (name?: string) => new RegExp(name ?? '.*');
+
+type LoggingConfig = {
+    loggers: Record<string, LogLevelDesc>;
+};
+
+// parse logging config
+const loggingConfig = yaml.load(config) as LoggingConfig;
+const defaultLoggers = new Map(
+    Object.entries(loggingConfig.loggers).map(([name, level]) => [
+        createNameMatcher(name),
+        level,
+    ])
+);
 
 const loadPersistedLevel = (name: string, logger: Logger) => {
     localforage.getItem(`loglevel:${name}`).then(persisted => {
@@ -44,7 +71,7 @@ logger.getLogger = (name: string) => {
         name
     );
     const childLogger = originalGetLogger.call(logger, name);
-    childLogger.setDefaultLevel(DEFAULT_LEVEL);
+    childLogger.setDefaultLevel(getDefaultLevel(name));
     if (isNew) {
         loadPersistedLevel(name, childLogger);
     }
@@ -52,13 +79,13 @@ logger.getLogger = (name: string) => {
 };
 
 // set root default level
-logger.setDefaultLevel(DEFAULT_LEVEL);
+logger.setDefaultLevel(getDefaultLevel('root'));
 // load root persisted level
 loadPersistedLevel('root', logger);
 
 export const getLoggers = (name?: string) => {
     // construct regexp from given name to match loggers with
-    const regexp = new RegExp(name?.replaceAll('*', '.*') ?? '.*');
+    const regexp = createNameMatcher(name);
     // get all loggers
     return (
         Object.entries({ ...logger.getLoggers(), root: logger })

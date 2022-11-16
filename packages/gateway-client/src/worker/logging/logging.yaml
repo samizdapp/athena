@@ -1,0 +1,4 @@
+loggers:
+  worker: INFO
+  worker/p2p/libp2p: ERROR
+  worker/p2p/bootstrap: TRACE

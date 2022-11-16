@@ -21,7 +21,7 @@ const waitFor = async (t: number): Promise<void> =>
     new Promise(r => setTimeout(r, t));
 
 export class P2pClient {
-    private log = logger.getLogger('worker/p2p-client');
+    private log = logger.getLogger('worker/p2p/client');
 
     private DIAL_TIMEOUT = 3000;
 

@@ -9,7 +9,7 @@ import { logger } from './logging';
 
 declare const self: ServiceWorkerGlobalScope;
 
-const log = logger.getLogger('worker');
+const log = logger.getLogger('worker/main');
 
 log.info('Executing worker...');
 

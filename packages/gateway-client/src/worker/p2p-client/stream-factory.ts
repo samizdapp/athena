@@ -13,7 +13,7 @@ const waitFor = async (t: number): Promise<void> =>
     new Promise(r => setTimeout(r, t));
 
 export class StreamFactory {
-    private log = logger.getLogger('worker/p2p-client/stream-factory');
+    private log = logger.getLogger('worker/p2p/stream');
 
     private locked = false;
     private retryTimeout = 0;

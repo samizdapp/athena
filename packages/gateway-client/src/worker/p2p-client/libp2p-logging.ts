@@ -3,9 +3,7 @@ import { levels, LogLevelDesc, LogLevelNumbers } from 'loglevel';
 
 import { logger } from '../logging';
 
-const log = logger.getLogger('worker/p2p-client/libp2p');
-
-log.setDefaultLevel(levels.ERROR);
+const log = logger.getLogger('worker/p2p/libp2p');
 
 // pass logger levels down to libp2p logger
 const levelHandlers: Record<LogLevelNumbers, (extra?: string) => void> = {

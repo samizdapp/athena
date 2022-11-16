@@ -14,7 +14,7 @@ import { nativeFetch } from '../p2p-fetch/override-fetch';
 import status from '../status';
 
 export class BootstrapList {
-    private log = logger.getLogger('worker/p2p-client/bootstrap-list');
+    private log = logger.getLogger('worker/p2p/bootstrap');
 
     private latencyMap: Map<string, number> = new Map();
     private latencySet: Set<string> = new Set();

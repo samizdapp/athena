@@ -1,4 +1,4 @@
-import { logger, getLoggers, setLevel, resetLevel } from './logging';
+import { logger, getLoggers, setLevel, resetLevel } from '.';
 
 describe('logging should', () => {
     afterEach(() => {

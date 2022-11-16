@@ -25,7 +25,7 @@ runs:
               docker buildx build \
                 --cache-from type=registry,ref=ghcr.io/samizdapp/athena:${{ github.event.before }} \
                 --cache-from type=registry,ref=ghcr.io/samizdapp/athena:develop \
-                --tag ghcr.io/samizdapp/athena:${{ github.sha }} \
+                --tag ghcr.io/samizdapp/athena:${{ github.event.pull_request.head.sha }} \
                 --push \
                 .
         - name: Build and export validate image
@@ -34,5 +34,5 @@ runs:
               mkdir -p /tmp/images
               docker build . \
                 -f .github/workflows/validate.Dockerfile \
-                --build-arg VERSION=${{ github.sha }} \
-                --tag ghcr.io/samizdapp/athena-validate:${{ github.sha }}
+                --build-arg VERSION=${{ github.event.pull_request.head.sha }} \
+                --tag ghcr.io/samizdapp/athena-validate:${{ github.event.pull_request.head.sha }}

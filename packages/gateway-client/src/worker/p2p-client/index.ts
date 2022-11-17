@@ -1,5 +1,6 @@
 import { Noise } from '@chainsafe/libp2p-noise';
 import { ConnectionEncrypter } from '@libp2p/interface-connection-encrypter';
+import { Connection } from '@libp2p/interface-connection';
 import { PeerId } from '@libp2p/interface-peer-id';
 import type { Address } from '@libp2p/interface-peer-store';
 import { KEEP_ALIVE } from '@libp2p/interface-peer-store/tags';
@@ -30,6 +31,7 @@ export class P2pClient {
     private eventTarget = new EventTarget();
 
     private serverPeer?: PeerId;
+    private serverConnection?: Promise<Connection>;
     public node?: Libp2p;
 
     public constructor() {
@@ -54,6 +56,64 @@ export class P2pClient {
         return this.streamFactory.getStream(protocol, id);
     }
 
+    public async connectToServer(retryTimeout = 1000): Promise<Connection> {
+        // if we haven't started yet
+        if (!this.node) {
+            throw new Error(
+                'Connection attempted before P2P client was started!'
+            );
+        }
+
+        // we'll also need to have discovered our peer
+        if (!this.serverPeer) {
+            throw new Error(
+                'Connection attempted before server peer discovered!'
+            );
+        }
+
+        // if we already have a connection (completed or pending)
+        if (this.serverConnection) {
+            // don't create a second one
+            return this.serverConnection;
+        } // else, we're good to go
+
+        // first, close any open connections to our server
+        this.log.debug('Closing existing server connections...');
+        await this.node.hangUp(this.serverPeer);
+
+        // at some point, addresses for our peer can get removed
+        // re-add everything from our bootstrap list before
+        // trying to connect again
+        this.log.debug('Re-adding server peer addresses');
+        this.node.peerStore.addressBook.add(
+            this.serverPeer,
+            this.bootstrapList.all().map(it => it.multiaddr)
+        );
+
+        // now, attempt to dial our server
+        this.log.info('Dialing server...');
+        this.serverConnection = this.node
+            .dial(this.serverPeer)
+            .catch(async e => {
+                // we weren't able to dial
+                this.log.error('Error dialing server: ', e);
+                this.log.debug('Retrying dial in: ', retryTimeout);
+                this.serverConnection = undefined;
+                // wait before retrying
+                await waitFor(retryTimeout);
+                // refresh our stats so that the dial gets an updated order
+                await this.bootstrapList.refreshStats();
+                // retry
+                this.log.info('Redialing server...');
+                return this.connectToServer(
+                    retryTimeout > 30000 ? retryTimeout : retryTimeout + 1000
+                );
+            });
+
+        // return our connection
+        return this.serverConnection;
+    }
+
     public async start() {
         // load our bootstrap list
         await this.bootstrapList.load();
@@ -75,7 +135,9 @@ export class P2pClient {
             streamMuxers: [new Mplex() as StreamMuxerFactory],
             peerDiscovery: [this.bootstrapList],
             connectionManager: {
-                autoDial: true, // Auto connect to discovered peers (limited by ConnectionManager minConnections)
+                // current version of libp2p will still autodial unless
+                // explicitly disabled (removed in later version)
+                autoDial: false,
                 minConnections: 3,
                 maxDialsPerPeer: 20,
                 maxParallelDials: 20,
@@ -115,6 +177,12 @@ export class P2pClient {
                 // we've discovered it
                 discoveredPeers.add(peerId);
                 this.log.info(`Discovered peer ${peerId.toString()}`);
+                // if this is our server peer
+                if (this.bootstrapList.serverId === peerId) {
+                    this.serverPeer = evt.detail.id;
+                    // connect to our server (autodial is disabled)
+                    this.connectToServer();
+                }
             }
         });
 
@@ -143,13 +211,16 @@ export class P2pClient {
                         return;
                     }
 
-                    this.serverPeer = connection.remotePeer;
                     // else, we've connected to our server
                     this.log.info('Connected to server.');
 
+                    if (!this.serverConnection) {
+                        this.serverConnection = Promise.resolve(connection);
+                    }
                     this.streamFactory = new StreamFactory(
                         this.DIAL_TIMEOUT,
-                        this.serverPeer,
+                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                        this.serverPeer!,
                         this
                     );
 
@@ -183,9 +254,10 @@ export class P2pClient {
                 connection.remotePeer.equals(this.serverPeer)
             ) {
                 this.log.warn('Disconnected from server.');
+                this.serverConnection = undefined;
                 // update status
                 status.serverPeer = ServerPeerStatus.CONNECTING;
-                this.node?.dial(this.serverPeer);
+                this.connectToServer();
             }
         });
 
@@ -201,19 +273,6 @@ export class P2pClient {
                 status.serverPeer = ServerPeerStatus.OFFLINE;
             }
         });
-    }
-
-    public async restart() {
-        // reset libp2p, track reset time
-        this.log.info('Resetting libp2p...');
-        const _s = Date.now();
-        // refresh our bootstrap list stats so that the node gets an updated order
-        this.bootstrapList.refreshStats();
-        // try turning it off and on again
-        await this.node?.stop();
-        await this.node?.start();
-        // log reset time
-        this.log.trace('Reset time: ', Date.now() - _s);
     }
 
     private dispatchEvent<T>(type: string, detail?: T) {

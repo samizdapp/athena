@@ -392,6 +392,10 @@ export class BootstrapList extends Bootstrap {
         return this.addressSorter(addressA, addressB);
     }
 
+    public all() {
+        return Object.values(this.addresses);
+    }
+
     public get addressList() {
         return Object.values(this.addresses).sort((a, b) =>
             this.addressSorter(a, b)

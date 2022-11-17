@@ -126,8 +126,8 @@ export class StreamFactory {
             // 5 minutes
             this.dialTimeout = Math.min(1000 * 60 * 5, this.dialTimeout * 4);
 
-            // now that we've waited awhile, we can restart our client
-            await this.client.restart();
+            // now that we've waited awhile, we can attempt to reconnect to our server
+            await this.client.connectToServer();
             // and try again
             this.inTimeout = false;
         }

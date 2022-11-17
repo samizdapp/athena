@@ -38,7 +38,7 @@ export class P2pClient {
 
     public async addServerPeerAddress(multiaddr: MultiaddrType) {
         if (!this.serverPeer) {
-            throw new Error('No server peer.');
+            throw new Error('No server peer discovered.');
         }
 
         await this.node?.peerStore.addressBook
@@ -102,9 +102,20 @@ export class P2pClient {
         initLibp2pLogging();
 
         // add event listeners
+
+        // track discovered peers
+        const discoveredPeers = new Set<string>();
         this.node.addEventListener('peer:discovery', evt => {
-            const peer = evt.detail;
-            this.log.info(`Found peer ${peer.id.toString()}`);
+            // if this is a new peer that we've just discovered
+            // (as opposed to an existing peer that we *haven't* discovered,
+            // but libp2p is dispatching a discovery event for anyway,
+            // because that makes sense)
+            const peerId = evt.detail.id.toString();
+            if (!discoveredPeers.has(peerId)) {
+                // we've discovered it
+                discoveredPeers.add(peerId);
+                this.log.info(`Discovered peer ${peerId.toString()}`);
+            }
         });
 
         // Listen for new connections to peers
@@ -130,9 +141,12 @@ export class P2pClient {
                     if (!serverMatch) {
                         // then there is no more to do
                         return;
-                    } // else, we've connected to our server
+                    }
 
                     this.serverPeer = connection.remotePeer;
+                    // else, we've connected to our server
+                    this.log.info('Connected to server.');
+
                     this.streamFactory = new StreamFactory(
                         this.DIAL_TIMEOUT,
                         this.serverPeer,
@@ -168,20 +182,20 @@ export class P2pClient {
                 this.serverPeer &&
                 connection.remotePeer.equals(this.serverPeer)
             ) {
-                this.log.info('Disconnected from server.');
+                this.log.warn('Disconnected from server.');
                 // update status
                 status.serverPeer = ServerPeerStatus.CONNECTING;
                 this.node?.dial(this.serverPeer);
             }
         });
 
+        // time to start up our node
         this.log.debug('Starting libp2p...');
         await this.node.start();
         this.log.info('Started libp2p.');
 
         // update status
         status.serverPeer = ServerPeerStatus.CONNECTING;
-
         waitFor(15000).then(() => {
             if (status.serverPeer === ServerPeerStatus.CONNECTING) {
                 status.serverPeer = ServerPeerStatus.OFFLINE;

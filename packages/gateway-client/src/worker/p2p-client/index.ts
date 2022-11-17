@@ -1,5 +1,4 @@
 import { Noise } from '@chainsafe/libp2p-noise';
-import { Bootstrap } from '@libp2p/bootstrap';
 import { ConnectionEncrypter } from '@libp2p/interface-connection-encrypter';
 import { PeerId } from '@libp2p/interface-peer-id';
 import type { Address } from '@libp2p/interface-peer-store';
@@ -7,6 +6,7 @@ import { KEEP_ALIVE } from '@libp2p/interface-peer-store/tags';
 import { StreamMuxerFactory } from '@libp2p/interface-stream-muxer';
 import { Mplex } from '@libp2p/mplex';
 import { WebSockets } from '@libp2p/websockets';
+import { all as filtersAll } from '@libp2p/websockets/filters';
 import { Multiaddr as MultiaddrType } from '@multiformats/multiaddr';
 import { createLibp2p, Libp2p } from 'libp2p';
 
@@ -55,56 +55,36 @@ export class P2pClient {
     }
 
     public async start() {
-        const bootstraplist = await this.bootstrapList.initCheckAddresses(
-            await this.bootstrapList.getBootstrapList()
-        );
-        this.log.info('Bootstrap list: ', bootstraplist);
-        // await initCheckAddresses(bootstraplist);
+        // load our bootstrap list
+        await this.bootstrapList.load();
+
         // update status
         status.serverPeer = ServerPeerStatus.BOOTSTRAPPED;
 
-        status.relays.push(...bootstraplist.slice(2));
-
-        // const datastore = new LevelDatastore('./libp2p');
-        // await datastore.open(); // level database must be ready before node boot
-        const serverID = bootstraplist[0].split('/').pop();
+        // create libp2p node
         this.node = await createLibp2p({
             // datastore,
             transports: [
                 new WebSockets({
-                    filter: (...args) =>
-                        this.bootstrapList.websocketAddressFilter(...args),
+                    filter: filtersAll,
                 }),
             ],
             connectionEncryption: [
                 new Noise() as unknown as ConnectionEncrypter,
             ],
             streamMuxers: [new Mplex() as StreamMuxerFactory],
-            peerDiscovery: [
-                new Bootstrap({
-                    list: bootstraplist, // provide array of multiaddrs
-                }),
-            ],
+            peerDiscovery: [this.bootstrapList],
             connectionManager: {
                 autoDial: true, // Auto connect to discovered peers (limited by ConnectionManager minConnections)
                 minConnections: 3,
                 maxDialsPerPeer: 20,
                 maxParallelDials: 20,
                 addressSorter: (a: Address, b: Address) =>
-                    this.bootstrapList.publicRelayAddressesFirst(a, b),
-                // The `tag` property will be searched when creating the instance of your Peer Discovery service.
-                // The associated object, will be passed to the service when it is instantiated.
-                // dialTimeout: self.DIAL_TIMEOUT,
-                // maxParallelDials: 25,
-                // maxAddrsToDial: 25,
-                // resolvers: {
-                //     dnsaddr: dnsaddrResolver,
-                //     // ,
-                //     // host: hostResolver
-                // },
+                    this.bootstrapList.libp2pAddressSorter(a, b),
             },
             relay: {
                 // Circuit Relay options (this config is part of libp2p core configurations)
+                // The circuit relay is a second transporter that is configured in libp2p (is tried after Websockets)
                 enabled: true, // Allows you to dial and accept relayed connections. Does not make you a relay.
                 autoRelay: {
                     enabled: true, // Allows you to bind to relays with HOP enabled for improving node dialability
@@ -118,8 +98,10 @@ export class P2pClient {
             },
         });
 
+        // init libp2p logging
         initLibp2pLogging();
 
+        // add event listeners
         this.node.addEventListener('peer:discovery', evt => {
             const peer = evt.detail;
             this.log.info(`Found peer ${peer.id.toString()}`);
@@ -139,11 +121,11 @@ export class P2pClient {
                     });
 
                     // if this is not our server
-                    const serverMatch = str_id === serverID;
+                    const serverMatch = str_id === this.bootstrapList.serverId;
                     this.log.info(
                         `Server match: ${serverMatch} (${str_id} ${
                             serverMatch ? '=' : '!'
-                        }== ${serverID})`
+                        }== ${this.bootstrapList.serverId})`
                     );
                     if (!serverMatch) {
                         // then there is no more to do
@@ -202,16 +184,24 @@ export class P2pClient {
         // update status
         status.serverPeer = ServerPeerStatus.CONNECTING;
 
-        const path = this.bootstrapList.getQuickestPath();
-        if (path) {
-            this.node.dial(path as unknown as MultiaddrType);
-        }
-
         waitFor(15000).then(() => {
             if (status.serverPeer === ServerPeerStatus.CONNECTING) {
                 status.serverPeer = ServerPeerStatus.OFFLINE;
             }
         });
+    }
+
+    public async restart() {
+        // reset libp2p, track reset time
+        this.log.info('Resetting libp2p...');
+        const _s = Date.now();
+        // refresh our bootstrap list stats so that the node gets an updated order
+        this.bootstrapList.refreshStats();
+        // try turning it off and on again
+        await this.node?.stop();
+        await this.node?.start();
+        // log reset time
+        this.log.trace('Reset time: ', Date.now() - _s);
     }
 
     private dispatchEvent<T>(type: string, detail?: T) {

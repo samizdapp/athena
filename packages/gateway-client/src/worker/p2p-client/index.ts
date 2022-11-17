@@ -136,9 +136,7 @@ export class P2pClient {
                     this.streamFactory = new StreamFactory(
                         this.DIAL_TIMEOUT,
                         this.serverPeer,
-                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                        this,
-                        this.bootstrapList
+                        this
                     );
 
                     // update status

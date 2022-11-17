@@ -1,3 +1,8 @@
+// The workbox-precaching import includes a type definition for
+// <self dot __WB_MANIFEST>.
+// Import it even though we're not using any of the imports,
+import * as workboxPrecaching from 'workbox-precaching';
+
 import bootstrap from './bootstrap';
 import {
     passThroughHandler,
@@ -6,6 +11,9 @@ import {
 } from './fetch-handlers';
 import fetchHandlers from './fetch-handlers/fetch-handlers';
 import { logger } from './logging';
+
+// Mark the workbox-precaching import as being used with this line:
+const _ = workboxPrecaching;
 
 declare const self: ServiceWorkerGlobalScope;
 

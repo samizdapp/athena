@@ -1,3 +1,5 @@
 loggers:
   worker: INFO
   worker/p2p/libp2p: ERROR
+  worker/p2p/bootstrap: DEBUG
+  worker/p2p/client: DEBUG

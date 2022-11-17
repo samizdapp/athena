@@ -10,11 +10,12 @@ const levelHandlers: Record<LogLevelNumbers, (extra?: string) => void> = {
     [levels.SILENT]: () => libp2pLogger.disable(),
     [levels.ERROR]: extra =>
         libp2pLogger.enable(
-            'libp2p:circuit:error, libp2p:bootstrap:error, libp2p:upgrader:error, ' +
-                extra
+            'libp2p:circuit:error, libp2p:bootstrap:error, ' + extra
         ),
     [levels.WARN]: extra =>
-        levelHandlers[levels.ERROR]('libp2p:websockets:error, ' + extra),
+        levelHandlers[levels.ERROR](
+            'libp2p:websockets:error, libp2p:upgrader:error, ' + extra
+        ),
     [levels.INFO]: extra =>
         levelHandlers[levels.WARN](
             'libp2p:dialer:error, libp2p:connection-manager:trace, ' + extra

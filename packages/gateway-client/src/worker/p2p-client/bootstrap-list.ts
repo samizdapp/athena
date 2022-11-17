@@ -1,25 +1,81 @@
+import { Bootstrap } from '@libp2p/bootstrap';
 import type { Address } from '@libp2p/interface-peer-store';
-import { isLoopback } from '@libp2p/utils/multiaddr/is-loopback';
-import { isPrivate } from '@libp2p/utils/multiaddr/is-private';
-import { all as WSAllfilter } from '@libp2p/websockets/filters';
-import { Multiaddr as MultiaddrType } from '@multiformats/multiaddr';
+import { Upgrader } from '@libp2p/interface-transport';
+import { WebSockets } from '@libp2p/websockets';
+import { multiaddr, Multiaddr } from '@multiformats/multiaddr';
+import { P2P } from '@multiformats/mafmt';
 import { Buffer } from 'buffer/';
 import { pipe } from 'it-pipe';
 import localforage from 'localforage';
-import Multiaddr from 'multiaddr';
+import { peerIdFromString } from '@libp2p/peer-id';
 
 import type { P2pClient } from '.';
 import { logger } from '../logging';
 import { nativeFetch } from '../p2p-fetch/override-fetch';
 import status from '../status';
 
-export class BootstrapList {
+const waitFor = async (t: number): Promise<void> =>
+    new Promise(r => setTimeout(r, t));
+
+class BootstrapAddress {
+    public multiaddr: Multiaddr;
+    public lastSeen = 0;
+    public latency = Infinity;
+    public serverId: string;
+    public isRelay = false;
+    public isDNS = false;
+
+    public constructor(public readonly address: string) {
+        if (!P2P.matches(address)) {
+            throw new Error('Invalid multiaddr');
+        }
+
+        this.multiaddr = multiaddr(address);
+        const serverId = this.multiaddr.getPeerId();
+        if (!serverId) {
+            throw new Error(
+                `Address ${address} contains invalid or missing peer id.`
+            );
+        }
+
+        this.serverId = serverId;
+        this.isRelay = this.address.includes('/p2p-circuit/');
+        this.isDNS = this.address.includes('/dns4/');
+    }
+
+    static fromJson(json: Record<string, unknown>): BootstrapAddress {
+        const addr = new BootstrapAddress(json.address as string);
+        addr.lastSeen = json.lastSeen as number;
+        addr.latency = json.latency as number;
+        return addr;
+    }
+
+    toJson(): Record<string, unknown> {
+        return {
+            address: this.address,
+            lastSeen: this.lastSeen,
+            latency: this.latency,
+        };
+    }
+
+    toString(): string {
+        return this.multiaddr.toString();
+    }
+}
+
+export class BootstrapList extends Bootstrap {
     private log = logger.getLogger('worker/p2p/bootstrap');
 
-    private latencyMap: Map<string, number> = new Map();
-    private latencySet: Set<string> = new Set();
+    private maxOffline = 7 * 24 * 60 * 60 * 1000;
+    private statsTimeout = 10000;
+
+    private addresses: Record<string, BootstrapAddress> = {};
+    private _serverId?: string;
 
     constructor(private client: P2pClient) {
+        // initialize bootstrap discovery with dummy list
+        super({ list: ['/ip4/1.2.3.4/tcp/1234/tls/p2p/QmFoo'] });
+        // open the relay stream to receive new relay addresses
         let relayDebounce = 0;
         client.addEventListener('connected', () => {
             if (Date.now() - relayDebounce > 60000) {
@@ -29,264 +85,320 @@ export class BootstrapList {
         });
     }
 
-    private isRelay(ma: Address): boolean {
-        const parts = new Set(ma.multiaddr.toString().split('/'));
-        return parts.has('p2p-circuit');
-    }
-    private isDNS(ma: Address): boolean {
-        const parts = new Set(ma.multiaddr.toString().split('/'));
-        return parts.has('dns4');
-    }
-
-    // slightly modified version of
-    // https://github.com/libp2p/js-libp2p-utils/blob/66e604cb0bfcf686eb68e44f278d62e3464c827c/src/address-sort.ts
-    // the goal here is to couple prioritizing relays with parallelism
-    public publicRelayAddressesFirst(a: Address, b: Address): -1 | 0 | 1 {
-        this.log.trace(
-            'Sorting: ',
-            a.multiaddr.toString(),
-            b.multiaddr.toString()
-        );
-
-        const haveLatencyA = this.latencyMap.has(a.multiaddr.toString());
-        const haveLatencyB = this.latencyMap.has(b.multiaddr.toString());
-
-        // if we only have one latency, it's the one we want
-        if (haveLatencyA && !haveLatencyB) {
-            return -1;
-        }
-        if (!haveLatencyA && haveLatencyB) {
-            return 1;
-        }
-
-        if (haveLatencyA && haveLatencyB) {
-            // if we have latency info for both, prefer non relay
-            const isARelay = this.isRelay(a);
-            const isBRelay = this.isRelay(b);
-            if (isARelay && !isBRelay) {
-                return 1;
-            }
-            if (!isARelay && isBRelay) {
-                return -1;
-            }
-            // if both/neither are relays, prefer the one with lower latency
-            const latencyA =
-                this.latencyMap.get(a.multiaddr.toString()) || Infinity;
-            const latencyB =
-                this.latencyMap.get(b.multiaddr.toString()) || Infinity;
-            if (latencyA < latencyB) {
-                return -1;
-            }
-            if (latencyA > latencyB) {
-                return 1;
-            }
-
-            // if both have the same latency, return 0
-            return 0;
-        }
-
-        // we should never get here, but not sure on where this vs filter
-        // is called, so leaving old logic just in case;
-
-        const isADNS = this.isDNS(a);
-        const isBDNS = this.isDNS(b);
-        const isAPrivate = isPrivate(a.multiaddr);
-        const isBPrivate = isPrivate(b.multiaddr);
-
-        if (isADNS && !isBDNS) {
-            return 1;
-        } else if (!isADNS && isBDNS) {
-            return -1;
-        } else if (isAPrivate && !isBPrivate) {
-            return 1;
-        } else if (!isAPrivate && isBPrivate) {
-            return -1;
-        } else if (!(isAPrivate || isBPrivate)) {
-            const isARelay = this.isRelay(a);
-            const isBRelay = this.isRelay(b);
-
-            if (isARelay && !isBRelay) {
-                return -1;
-            } else if (!isARelay && isBRelay) {
-                return 1;
-            } else {
-                return 0;
-            }
-        } else if (isAPrivate && isBPrivate) {
-            const isALoopback = isLoopback(a.multiaddr);
-            const isBLoopback = isLoopback(b.multiaddr);
-
-            if (isALoopback && !isBLoopback) {
-                return 1;
-            } else if (!isALoopback && isBLoopback) {
-                return -1;
-            } else {
-                return 0;
-            }
-        }
-
-        return 0;
-    }
-
-    private async getWSOpenLatency(ma: string): Promise<number> {
-        return new Promise(resolve => {
-            setTimeout(resolve, 5000, Infinity);
-            try {
-                const [_nil, _type, host, _tcp, port, _ws, _p2p, id] =
-                    ma.split('/');
-                const start = Date.now();
-                const ws = new WebSocket(`ws://${host}:${port}/p2p/${id}`);
-                ws.onopen = () => {
-                    ws.close();
-                    resolve(Date.now() - start);
-                };
-                ws.onerror = () => resolve(Infinity);
-            } catch (e) {
-                this.log.error(e);
-                resolve(Infinity);
-            }
-        });
-    }
-
-    private async checkAddress(address: string): Promise<boolean> {
-        const latency = await this.getWSOpenLatency(address);
-        this.log.trace('Latency for address: ', address, latency);
-        if (latency < Infinity) {
-            this.latencyMap.set(address, latency);
-            this.latencySet.add(address.split('/p2p-circuit')[0]);
-            return true;
-        }
-
-        return false;
-    }
-
-    public async initCheckAddresses(addresses: string[]): Promise<string[]> {
-        this.latencyMap = new Map();
-        this.latencySet = new Set();
-        await Promise.all(addresses.map(it => this.checkAddress(it)));
-        return addresses.filter(a => this.latencyMap.has(a));
-    }
-
-    private getHostAddrs(hostname: string, tail: string[]): string[] {
-        const res = [`/dns4/${hostname}/${tail.join('/')}`];
-        if (hostname.endsWith('localhost')) {
-            res.push(
-                `/dns4/${hostname.substring(
-                    0,
-                    hostname.length - 4
-                )}/${tail.join('/')}`
-            );
-        }
-        this.log.debug('Found host addresses: ', res);
-        return res;
-    }
-
-    public async getBootstrapList(skipFetch = false) {
-        let newBootstrapAddress = null;
+    private async populateStats(address: BootstrapAddress) {
+        // timeout after configured timeout
+        const abortController = new AbortController();
+        const signal = abortController.signal;
+        waitFor(this.statsTimeout).then(() => abortController.abort());
+        // send websocket request, track time
+        const start = Date.now();
         try {
-            if (!skipFetch) {
-                newBootstrapAddress = await nativeFetch(
-                    '/smz/pwa/assets/libp2p.bootstrap'
-                )
-                    .then(res => {
-                        if (res.status >= 400) {
-                            throw res;
-                        }
-                        return res.text();
-                    })
-                    .then(text => text.trim());
-            }
+            await new WebSockets().dial(
+                address.isRelay
+                    ? address.multiaddr.decapsulate('p2p-circuit')
+                    : address.multiaddr,
+                {
+                    signal,
+                    upgrader: {
+                        upgradeOutbound: async () => null,
+                    } as unknown as Upgrader,
+                }
+            );
+            address.latency = Date.now() - start;
+            address.lastSeen = Date.now();
         } catch (e) {
-            this.log.warn(
-                'Error while trying to fetch new bootstrap address: ',
-                e
-            );
+            this.log.debug(`Failed to connect to ${address}: `, e);
+            address.latency = Infinity;
         }
-        const cachedBootstrapAddress =
-            (await localforage.getItem<string>('libp2p.bootstrap')) ?? null;
-        const bootstrapaddr = newBootstrapAddress || cachedBootstrapAddress;
-        if (bootstrapaddr !== cachedBootstrapAddress) {
-            this.log.info(
-                'Detected updated bootstrap address, updating cache: ',
-                bootstrapaddr
-            );
-            await localforage.setItem('libp2p.bootstrap', bootstrapaddr);
-        }
-
-        this.log.info('Using bootstrap address: ', bootstrapaddr);
-        const relay_addrs =
-            (await localforage
-                .getItem<string[]>('libp2p.relays')
-                .catch(_ => [])) ?? [];
-        this.log.info('Got relay addresses: ', relay_addrs);
-
-        const { hostname } = new URL(self.origin);
-        const [_, _proto, _ip, ...rest] = bootstrapaddr?.split('/') ?? [];
-        const hostaddrs = this.getHostAddrs(hostname, rest);
-        const res = [bootstrapaddr ?? '', ...hostaddrs, ...relay_addrs].filter(
-            notEmpty => notEmpty
+        this.log.trace(
+            'Latency for address: ',
+            address.address,
+            address.latency
         );
-        return res;
     }
 
-    public websocketAddressFilter(addresses: MultiaddrType[]) {
-        const res = WSAllfilter(addresses).filter((addr: MultiaddrType) => {
-            return this.latencySet.has(addr.toString());
-        });
-        this.log.trace('Filtered websockets: ', res);
-        return res;
+    private isRecent(address: BootstrapAddress) {
+        return address.lastSeen > Date.now() - this.maxOffline;
     }
 
-    public getQuickestPath(): string | null {
-        let quickest = Infinity;
-        let quickestAddr = null;
-        for (const [addr, latency] of this.latencyMap.entries()) {
-            if (latency < quickest) {
-                quickest = latency;
-                quickestAddr = addr;
-            }
+    private async addAddress(addressToAdd: string | BootstrapAddress) {
+        if (!addressToAdd) {
+            this.log.trace(`Ignoring falsy address: ${addressToAdd}`);
+            return null;
         }
-        return quickestAddr;
+
+        // ensure this is a valid bootstrap address object
+        let address;
+        try {
+            address =
+                typeof addressToAdd === 'string'
+                    ? new BootstrapAddress(addressToAdd)
+                    : addressToAdd;
+        } catch (e) {
+            this.log.debug(`Ignoring invalid address: ${addressToAdd} (${e})`);
+            return null;
+        }
+
+        // ensure this is a new address
+        if (this.addresses[address.address]) {
+            this.log.trace(`Declining to add existing address: ${address}`);
+            return null;
+        }
+
+        // ensure it matches our current server id
+        if (this._serverId && address.serverId !== this._serverId) {
+            this.log.debug(
+                `Declining to add address with different server id: ${address}`
+            );
+            return null;
+        }
+
+        // get stats for this address
+        await this.populateStats(address);
+        // ensure this address is recent
+        if (!this.isRecent(address)) {
+            this.log.debug(`Declining to add stale address: ${address}`);
+            return null;
+        }
+
+        // by this point, we know this is a valid and active address
+        // add this address to our list
+        this.log.trace(`Adding address: ${address}`);
+        this.addresses[address.address] = address;
+        return address;
     }
 
-    private async openRelayStream(cb?: () => unknown) {
+    private async removeAddress(address: BootstrapAddress) {
+        this.log.trace(`Removing address: ${address}`);
+        delete this.addresses[address.address];
+    }
+
+    private async loadCache() {
+        // load our cached bootstrap list
+        const cached = await localforage.getItem<string>('p2p:bootstrap-list');
+        if (!cached) {
+            // no more to do
+            return;
+        } // else we have a cached list
+        const cacheList = JSON.parse(cached) as Record<string, unknown>[];
+        this.log.debug('Loaded cached bootstrap list: ', cacheList);
+        // parse the cached list
+        await Promise.all(
+            cacheList.map((address: Record<string, unknown>) =>
+                this.addAddress(BootstrapAddress.fromJson(address))
+            )
+        );
+    }
+
+    private async dumpCache() {
+        // dump our bootstrap list to cache
+        return localforage.setItem(
+            'p2p:bootstrap-list',
+            JSON.stringify(
+                Object.values(this.addresses).map(address => address.toJson())
+            )
+        );
+    }
+
+    private async openRelayStream() {
+        // open stream to relay protocol
         const stream = await this.client.getStream('/samizdapp-relay');
-        let gotFirstRelay = false;
         this.log.trace('Got relay stream: ', stream);
+
+        // receive messages from relay protocol
         await pipe(stream.source, async source => {
             for await (const msg of source) {
-                const str_relay = Buffer.from(msg.subarray()).toString();
-                if (await this.checkAddress(str_relay)) {
-                    if (!gotFirstRelay) {
-                        gotFirstRelay = true;
-                        cb?.();
-                        await localforage.setItem('libp2p.relays', []);
-                    }
-                    await localforage
-                        .getItem<string[]>('libp2p.relays')
-                        .then(str_array => {
-                            const dedup = Array.from(
-                                new Set([str_relay, ...(str_array || [])])
-                            );
-
-                            return localforage.setItem('libp2p.relays', dedup);
-                        });
-                    const multiaddr = Multiaddr.multiaddr(
-                        str_relay
-                    ) as unknown as MultiaddrType;
-
-                    this.client.addServerPeerAddress(multiaddr);
-
-                    // update status
-                    if (!status.relays.includes(str_relay)) {
-                        status.relays.push(str_relay);
-                    }
+                // this message is an address
+                const addressString = Buffer.from(msg.subarray()).toString();
+                this.log.debug(
+                    `Received relay address from stream: ${addressString}`
+                );
+                // add it to our list
+                const addedAddress = await this.addAddress(addressString);
+                // if NOT successfully added
+                if (!addedAddress) {
+                    // nothing more to do
+                    continue;
                 }
+                // else, we just added a new address
+                this.log.info(`Got new relay address: ${addedAddress}`);
+                // update our cache
+                await this.dumpCache();
+                // add this new address to the client
+                this.client.addServerPeerAddress(addedAddress.multiaddr);
+                // update status
+                status.relays.push(addedAddress.address);
             }
         }).catch(e => {
             this.log.warn('Error in pipe: ', e);
         });
         // we wan't fetch streams to have priority, so let's ease up this loop
         await new Promise(r => setTimeout(r, 20000));
+    }
+
+    public async refreshStats() {
+        // refresh the stats for all addresses
+        await Promise.all(
+            Object.values(this.addresses).map(async address => {
+                await this.populateStats(address);
+                // if this address is stale, remove it
+                if (!this.isRecent(address)) {
+                    this.log.debug(`Removing stale address: ${address}`);
+                    await this.removeAddress(address);
+                }
+            })
+        );
+    }
+
+    public async load() {
+        // start by loading our cached bootstrap list
+        await this.loadCache();
+
+        // next, check for a new bootstrap address
+        let newBootstrapAddress = null;
+        try {
+            newBootstrapAddress = await nativeFetch(
+                '/smz/pwa/assets/libp2p.bootstrap'
+            )
+                .then(res => {
+                    if (res.status >= 400) {
+                        throw res;
+                    }
+                    return res.text();
+                })
+                .then(text => text.trim());
+        } catch (e) {
+            this.log.warn(
+                'Error while trying to fetch new bootstrap address: ',
+                e
+            );
+        }
+        // if we received a new bootstrap address, add it to our list
+        const addedBootstrap = await this.addAddress(newBootstrapAddress ?? '');
+        // if it was added successfully
+        if (addedBootstrap) {
+            // our new bootstrap address was successfully added
+            this.log.info(
+                `Found updated bootstrap address, updating bootstrap list: ${addedBootstrap}`
+            );
+
+            // construct a /dns4 address from our new bootstrap address
+            const { hostname } = new URL(self.origin);
+            const [_, _proto, _ip, ...rest] = addedBootstrap.address.split('/');
+            const withDns = `/dns4/${hostname}/${rest.join('/')}`;
+            // add it to our list
+            this.log.debug('Adding /dns4 address: ', withDns);
+            await this.addAddress(withDns);
+
+            // construct a local /dns4 address
+            const withLocalDns = `/dns4/${hostname.replace(
+                /localhost$/,
+                'local'
+            )}/${rest.join('/')}`;
+            // add it to our list
+            this.log.debug('Adding /dns4 local address: ', withLocalDns);
+            await this.addAddress(withLocalDns);
+        }
+
+        // refresh stats
+        await this.refreshStats();
+
+        // log list
+        const addressList = this.addressList.map(it => it.address);
+        this.log.info('Loaded bootstrap addresses: ', addressList);
+        status.relays.push(...addressList);
+
+        // update our cache
+        await this.dumpCache();
+
+        // if we have no addresses
+        if (!Object.keys(this.addresses).length) {
+            // this isn't good
+            this.log.error(
+                'No addresses loaded into bootstrap list, client will fail.'
+            );
+            return;
+        }
+
+        // create a bootstrap discovery list grouped by peer
+        const addressesByPeer: Record<string, BootstrapAddress[]> = {};
+        Object.values(this.addresses).forEach(address => {
+            if (!addressesByPeer[address.serverId]) {
+                addressesByPeer[address.serverId] = [];
+            }
+            addressesByPeer[address.serverId].push(address);
+        });
+        // override our current bootstrap discovery list
+        Object.defineProperty(this, 'list', {
+            configurable: true,
+            value: Object.entries(addressesByPeer).map(
+                ([peerId, addresses]) => ({
+                    id: peerIdFromString(peerId),
+                    multiaddrs: addresses.map(address => address.multiaddr),
+                    protocols: [],
+                })
+            ),
+        });
+
+        // get our server id
+        this._serverId = Object.values(this.addresses)[0]?.serverId;
+    }
+
+    public get serverId() {
+        if (!this._serverId) {
+            throw new Error('Attempt to access serverId before it is set.');
+        }
+        return this._serverId;
+    }
+
+    private addressSorter(a: BootstrapAddress, b: BootstrapAddress) {
+        this.log.trace(`Sorting: ${a} <=> ${b}`);
+
+        // if we don't have stats for an address, prefer the one we have stats for
+        if (!a && !b) {
+            return 0;
+        }
+        if (!a) {
+            return 1;
+        }
+        if (!b) {
+            return -1;
+        }
+
+        // we have stats for both, prefer the one we've been able to connect to
+        if (a.latency === Infinity && b.latency !== Infinity) {
+            return 1;
+        }
+        if (a.latency !== Infinity && b.latency === Infinity) {
+            return -1;
+        }
+
+        // we've been able to connect to both/neither, prefer a non relay
+        if (a.isRelay && !b.isRelay) {
+            return 1;
+        }
+        if (!a.isRelay && b.isRelay) {
+            return -1;
+        }
+
+        // both/neither are relays, prefer the one with lower latency
+        return a.latency - b.latency;
+    }
+
+    public libp2pAddressSorter(a: Address, b: Address) {
+        // first of all, get our addresses
+        const addressA = this.addresses[a.multiaddr.toString()];
+        const addressB = this.addresses[b.multiaddr.toString()];
+        return this.addressSorter(addressA, addressB);
+    }
+
+    public all() {
+        return Object.values(this.addresses);
+    }
+
+    public get addressList() {
+        return Object.values(this.addresses).sort((a, b) =>
+            this.addressSorter(a, b)
+        );
     }
 }

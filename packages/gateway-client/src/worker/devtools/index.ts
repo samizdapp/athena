@@ -17,4 +17,17 @@ export class SamizdAppDevTools {
         // attach to window
         self.SamizdAppDevTools = this;
     }
+
+    public get addressBook() {
+        return this.p2pClient.node?.peerStore
+            .all()
+            .then(peers =>
+                Object.fromEntries(
+                    peers.map(it => [
+                        it.id.toString(),
+                        it.addresses.map(it => it.multiaddr.toString()),
+                    ])
+                )
+            );
+    }
 }

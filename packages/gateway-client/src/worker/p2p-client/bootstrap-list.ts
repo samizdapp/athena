@@ -52,9 +52,9 @@ class BootstrapAddress {
 
     toJson(): Record<string, unknown> {
         return {
-            address: this.address,
-            lastSeen: this.lastSeen,
-            latency: this.latency,
+            address: this.address ?? '',
+            lastSeen: this.lastSeen ?? Date.now(),
+            latency: this.latency ?? Infinity,
         };
     }
 
@@ -184,9 +184,15 @@ export class BootstrapList extends Bootstrap {
         this.log.debug('Loaded cached bootstrap list: ', cacheList);
         // parse the cached list
         await Promise.all(
-            cacheList.map((address: Record<string, unknown>) =>
-                this.addAddress(BootstrapAddress.fromJson(address))
-            )
+            cacheList.map((address: Record<string, unknown>) => {
+                let parsedAddress: string | BootstrapAddress = '';
+                try {
+                    parsedAddress = BootstrapAddress.fromJson(address);
+                } catch (e) {
+                    this.log.warn('Invalid address in cache: ', address, e);
+                }
+                return this.addAddress(parsedAddress);
+            })
         );
     }
 

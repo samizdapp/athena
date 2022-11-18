@@ -1,13 +1,14 @@
 import { Bootstrap } from '@libp2p/bootstrap';
+import { MultiaddrConnection } from '@libp2p/interface-connection';
 import type { Address } from '@libp2p/interface-peer-store';
 import { Upgrader } from '@libp2p/interface-transport';
+import { peerIdFromString } from '@libp2p/peer-id';
 import { WebSockets } from '@libp2p/websockets';
-import { multiaddr, Multiaddr } from '@multiformats/multiaddr';
 import { P2P } from '@multiformats/mafmt';
-import { Buffer } from 'buffer/';
+import { multiaddr, Multiaddr } from '@multiformats/multiaddr';
+import { Buffer } from 'buffer';
 import { pipe } from 'it-pipe';
 import localforage from 'localforage';
-import { peerIdFromString } from '@libp2p/peer-id';
 
 import type { P2pClient } from '.';
 import { logger } from '../logging';
@@ -92,15 +93,17 @@ export class BootstrapList extends Bootstrap {
         waitFor(this.statsTimeout).then(() => abortController.abort());
         // send websocket request, track time
         const start = Date.now();
+        let socket;
         try {
-            await new WebSockets().dial(
+            socket = await new WebSockets().dial(
                 address.isRelay
                     ? address.multiaddr.decapsulate('p2p-circuit')
                     : address.multiaddr,
                 {
                     signal,
                     upgrader: {
-                        upgradeOutbound: async () => null,
+                        upgradeOutbound: async (socket: MultiaddrConnection) =>
+                            socket,
                     } as unknown as Upgrader,
                 }
             );
@@ -110,6 +113,15 @@ export class BootstrapList extends Bootstrap {
             this.log.debug(`Failed to connect to ${address}: `, e);
             address.latency = Infinity;
         }
+        // close the socket
+        try {
+            if (socket) {
+                await socket.close();
+            }
+        } catch (e) {
+            this.log.warn(`Failed to close socket to ${address}: `, e);
+        }
+        // we've finished collecting stats
         this.log.trace(
             'Latency for address: ',
             address.address,

@@ -191,6 +191,11 @@ export class BootstrapList extends Bootstrap {
     }
 
     private async dumpCache() {
+        // don't dump if the list is empty
+        if (!Object.keys(this.addresses).length) {
+            this.log.error('Declining to cache empty bootstrap list.');
+            return;
+        }
         // dump our bootstrap list to cache
         return localforage.setItem(
             'p2p:bootstrap-list',
@@ -308,9 +313,6 @@ export class BootstrapList extends Bootstrap {
         this.log.info('Loaded bootstrap addresses: ', addressList);
         status.relays.push(...addressList);
 
-        // update our cache
-        await this.dumpCache();
-
         // if we have no addresses
         if (!Object.keys(this.addresses).length) {
             // this isn't good
@@ -319,6 +321,9 @@ export class BootstrapList extends Bootstrap {
             );
             return;
         }
+
+        // update our cache
+        await this.dumpCache();
 
         // create a bootstrap discovery list grouped by peer
         const addressesByPeer: Record<string, BootstrapAddress[]> = {};

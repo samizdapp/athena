@@ -29,6 +29,11 @@ export const staticCacheHandler: Handler = (request, respondWith) => {
         return;
     }
 
+    // don't cache when running locally
+    if (process.env.NX_LOCAL === 'true') {
+        return;
+    }
+
     // respond with asset from either cache or fetch
     respondWith(
         caches.open('pwa-static-cache').then(cache => {

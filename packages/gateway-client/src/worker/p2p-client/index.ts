@@ -267,6 +267,7 @@ export class P2pClient {
                 this.serverConnection = undefined;
                 // update status
                 this.connectionStatus = ServerPeerStatus.CONNECTING;
+                this.dispatchEvent('disconnected');
                 this.connectToServer();
             }
         });

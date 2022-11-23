@@ -58,12 +58,12 @@ export class P2pClient {
             .catch(_ => _);
     }
 
-    public getStream(protocol?: string, id?: string) {
+    public getStream(protocol?: string) {
         if (!this.streamFactory) {
             throw new Error('No connection established!');
         }
 
-        return this.streamFactory.getStream(protocol, id);
+        return this.streamFactory.getStream(protocol);
     }
 
     public async connectToServer(retryTimeout = 1000): Promise<Connection> {

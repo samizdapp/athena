@@ -71,8 +71,8 @@ logger.getLogger = (name: string) => {
         name
     );
     const childLogger = originalGetLogger.call(logger, name);
-    childLogger.setDefaultLevel(getDefaultLevel(name));
     if (isNew) {
+        childLogger.setDefaultLevel(getDefaultLevel(name));
         loadPersistedLevel(name, childLogger);
     }
     return childLogger;

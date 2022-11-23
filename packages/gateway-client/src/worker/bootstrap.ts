@@ -6,7 +6,7 @@ import { logger } from './logging';
 import messenger from './messenger';
 import { runMigrations } from './migrations';
 import { P2pClient } from './p2p-client';
-import { overrideFetch } from './p2p-fetch/override-fetch';
+import { overrideFetch } from './p2p-fetch';
 import status from './status';
 
 declare const self: ServiceWorkerGlobalScope;

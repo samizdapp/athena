@@ -33,9 +33,19 @@ export class P2pClient {
     private serverPeer?: PeerId;
     private serverConnection?: Promise<Connection>;
     public node?: Libp2p;
+    private _connectionStatus: ServerPeerStatus = ServerPeerStatus.OFFLINE;
 
     public constructor() {
         this.bootstrapList = new BootstrapList(this);
+    }
+
+    public get connectionStatus(): ServerPeerStatus {
+        return this._connectionStatus;
+    }
+
+    public set connectionStatus(connectionStatus: ServerPeerStatus) {
+        this._connectionStatus = connectionStatus;
+        status.serverPeer = connectionStatus;
     }
 
     public async addServerPeerAddress(multiaddr: MultiaddrType) {
@@ -119,7 +129,7 @@ export class P2pClient {
         await this.bootstrapList.load();
 
         // update status
-        status.serverPeer = ServerPeerStatus.BOOTSTRAPPED;
+        this.connectionStatus = ServerPeerStatus.BOOTSTRAPPED;
 
         // create libp2p node
         this.node = await createLibp2p({
@@ -225,7 +235,7 @@ export class P2pClient {
                     );
 
                     // update status
-                    status.serverPeer = ServerPeerStatus.CONNECTED;
+                    this.connectionStatus = ServerPeerStatus.CONNECTED;
 
                     // set keep-alive on connection
                     try {
@@ -256,7 +266,7 @@ export class P2pClient {
                 this.log.warn('Disconnected from server.');
                 this.serverConnection = undefined;
                 // update status
-                status.serverPeer = ServerPeerStatus.CONNECTING;
+                this.connectionStatus = ServerPeerStatus.CONNECTING;
                 this.connectToServer();
             }
         });
@@ -267,10 +277,10 @@ export class P2pClient {
         this.log.info('Started libp2p.');
 
         // update status
-        status.serverPeer = ServerPeerStatus.CONNECTING;
+        this.connectionStatus = ServerPeerStatus.CONNECTING;
         waitFor(15000).then(() => {
-            if (status.serverPeer === ServerPeerStatus.CONNECTING) {
-                status.serverPeer = ServerPeerStatus.OFFLINE;
+            if (this.connectionStatus === ServerPeerStatus.CONNECTING) {
+                this.connectionStatus = ServerPeerStatus.OFFLINE;
             }
         });
     }

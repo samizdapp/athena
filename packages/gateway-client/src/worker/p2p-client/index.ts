@@ -83,9 +83,30 @@ export class P2pClient {
 
         // if we already have a connection (completed or pending)
         if (this.serverConnection) {
-            // don't create a second one
-            return this.serverConnection;
-        } // else, we're good to go
+            // get the connection so we can take a closer look at it
+            let connection;
+            try {
+                connection = await this.serverConnection;
+            } catch (e) {
+                // ignore errors
+            }
+            // if this connection:
+            // - exists
+            // - is open
+            // - and is less than a minute old
+            if (
+                connection?.stat?.status === 'OPEN' &&
+                connection.stat?.timeline.open < Date.now() - 60 * 1000
+            ) {
+                // this is a newly opened connection
+                // instead of creating a second one
+                // just return the connection we just made
+                return this.serverConnection;
+            }
+            // else, this connection may have failed, be closed,
+            // or be old (could have failed more exotically)
+            // we should discard it and create a new connection
+        }
 
         // first, close any open connections to our server
         this.log.debug('Closing existing server connections...');

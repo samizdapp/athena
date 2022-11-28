@@ -12,7 +12,7 @@ import localforage from 'localforage';
 
 import type { P2pClient } from '.';
 import { logger } from '../logging';
-import { nativeFetch } from '../p2p-fetch/override-fetch';
+import { nativeFetch } from '../p2p-fetch';
 import status from '../status';
 
 const waitFor = async (t: number): Promise<void> =>

@@ -33,9 +33,19 @@ export class P2pClient {
     private serverPeer?: PeerId;
     private serverConnection?: Promise<Connection>;
     public node?: Libp2p;
+    private _connectionStatus: ServerPeerStatus = ServerPeerStatus.OFFLINE;
 
     public constructor() {
         this.bootstrapList = new BootstrapList(this);
+    }
+
+    public get connectionStatus(): ServerPeerStatus {
+        return this._connectionStatus;
+    }
+
+    public set connectionStatus(connectionStatus: ServerPeerStatus) {
+        this._connectionStatus = connectionStatus;
+        status.serverPeer = connectionStatus;
     }
 
     public async addServerPeerAddress(multiaddr: MultiaddrType) {
@@ -48,12 +58,12 @@ export class P2pClient {
             .catch(_ => _);
     }
 
-    public getStream(protocol?: string, id?: string) {
+    public getStream(protocol?: string) {
         if (!this.streamFactory) {
             throw new Error('No connection established!');
         }
 
-        return this.streamFactory.getStream(protocol, id);
+        return this.streamFactory.getStream(protocol);
     }
 
     public async connectToServer(retryTimeout = 1000): Promise<Connection> {
@@ -73,9 +83,30 @@ export class P2pClient {
 
         // if we already have a connection (completed or pending)
         if (this.serverConnection) {
-            // don't create a second one
-            return this.serverConnection;
-        } // else, we're good to go
+            // get the connection so we can take a closer look at it
+            let connection;
+            try {
+                connection = await this.serverConnection;
+            } catch (e) {
+                // ignore errors
+            }
+            // if this connection:
+            // - exists
+            // - is open
+            // - and is less than a minute old
+            if (
+                connection?.stat?.status === 'OPEN' &&
+                connection.stat?.timeline.open < Date.now() - 60 * 1000
+            ) {
+                // this is a newly opened connection
+                // instead of creating a second one
+                // just return the connection we just made
+                return this.serverConnection;
+            }
+            // else, this connection may have failed, be closed,
+            // or be old (could have failed more exotically)
+            // we should discard it and create a new connection
+        }
 
         // first, close any open connections to our server
         this.log.debug('Closing existing server connections...');
@@ -119,7 +150,7 @@ export class P2pClient {
         await this.bootstrapList.load();
 
         // update status
-        status.serverPeer = ServerPeerStatus.BOOTSTRAPPED;
+        this.connectionStatus = ServerPeerStatus.BOOTSTRAPPED;
 
         // create libp2p node
         this.node = await createLibp2p({
@@ -225,7 +256,7 @@ export class P2pClient {
                     );
 
                     // update status
-                    status.serverPeer = ServerPeerStatus.CONNECTED;
+                    this.connectionStatus = ServerPeerStatus.CONNECTED;
 
                     // set keep-alive on connection
                     try {
@@ -256,7 +287,8 @@ export class P2pClient {
                 this.log.warn('Disconnected from server.');
                 this.serverConnection = undefined;
                 // update status
-                status.serverPeer = ServerPeerStatus.CONNECTING;
+                this.connectionStatus = ServerPeerStatus.CONNECTING;
+                this.dispatchEvent('disconnected');
                 this.connectToServer();
             }
         });
@@ -267,10 +299,10 @@ export class P2pClient {
         this.log.info('Started libp2p.');
 
         // update status
-        status.serverPeer = ServerPeerStatus.CONNECTING;
+        this.connectionStatus = ServerPeerStatus.CONNECTING;
         waitFor(15000).then(() => {
-            if (status.serverPeer === ServerPeerStatus.CONNECTING) {
-                status.serverPeer = ServerPeerStatus.OFFLINE;
+            if (this.connectionStatus === ServerPeerStatus.CONNECTING) {
+                this.connectionStatus = ServerPeerStatus.OFFLINE;
             }
         });
     }

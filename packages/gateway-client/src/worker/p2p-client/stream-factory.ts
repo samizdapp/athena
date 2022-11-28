@@ -24,7 +24,7 @@ export class StreamFactory {
         this.dialTimeout = maxDialTimeout;
     }
 
-    private async makeStream(protocol: string, _piperId: string) {
+    private async makeStream(protocol: string) {
         this.log.trace('Get stream for protocol: ', protocol);
 
         // we need to be connected
@@ -136,10 +136,7 @@ export class StreamFactory {
         return stream;
     }
 
-    public async getStream(
-        protocol = '/samizdapp-proxy',
-        id: string = crypto.randomUUID()
-    ) {
-        return this.makeStream(protocol, id);
+    public async getStream(protocol = '/samizdapp-proxy') {
+        return this.makeStream(protocol);
     }
 }

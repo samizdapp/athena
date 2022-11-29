@@ -16,13 +16,13 @@ class Messenger {
     private log = logger.getLogger('worker/messenger');
 
     init() {
-        self.addEventListener('message', event => {
-            const msg = event.data;
-            this.log.debug('Received client message: ', msg);
-            this.eventTarget.dispatchEvent(
-                new CustomEvent(msg.type, { detail: msg })
-            );
-        });
+        // self.addEventListener('message', event => {
+        //     const msg = event.data;
+        //     this.log.debug('Received client message: ', msg);
+        //     this.eventTarget.dispatchEvent(
+        //         new CustomEvent(msg.type, { detail: msg })
+        //     );
+        // });
     }
 
     addListener<K extends ClientMessageType>(type: K, handler: MessageHandler) {
@@ -52,6 +52,20 @@ class Messenger {
         this.log.debug('Sending worker message: ', msg);
         client?.postMessage(msg);
     }
+
+    messageHandler(event: MessageEvent) {
+        const msg = event.data;
+        this.log.debug('Received client message: ', msg);
+        this.eventTarget.dispatchEvent(
+            new CustomEvent(msg.type, { detail: msg })
+        );
+    }
 }
+
+const messenger = new Messenger();
+self.addEventListener(
+    'message',
+    messenger.messageHandler.bind(messenger) as EventListener
+);
 
 export default new Messenger();

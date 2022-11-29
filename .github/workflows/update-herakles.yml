@@ -16,10 +16,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Repository Dispatch
-      uses: peter-evans/repository-dispatch@v2
-      with:
-        token: ${{ secrets.HERAKLES_TOKEN }}
-        repository: samizdapp/herakles
-        event-type: push
-        client-payload: '{"repository": "${{ github.repository }}"}'
+      - name: Repository Dispatch
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.HERAKLES_TOKEN }}
+          repository: samizdapp/herakles
+          event-type: push
+          client-payload: '{"repository": "${{ github.repository }}"}'

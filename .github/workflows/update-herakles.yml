@@ -12,14 +12,14 @@ on:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-    update-herakles:
-        runs-on: ubuntu-latest
+  update-herakles:
+    runs-on: ubuntu-latest
 
-        steps:
-        - name: Repository Dispatch
-          uses: peter-evans/repository-dispatch@v2
-          with:
-            token: ${{ secrets.HERAKLES_TOKEN }}
-            repository: samizdapp/herakles
-            event-type: push
-            client-payload: '{"repository": "${{ github.repository }}"}'
+    steps:
+    - name: Repository Dispatch
+      uses: peter-evans/repository-dispatch@v2
+      with:
+        token: ${{ secrets.HERAKLES_TOKEN }}
+        repository: samizdapp/herakles
+        event-type: push
+        client-payload: '{"repository": "${{ github.repository }}"}'

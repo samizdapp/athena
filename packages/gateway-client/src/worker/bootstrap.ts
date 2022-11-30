@@ -15,10 +15,7 @@ export default async () => {
     // create our bootstrap logger
     const log = logger.getLogger('worker/bootstrap');
 
-    // run migrations before anything else
-    await runMigrations();
-
-    // setup event handlers
+    // setup event handlers (this must be done before we start any async work)
     self.addEventListener('online', () => log.debug('<<<<online'));
     self.addEventListener('offline', () => log.debug('<<<<offline'));
 
@@ -51,6 +48,9 @@ export default async () => {
 
     // init messenger
     messenger.init();
+
+    // run migrations before any other async work
+    await runMigrations();
 
     // create and start p2p client
     const p2pClient = new P2pClient();

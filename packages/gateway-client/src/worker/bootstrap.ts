@@ -15,7 +15,7 @@ export default async () => {
     // create our bootstrap logger
     const log = logger.getLogger('worker/bootstrap');
 
-    // setup event handlers
+    // setup event handlers (this must be done before we start any async work)
     self.addEventListener('online', () => log.debug('<<<<online'));
     self.addEventListener('offline', () => log.debug('<<<<offline'));
 

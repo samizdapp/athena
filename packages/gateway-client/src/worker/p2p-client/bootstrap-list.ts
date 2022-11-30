@@ -22,11 +22,13 @@ class BootstrapAddress {
     public multiaddr: Multiaddr;
     public lastSeen = 0;
     public latency = Infinity;
-    public serverId: string;
     public isRelay = false;
     public isDNS = false;
+    public address: string;
 
-    public constructor(public readonly address: string) {
+    private _serverId: string;
+
+    public constructor(address: string) {
         if (!P2P.matches(address)) {
             throw new Error('Invalid multiaddr');
         }
@@ -39,7 +41,8 @@ class BootstrapAddress {
             );
         }
 
-        this.serverId = serverId;
+        this.address = this.multiaddr.toString();
+        this._serverId = serverId;
         this.isRelay = this.address.includes('/p2p-circuit/');
         this.isDNS = this.address.includes('/dns4/');
     }
@@ -60,7 +63,27 @@ class BootstrapAddress {
     }
 
     toString(): string {
-        return this.multiaddr.toString();
+        return this.address;
+    }
+
+    get serverId(): string {
+        return this._serverId;
+    }
+
+    set serverId(id: string) {
+        // update multiaddr
+        const newMultiaddr = multiaddr(
+            this.multiaddr.toString().replace(this._serverId, id)
+        );
+        const newServerId = newMultiaddr.getPeerId();
+        if (!newServerId) {
+            throw new Error(
+                `Error setting serverId: ${id} (was parsed to: ${newServerId}).`
+            );
+        }
+        this.address = newMultiaddr.toString();
+        this.multiaddr = newMultiaddr;
+        this._serverId = newServerId;
     }
 }
 
@@ -68,7 +91,7 @@ export class BootstrapList extends Bootstrap {
     private log = logger.getLogger('worker/p2p/bootstrap');
 
     private maxOffline = 7 * 24 * 60 * 60 * 1000;
-    private statsTimeout = 10000;
+    private defaultStatsTimeout = 10000;
 
     private addresses: Record<string, BootstrapAddress> = {};
     private _serverId?: string;
@@ -86,11 +109,14 @@ export class BootstrapList extends Bootstrap {
         });
     }
 
-    private async populateStats(address: BootstrapAddress) {
+    private async populateStats(
+        address: BootstrapAddress,
+        timeout = this.defaultStatsTimeout
+    ) {
         // timeout after configured timeout
         const abortController = new AbortController();
         const signal = abortController.signal;
-        waitFor(this.statsTimeout).then(() => abortController.abort());
+        waitFor(timeout).then(() => abortController.abort());
         // send websocket request, track time
         const start = Date.now();
         let socket;
@@ -133,14 +159,17 @@ export class BootstrapList extends Bootstrap {
         return address.lastSeen > Date.now() - this.maxOffline;
     }
 
-    private async addAddress(addressToAdd: string | BootstrapAddress) {
+    private async addAddress(
+        addressToAdd: string | BootstrapAddress,
+        { overrideServerId = false, statsTimeout = 0 } = {}
+    ) {
         if (!addressToAdd) {
             this.log.trace(`Ignoring falsy address: ${addressToAdd}`);
             return null;
         }
 
         // ensure this is a valid bootstrap address object
-        let address;
+        let address: BootstrapAddress;
         try {
             address =
                 typeof addressToAdd === 'string'
@@ -158,7 +187,13 @@ export class BootstrapList extends Bootstrap {
         }
 
         // ensure it matches our current server id
-        if (this._serverId && address.serverId !== this._serverId) {
+        // optionally, override our existing server id by letting
+        // this address through if it doesn't match
+        if (
+            this._serverId &&
+            address.serverId !== this._serverId &&
+            !overrideServerId
+        ) {
             this.log.debug(
                 `Declining to add address with different server id: ${address}`
             );
@@ -166,7 +201,13 @@ export class BootstrapList extends Bootstrap {
         }
 
         // get stats for this address
-        await this.populateStats(address);
+        await this.populateStats(
+            address,
+            // set a timeout of twice our quickest latency
+            // (if we already have an address, it isn't super important that we
+            // give this extra address time)
+            statsTimeout || Math.min(this.addressList[0]?.latency * 2 || 1000)
+        );
         // ensure this address is recent
         if (!this.isRecent(address)) {
             this.log.debug(`Declining to add stale address: ${address}`);
@@ -174,6 +215,30 @@ export class BootstrapList extends Bootstrap {
         }
 
         // by this point, we know this is a valid and active address
+
+        // if we don't have a server id yet,
+        // or if we're supposed to override our server id
+        if (
+            !this._serverId ||
+            (overrideServerId && address.serverId !== this._serverId)
+        ) {
+            // log a warning if we're going to override our server id
+            if (this._serverId) {
+                this.log.warn(
+                    `Overriding server id ${this._serverId} with ${address.serverId}`
+                );
+            }
+            // now, set our server id to the server id of this address
+            this._serverId = address.serverId;
+            // now, update all of our existing addresses with the new server id
+            this.addresses = Object.fromEntries(
+                Object.values(this.addresses).map(existingAddress => {
+                    existingAddress.serverId = address.serverId;
+                    return [existingAddress.address, existingAddress];
+                })
+            );
+        }
+
         // add this address to our list
         this.log.trace(`Adding address: ${address}`);
         this.addresses[address.address] = address;
@@ -195,17 +260,15 @@ export class BootstrapList extends Bootstrap {
         const cacheList = JSON.parse(cached) as Record<string, unknown>[];
         this.log.debug('Loaded cached bootstrap list: ', cacheList);
         // parse the cached list
-        await Promise.all(
-            cacheList.map((address: Record<string, unknown>) => {
-                let parsedAddress: string | BootstrapAddress = '';
-                try {
-                    parsedAddress = BootstrapAddress.fromJson(address);
-                } catch (e) {
-                    this.log.warn('Invalid address in cache: ', address, e);
-                }
-                return this.addAddress(parsedAddress);
-            })
-        );
+        for (const address of cacheList) {
+            let parsedAddress: string | BootstrapAddress = '';
+            try {
+                parsedAddress = BootstrapAddress.fromJson(address);
+            } catch (e) {
+                this.log.warn('Invalid address in cache: ', address, e);
+            }
+            await this.addAddress(parsedAddress);
+        }
     }
 
     private async dumpCache() {
@@ -237,7 +300,9 @@ export class BootstrapList extends Bootstrap {
                     `Received relay address from stream: ${addressString}`
                 );
                 // add it to our list
-                const addedAddress = await this.addAddress(addressString);
+                const addedAddress = await this.addAddress(addressString, {
+                    statsTimeout: this.defaultStatsTimeout,
+                });
                 // if NOT successfully added
                 if (!addedAddress) {
                     // nothing more to do
@@ -297,7 +362,12 @@ export class BootstrapList extends Bootstrap {
             );
         }
         // if we received a new bootstrap address, add it to our list
-        const addedBootstrap = await this.addAddress(newBootstrapAddress ?? '');
+        // use it to override our server id (this allows us to get the new
+        // server id from our box)
+        const addedBootstrap = await this.addAddress(
+            newBootstrapAddress ?? '',
+            { overrideServerId: true }
+        );
         // if it was added successfully
         if (addedBootstrap) {
             // our new bootstrap address was successfully added
@@ -323,8 +393,10 @@ export class BootstrapList extends Bootstrap {
             await this.addAddress(withLocalDns);
         }
 
-        // refresh stats
-        await this.refreshStats();
+        // now that we've added all of our addresses,
+        // give our slower addresses another chance to be seen using the
+        // default timeout, but don't wait for them
+        this.refreshStats();
 
         // log list
         const addressList = this.addressList.map(it => it.address);
@@ -362,9 +434,6 @@ export class BootstrapList extends Bootstrap {
                 })
             ),
         });
-
-        // get our server id
-        this._serverId = Object.values(this.addresses)[0]?.serverId;
     }
 
     public get serverId() {

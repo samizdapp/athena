@@ -96,7 +96,7 @@ export class P2pClient {
             // - and is less than a minute old
             if (
                 connection?.stat?.status === 'OPEN' &&
-                connection.stat?.timeline.open < Date.now() - 60 * 1000
+                connection.stat?.timeline.open > Date.now() - 60 * 1000
             ) {
                 // this is a newly opened connection
                 // instead of creating a second one
@@ -300,7 +300,7 @@ export class P2pClient {
 
         // update status
         this.connectionStatus = ServerPeerStatus.CONNECTING;
-        waitFor(15000).then(() => {
+        waitFor(30000).then(() => {
             if (this.connectionStatus === ServerPeerStatus.CONNECTING) {
                 this.connectionStatus = ServerPeerStatus.OFFLINE;
             }

@@ -54,7 +54,7 @@ jobs:
               with:
                   github_token: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: lint
+            - name: affected:lint
               run: |
                   docker run \
                     --rm \
@@ -103,7 +103,7 @@ jobs:
               with:
                   github_token: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: affected:build
+            - name: affected:test
               run: |
                   docker run \
                     --rm \

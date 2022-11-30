@@ -2,6 +2,7 @@
   "$schema": "./node_modules/nx/schemas/workspace-schema.json",
   "version": 2,
   "projects": {
+    "app-service": "packages/app-service",
     "gateway-client": "packages/gateway-client",
     "shared-api": "packages/shared/api",
     "shared-service-worker": "packages/shared/service-worker",

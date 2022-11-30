@@ -1,20 +1,17 @@
 {
-  "name": "status-service",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "packages/status-service/src",
+  "sourceRoot": "packages/app-service/src",
   "projectType": "application",
   "targets": {
     "build": {
-      "executor": "@nrwl/webpack:webpack",
+      "executor": "@nrwl/node:webpack",
       "outputs": ["{options.outputPath}"],
       "options": {
-        "target": "node",
-        "compiler": "tsc",
         "generatePackageJson": true,
-        "outputPath": "dist/packages/status-service",
-        "main": "packages/status-service/src/main.ts",
-        "tsConfig": "packages/status-service/tsconfig.app.json",
-        "assets": ["packages/status-service/src/assets"]
+        "outputPath": "dist/packages/app-service",
+        "main": "packages/app-service/src/main.ts",
+        "tsConfig": "packages/app-service/tsconfig.app.json",
+        "assets": ["packages/app-service/src/assets"]
       },
       "configurations": {
         "production": {
@@ -25,13 +22,13 @@
       }
     },
     "serve": {
-      "executor": "@nrwl/js:node",
+      "executor": "@nrwl/node:node",
       "options": {
-        "buildTarget": "status-service:build"
+        "buildTarget": "app-service:build"
       },
       "configurations": {
         "production": {
-          "buildTarget": "status-service:build:production"
+          "buildTarget": "app-service:build:production"
         }
       }
     },
@@ -39,14 +36,14 @@
       "executor": "@nrwl/linter:eslint",
       "outputs": ["{options.outputFile}"],
       "options": {
-        "lintFilePatterns": ["packages/status-service/**/*.ts"]
+        "lintFilePatterns": ["packages/app-service/**/*.ts"]
       }
     },
     "test": {
       "executor": "@nrwl/jest:jest",
-      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "outputs": ["coverage/packages/app-service"],
       "options": {
-        "jestConfig": "packages/status-service/jest.config.ts",
+        "jestConfig": "packages/app-service/jest.config.ts",
         "passWithNoTests": true
       }
     }

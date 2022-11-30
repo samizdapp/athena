@@ -10,9 +10,9 @@ import { AppModule } from './app/app.module';
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);
-    const globalPrefix = '/smz/api/status';
+    const globalPrefix = '/smz/api/app';
     app.setGlobalPrefix(globalPrefix);
-    const port = process.env.PORT || 3411;
+    const port = process.env.PORT || 3412;
     await app.listen(port);
     Logger.log(
         `🚀 Application is running on: http://localhost:${port}${globalPrefix}`

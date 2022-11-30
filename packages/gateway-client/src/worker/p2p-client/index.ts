@@ -300,7 +300,7 @@ export class P2pClient {
 
         // update status
         this.connectionStatus = ServerPeerStatus.CONNECTING;
-        waitFor(15000).then(() => {
+        waitFor(30000).then(() => {
             if (this.connectionStatus === ServerPeerStatus.CONNECTING) {
                 this.connectionStatus = ServerPeerStatus.OFFLINE;
             }

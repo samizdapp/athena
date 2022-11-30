@@ -1,11 +1,15 @@
-import { Module } from '@nestjs/common';
+import { Global, Module, ValidationPipe } from '@nestjs/common';
+import { APP_PIPE } from '@nestjs/core';
+import { ManifestsModule } from '../manifests/manifests.module';
 
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
-
+@Global()
 @Module({
-    imports: [],
-    controllers: [AppController],
-    providers: [AppService],
+    imports: [ManifestsModule],
+    providers: [
+        {
+            provide: APP_PIPE,
+            useClass: ValidationPipe,
+        },
+    ],
 })
 export class AppModule {}

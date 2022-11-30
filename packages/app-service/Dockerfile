@@ -23,4 +23,7 @@ COPY --from=build /usr/src/athena/dist/packages/app-service dist/packages/app-se
 
 RUN cd dist/packages/app-service && npm install
 
+ENV APP_MANIFESTS_VOLUME=/usr/src/volumes/app_manifests
+RUN mkdir -p $APP_MANIFESTS_VOLUME
+
 CMD [ "/usr/local/bin/node", "dist/packages/app-service/main.js"  ]

@@ -49,7 +49,7 @@ export default async () => {
     // init messenger
     messenger.init();
 
-    // run migrations before anything else
+    // run migrations before any other async work
     await runMigrations();
 
     // create and start p2p client

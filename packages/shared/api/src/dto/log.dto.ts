@@ -1,5 +1,6 @@
-import { PartialType } from '@nestjs/mapped-types';
+import { IntersectionType, PartialType } from '@nestjs/mapped-types';
 import { IsString, IsEnum } from 'class-validator';
+import { Resource } from './resource.dto';
 
 export enum Status {
     ONLINE = 'ONLINE',
@@ -20,8 +21,4 @@ export class Create {
 
 export class Update extends PartialType(Create) {}
 
-export class Log extends Create {
-    id!: string;
-    createdAt!: string;
-    updatedAt!: string;
-}
+export class Log extends IntersectionType(Resource, Create) {}

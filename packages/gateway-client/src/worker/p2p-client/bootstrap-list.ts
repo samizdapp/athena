@@ -156,14 +156,17 @@ export class BootstrapList extends Bootstrap {
         return address.lastSeen > Date.now() - this.maxOffline;
     }
 
-    private async addAddress(addressToAdd: string | BootstrapAddress) {
+    private async addAddress(
+        addressToAdd: string | BootstrapAddress,
+        { overrideServerId = false, statsTimeout = 0 } = {}
+    ) {
         if (!addressToAdd) {
             this.log.trace(`Ignoring falsy address: ${addressToAdd}`);
             return null;
         }
 
         // ensure this is a valid bootstrap address object
-        let address;
+        let address: BootstrapAddress;
         try {
             address =
                 typeof addressToAdd === 'string'
@@ -181,7 +184,13 @@ export class BootstrapList extends Bootstrap {
         }
 
         // ensure it matches our current server id
-        if (this._serverId && address.serverId !== this._serverId) {
+        // optionally, override our existing server id by letting
+        // this address through if it doesn't match
+        if (
+            this._serverId &&
+            address.serverId !== this._serverId &&
+            !overrideServerId
+        ) {
             this.log.debug(
                 `Declining to add address with different server id: ${address}`
             );
@@ -197,6 +206,30 @@ export class BootstrapList extends Bootstrap {
         }
 
         // by this point, we know this is a valid and active address
+
+        // if we don't have a server id yet,
+        // or if we're supposed to override our server id
+        if (
+            !this._serverId ||
+            (overrideServerId && address.serverId !== this._serverId)
+        ) {
+            // log a warning if we're going to override our server id
+            if (this._serverId) {
+                this.log.warn(
+                    `Overriding server id ${this._serverId} with ${address.serverId}`
+                );
+            }
+            // now, set our server id to the server id of this address
+            this._serverId = address.serverId;
+            // now, update all of our existing addresses with the new server id
+            this.addresses = Object.fromEntries(
+                Object.values(this.addresses).map(existingAddress => {
+                    existingAddress.serverId = address.serverId;
+                    return [existingAddress.address, existingAddress];
+                })
+            );
+        }
+
         // add this address to our list
         this.log.trace(`Adding address: ${address}`);
         this.addresses[address.address] = address;
@@ -320,7 +353,12 @@ export class BootstrapList extends Bootstrap {
             );
         }
         // if we received a new bootstrap address, add it to our list
-        const addedBootstrap = await this.addAddress(newBootstrapAddress ?? '');
+        // use it to override our server id (this allows us to get the new
+        // server id from our box)
+        const addedBootstrap = await this.addAddress(
+            newBootstrapAddress ?? '',
+            { overrideServerId: true }
+        );
         // if it was added successfully
         if (addedBootstrap) {
             // our new bootstrap address was successfully added
@@ -385,9 +423,6 @@ export class BootstrapList extends Bootstrap {
                 })
             ),
         });
-
-        // get our server id
-        this._serverId = Object.values(this.addresses)[0]?.serverId;
     }
 
     public get serverId() {

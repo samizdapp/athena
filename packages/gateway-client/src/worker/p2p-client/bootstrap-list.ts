@@ -91,7 +91,7 @@ export class BootstrapList extends Bootstrap {
     private log = logger.getLogger('worker/p2p/bootstrap');
 
     private maxOffline = 7 * 24 * 60 * 60 * 1000;
-    private statsTimeout = 10000;
+    private defaultStatsTimeout = 10000;
 
     private addresses: Record<string, BootstrapAddress> = {};
     private _serverId?: string;
@@ -109,11 +109,14 @@ export class BootstrapList extends Bootstrap {
         });
     }
 
-    private async populateStats(address: BootstrapAddress) {
+    private async populateStats(
+        address: BootstrapAddress,
+        timeout = this.defaultStatsTimeout
+    ) {
         // timeout after configured timeout
         const abortController = new AbortController();
         const signal = abortController.signal;
-        waitFor(this.statsTimeout).then(() => abortController.abort());
+        waitFor(timeout).then(() => abortController.abort());
         // send websocket request, track time
         const start = Date.now();
         let socket;
@@ -198,7 +201,13 @@ export class BootstrapList extends Bootstrap {
         }
 
         // get stats for this address
-        await this.populateStats(address);
+        await this.populateStats(
+            address,
+            // set a timeout of twice our quickest latency
+            // (if we already have an address, it isn't super important that we
+            // give this extra address time)
+            statsTimeout || Math.min(this.addressList[0]?.latency * 2 || 1000)
+        );
         // ensure this address is recent
         if (!this.isRecent(address)) {
             this.log.debug(`Declining to add stale address: ${address}`);
@@ -251,17 +260,15 @@ export class BootstrapList extends Bootstrap {
         const cacheList = JSON.parse(cached) as Record<string, unknown>[];
         this.log.debug('Loaded cached bootstrap list: ', cacheList);
         // parse the cached list
-        await Promise.all(
-            cacheList.map((address: Record<string, unknown>) => {
-                let parsedAddress: string | BootstrapAddress = '';
-                try {
-                    parsedAddress = BootstrapAddress.fromJson(address);
-                } catch (e) {
-                    this.log.warn('Invalid address in cache: ', address, e);
-                }
-                return this.addAddress(parsedAddress);
-            })
-        );
+        for (const address of cacheList) {
+            let parsedAddress: string | BootstrapAddress = '';
+            try {
+                parsedAddress = BootstrapAddress.fromJson(address);
+            } catch (e) {
+                this.log.warn('Invalid address in cache: ', address, e);
+            }
+            await this.addAddress(parsedAddress);
+        }
     }
 
     private async dumpCache() {
@@ -293,7 +300,9 @@ export class BootstrapList extends Bootstrap {
                     `Received relay address from stream: ${addressString}`
                 );
                 // add it to our list
-                const addedAddress = await this.addAddress(addressString);
+                const addedAddress = await this.addAddress(addressString, {
+                    statsTimeout: this.defaultStatsTimeout,
+                });
                 // if NOT successfully added
                 if (!addedAddress) {
                     // nothing more to do
@@ -384,8 +393,10 @@ export class BootstrapList extends Bootstrap {
             await this.addAddress(withLocalDns);
         }
 
-        // refresh stats
-        await this.refreshStats();
+        // now that we've added all of our addresses,
+        // give our slower addresses another chance to be seen using the
+        // default timeout, but don't wait for them
+        this.refreshStats();
 
         // log list
         const addressList = this.addressList.map(it => it.address);

@@ -22,11 +22,13 @@ class BootstrapAddress {
     public multiaddr: Multiaddr;
     public lastSeen = 0;
     public latency = Infinity;
-    public serverId: string;
     public isRelay = false;
     public isDNS = false;
+    public address: string;
 
-    public constructor(public readonly address: string) {
+    private _serverId: string;
+
+    public constructor(address: string) {
         if (!P2P.matches(address)) {
             throw new Error('Invalid multiaddr');
         }
@@ -39,7 +41,8 @@ class BootstrapAddress {
             );
         }
 
-        this.serverId = serverId;
+        this.address = this.multiaddr.toString();
+        this._serverId = serverId;
         this.isRelay = this.address.includes('/p2p-circuit/');
         this.isDNS = this.address.includes('/dns4/');
     }
@@ -60,7 +63,27 @@ class BootstrapAddress {
     }
 
     toString(): string {
-        return this.multiaddr.toString();
+        return this.address;
+    }
+
+    get serverId(): string {
+        return this._serverId;
+    }
+
+    set serverId(id: string) {
+        // update multiaddr
+        const newMultiaddr = multiaddr(
+            this.multiaddr.toString().replace(this._serverId, id)
+        );
+        const newServerId = newMultiaddr.getPeerId();
+        if (!newServerId) {
+            throw new Error(
+                `Error setting serverId: ${id} (was parsed to: ${newServerId}).`
+            );
+        }
+        this.address = newMultiaddr.toString();
+        this.multiaddr = newMultiaddr;
+        this._serverId = newServerId;
     }
 }
 

@@ -20,7 +20,7 @@ export class ManifestsManager {
             indexes: {
                 name: {},
             },
-        };
+        } as ManifestsDb;
     }
 
     private async loadDb() {

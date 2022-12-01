@@ -33,25 +33,27 @@ const SW_HEARTBEAT_SPLIT = '<head>';
 // this is the script that will be injected, it issues a postMessage to the service worker
 // when the document becomes visible, and listens for a response within 1 second
 const SW_HEARTBEAT_SNIPPET = `<script>
-    document.addEventListener("visibilitychange", () => {
-        console.log('visibilitychange', document.visibilityState, navigator.serviceWorker.controller?.state);
-        if (document.visibilityState === 'visible' && navigator.serviceWorker.controller?.state === 'activated') {
-            console.log('test service worker responsiveness');
-            navigator.serviceWorker.controller?.postMessage({
-                type: '${ClientMessageType.SW_HEARTBEAT}'
-            });
-            const start = Date.now();
-            const timeout = setTimeout(() => {
-                alert('Service worker is unresponsive, please restart the app');
-            }, 1000);
-            navigator.serviceWorker.onmessage = (e) => {
-                if (e.data.type === '${WorkerMessageType.SW_HEARTBEAT}') {
-                    console.log('Service worker is responsive', Date.now() - start);
-                    clearTimeout(timeout);
-                }
-            };
-        }
-    });
+    if (navigator.userAgent.includes('iPhone')) {
+        document.addEventListener("visibilitychange", () => {
+            console.log('visibilitychange', document.visibilityState, navigator.serviceWorker.controller?.state);
+            if (document.visibilityState === 'visible' && navigator.serviceWorker.controller?.state === 'activated') {
+                console.log('test service worker responsiveness');
+                navigator.serviceWorker.controller?.postMessage({
+                    type: '${ClientMessageType.SW_HEARTBEAT}'
+                });
+                const start = Date.now();
+                const timeout = setTimeout(() => {
+                    alert('Service worker is unresponsive, please restart the app');
+                }, 1000);
+                navigator.serviceWorker.onmessage = (e) => {
+                    if (e.data.type === '${WorkerMessageType.SW_HEARTBEAT}') {
+                        console.log('Service worker is responsive', Date.now() - start);
+                        clearTimeout(timeout);
+                    }
+                };
+            }
+        });
+    }
 </script>`;
 
 // this is the injector function that will be called for each response

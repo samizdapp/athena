@@ -5,9 +5,122 @@ import type { P2pClient } from '.';
 import { ServerPeerStatus } from '../../worker-messaging';
 import { logger } from '../logging';
 import status from '../status';
+import { decode } from '../p2p-fetch/lob-enc';
+class Deferred<T> {
+    promise: Promise<T>;
+    resolve!: (value: T) => void;
+    reject!: (reason?: unknown) => void;
+
+    constructor() {
+        this.promise = new Promise((resolve, reject) => {
+            this.resolve = resolve;
+            this.reject = reject;
+        });
+    }
+}
 
 const waitFor = async (t: number): Promise<void> =>
     new Promise(r => setTimeout(r, t));
+
+declare type ChunkCallback = () => void;
+export class RequestStream {
+    private log = logger.getLogger('worker/p2p/wrapped-stream');
+    private outbox = new Deferred<Buffer[]>();
+    private inbox = new Deferred<Buffer[]>();
+    private hasOpened = false;
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    private chunkCallback?: ChunkCallback;
+
+    get isOpen(): boolean {
+        return this.stream.stat.timeline.close === undefined;
+    }
+
+    constructor(private readonly stream: Stream) {}
+
+    // set up stream for continual send/receive
+    public async open(): Promise<void> {
+        this.hasOpened = true;
+        // we can only call sink once, so we need to provide a generator
+        // that will yield chunks from the outbox
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
+        const that = this;
+        this.stream.sink(
+            (async function* () {
+                while (true) {
+                    const chunks = await that.outbox.promise;
+
+                    for await (const chunk of chunks) {
+                        yield chunk;
+                    }
+                }
+            })()
+        );
+
+        // we can read from the stream source as many times as we want
+        // so we can just read chunks and put them in the inbox
+        let inboxLocal = [];
+        let currentLength = 0;
+        let headLength = 0;
+        let totalLength = 0;
+        for await (const chunk of this.stream.source) {
+            const buf = Buffer.from(chunk.subarray());
+            inboxLocal.push(buf);
+            // first 2 bytes are the length of the packet json portion
+            if (headLength === 0) {
+                headLength = buf.readUInt16BE(0) + 2;
+            }
+            currentLength += buf.length;
+            // if we haven't read the packet json yet, we don't know the
+            // total length of the packet, so we can't know when we're done
+            if (totalLength === 0 && currentLength >= headLength) {
+                const packet = decode(Buffer.concat(inboxLocal));
+                totalLength =
+                    ((packet?.json?.bodyLength as number) ?? 0) + headLength;
+            }
+            // if we've read the packet json and we've got the total length
+            // of the packet, we can resolve the inbox
+            if (currentLength === totalLength) {
+                currentLength = 0;
+                headLength = 0;
+                totalLength = 0;
+                this.receive(inboxLocal);
+                inboxLocal = [];
+            }
+            this.chunkCallback?.();
+        }
+
+        this.log.debug('stream stopped receiving data');
+
+        this.close();
+    }
+
+    private async send(chunks: Buffer[]): Promise<void> {
+        this.outbox.resolve(chunks);
+        this.outbox = new Deferred<Buffer[]>();
+    }
+
+    private async receive(chunks: Buffer[]): Promise<void> {
+        this.inbox.resolve(chunks);
+        this.inbox = new Deferred<Buffer[]>();
+    }
+
+    public async request(
+        chunks: Buffer[],
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        chunkCallback?: ChunkCallback
+    ): Promise<Buffer[]> {
+        this.chunkCallback = chunkCallback;
+        if (!this.hasOpened) {
+            throw new Error('send: Stream not opened');
+        }
+        await this.send(chunks);
+        return this.inbox.promise;
+    }
+
+    public close(): void {
+        this.stream.close();
+    }
+}
 
 export class StreamFactory {
     private log = logger.getLogger('worker/p2p/stream');
@@ -15,6 +128,7 @@ export class StreamFactory {
     private inTimeout = false;
     private retryTimeout = 0;
     private dialTimeout: number;
+    private requestStreamPool: RequestStream[] = [];
 
     public constructor(
         private maxDialTimeout: number,
@@ -138,5 +252,23 @@ export class StreamFactory {
 
     public async getStream(protocol = '/samizdapp-proxy') {
         return this.makeStream(protocol);
+    }
+
+    public async getRequestStream(protocol = '/samizdapp-proxy/2.0.0') {
+        // TODO - we should have a proper abstraction for this
+        do {
+            const stream = this.requestStreamPool.pop();
+            if (stream?.isOpen) {
+                return stream;
+            }
+        } while (this.requestStreamPool.length > 0);
+        const rawStream = await this.getStream(protocol);
+        const stream = new RequestStream(rawStream);
+        stream.open();
+        return stream;
+    }
+
+    public releaseRequestStream(stream: RequestStream) {
+        this.requestStreamPool.push(stream);
     }
 }

@@ -16,7 +16,7 @@ import { logger } from '../logging';
 import status from '../status';
 import { BootstrapList } from './bootstrap-list';
 import { initLibp2pLogging } from './libp2p-logging';
-import { StreamFactory } from './stream-factory';
+import { StreamFactory, RequestStream } from './stream-factory';
 
 const waitFor = async (t: number): Promise<void> =>
     new Promise(r => setTimeout(r, t));
@@ -305,6 +305,17 @@ export class P2pClient {
                 this.connectionStatus = ServerPeerStatus.OFFLINE;
             }
         });
+    }
+
+    public async getRequestStream() {
+        if (!this.streamFactory) {
+            throw new Error('Stream factory not initialized');
+        }
+        return this.streamFactory.getRequestStream();
+    }
+
+    releaseRequestStream(stream: RequestStream) {
+        this.streamFactory?.releaseRequestStream(stream);
     }
 
     private dispatchEvent<T>(type: string, detail?: T) {

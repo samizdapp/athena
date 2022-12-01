@@ -15,7 +15,9 @@ import { logger } from './logging';
 // Mark the workbox-precaching import as being used with this line:
 const _ = workboxPrecaching;
 
-declare const self: ServiceWorkerGlobalScope;
+declare const self: {
+    fetchHandlers: typeof fetchHandlers;
+} & ServiceWorkerGlobalScope;
 
 const log = logger.getLogger('worker/main');
 
@@ -40,6 +42,7 @@ fetchHandlers
     .use(pleromaTimelineHandler)
     .use(passThroughHandler);
 
+self.fetchHandlers = fetchHandlers;
 bootstrap();
 
 log.info('Worker executed.');

@@ -29,6 +29,9 @@ export class ServiceWorkerLogic {
         LOADED_RELAYS: (msg, dispatch) => {
             dispatch(setRelayAddresses(msg.relays as string[]));
         },
+        SW_MONITOR: (_msg, _dispatch) => {
+            //noop
+        },
     };
 
     private updateStatus(dispatch: AppDispatch) {

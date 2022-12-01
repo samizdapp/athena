@@ -47,6 +47,35 @@ class RequestAttempt {
         private responseTimeout: number
     ) {}
 
+    private async pipe(stream: RequestStream) {
+        // track the time we received our last chunk
+        this.lastChunkTime = Date.now();
+
+        return stream.request(this.parts, () => {
+            // calculate time since we received last chunk
+            const timeSinceLastChunk = Date.now() - this.lastChunkTime;
+            // if we haven't gotten a chunk yet
+            if (!this.hasReceivedChunk) {
+                // we have now
+                this.log.debug(
+                    `Request: ${this.requestId} - Timing: received first ` +
+                        `chunk in ${timeSinceLastChunk}ms.`
+                );
+                this.hasReceivedChunk = true;
+            }
+            // else, we've already gotten chunks previously
+            else {
+                // update the longest time since last chunk
+                this.longestChunkTime = Math.max(
+                    this.longestChunkTime,
+                    timeSinceLastChunk
+                );
+            }
+            // track the time we received our last chunk
+            this.lastChunkTime = Date.now();
+        });
+    }
+
     private async send(): Promise<void> {
         // if we don't have a stream opened
         if (!this.stream) {
@@ -57,7 +86,7 @@ class RequestAttempt {
         try {
             // attempt to send our request through the stream and
             // receive a response
-            const response = await this.stream.request(this.parts);
+            const response = await this.pipe(this.stream);
             // once our response is received, resolve our promise with it
             this.deferredResponse?.resolve(response);
         } catch (e) {

@@ -27,6 +27,8 @@ export class RequestStream {
     private outbox = new Deferred<Buffer[]>();
     private inbox = new Deferred<Buffer[]>();
     private hasOpened = false;
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    private chunkCB = () => {};
 
     get isOpen(): boolean {
         return this.stream.stat.timeline.close === undefined;
@@ -83,6 +85,7 @@ export class RequestStream {
                 this.receive(inboxLocal);
                 inboxLocal = [];
             }
+            this.chunkCB();
         }
 
         this.log.debug('stream stopped receiving data');
@@ -100,7 +103,12 @@ export class RequestStream {
         this.inbox = new Deferred<Buffer[]>();
     }
 
-    public async request(chunks: Buffer[]): Promise<Buffer[]> {
+    public async request(
+        chunks: Buffer[],
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        chunkCB = () => {}
+    ): Promise<Buffer[]> {
+        this.chunkCB = chunkCB;
         if (!this.hasOpened) {
             throw new Error('send: Stream not opened');
         }

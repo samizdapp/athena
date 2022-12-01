@@ -1,4 +1,3 @@
-import { Stream } from '@libp2p/interface-connection';
 import { ServerPeerStatus } from '../../worker-messaging';
 import { logger } from '../logging';
 import { RequestStream } from '../p2p-client/stream-factory';

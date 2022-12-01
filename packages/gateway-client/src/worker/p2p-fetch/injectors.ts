@@ -22,14 +22,9 @@ messenger.addListener(ClientMessageType.SW_MONITOR, () => {
     });
 });
 
-const injectSWMonitor: Injector = (headers, body) => {
-    if (headers.get('content-type')?.startsWith('text/html')) {
-        const [start, end] = body.toString().split('<head>');
-        if (start && end) {
-            const parts = [
-                start,
-                '<head>',
-                `<script>
+const SW_MONITOR_SPLIT = '<head>';
+
+const SW_MONITOR_SNIPPET = `<script>
                     document.addEventListener("visibilitychange", () => {
                         console.log('visibilitychange', document.visibilityState, navigator.serviceWorker.controller?.state);
                         if (document.visibilityState === 'visible' && navigator.serviceWorker.controller?.state === 'activated') {
@@ -49,10 +44,16 @@ const injectSWMonitor: Injector = (headers, body) => {
                             };
                         }
                     });
-                </script>`,
-                end,
-            ];
-            return Buffer.from(parts.join(''));
+                </script>`;
+
+const injectSWMonitor: Injector = (headers, body) => {
+    if (headers.get('content-type')?.startsWith('text/html')) {
+        const [start, end] = body.toString().split(SW_MONITOR_SPLIT);
+        if (start && end) {
+            const parts = [start, SW_MONITOR_SPLIT, SW_MONITOR_SNIPPET, end];
+            const newBody = Buffer.from(parts.join(''));
+            headers.set('content-length', newBody.byteLength.toString());
+            return newBody;
         }
     }
     return body;

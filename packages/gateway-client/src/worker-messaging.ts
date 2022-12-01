@@ -8,13 +8,13 @@ export enum ServerPeerStatus {
 export enum WorkerMessageType {
     SERVER_PEER_STATUS = 'SERVER_PEER_STATUS',
     LOADED_RELAYS = 'LOADED_RELAYS',
-    SW_HEARTBEAT = 'SW_HEARTBEAT',
+    HEARTBEAT = 'HEARTBEAT',
 }
 
 export enum ClientMessageType {
     REQUEST_STATUS = 'REQUEST_STATUS',
     OPENED = 'OPENED',
-    SW_HEARTBEAT = 'SW_HEARTBEAT',
+    HEARTBEAT = 'HEARTBEAT',
 }
 
 export type Message<T extends WorkerMessageType | ClientMessageType> = {

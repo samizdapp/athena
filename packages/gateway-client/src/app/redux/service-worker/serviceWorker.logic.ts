@@ -29,7 +29,7 @@ export class ServiceWorkerLogic {
         LOADED_RELAYS: (msg, dispatch) => {
             dispatch(setRelayAddresses(msg.relays as string[]));
         },
-        SW_HEARTBEAT: (_msg, _dispatch) => {
+        HEARTBEAT: (_msg, _dispatch) => {
             //noop
         },
     };

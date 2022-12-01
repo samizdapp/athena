@@ -35,11 +35,13 @@ const injectSWMonitor: Injector = (headers, body) => {
                             navigator.serviceWorker.controller?.postMessage({
                                 type: '${ClientMessageType.SW_MONITOR}'
                             });
+                            const start = Date.now();
                             const timeout = setTimeout(() => {
                                 alert('Service worker is unresponsive, please restart the app');
                             }, 1000);
                             navigator.serviceWorker.onmessage = (e) => {
                                 if (e.data.type === '${WorkerMessageType.SW_MONITOR}') {
+                                    console.log('Service worker is responsive', Date.now() - start);
                                     clearTimeout(timeout);
                                 }
                             });

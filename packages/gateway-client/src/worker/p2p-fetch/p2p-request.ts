@@ -48,13 +48,6 @@ class RequestAttempt {
         private responseTimeout: number
     ) {}
 
-    private async pipe(stream: RequestStream) {
-        // track the time we received our last chunk
-        this.lastChunkTime = Date.now();
-
-        return stream.request(this.parts);
-    }
-
     private async send(): Promise<void> {
         // if we don't have a stream opened
         if (!this.stream) {
@@ -65,7 +58,7 @@ class RequestAttempt {
         try {
             // attempt to send our request through the stream and
             // receive a response
-            const response = await this.pipe(this.stream);
+            const response = await this.stream.request(this.parts);
             // once our response is received, resolve our promise with it
             this.deferredResponse?.resolve(response);
         } catch (e) {

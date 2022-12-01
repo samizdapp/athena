@@ -29,7 +29,7 @@ export class RequestStream {
     private inbox = new Deferred<Buffer[]>();
     private hasOpened = false;
     // eslint-disable-next-line @typescript-eslint/no-empty-function
-    private chunkCallback: ChunkCallback | undefined;
+    private chunkCallback?: ChunkCallback;
 
     get isOpen(): boolean {
         return this.stream.stat.timeline.close === undefined;

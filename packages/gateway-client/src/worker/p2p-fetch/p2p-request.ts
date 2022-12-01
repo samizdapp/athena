@@ -1,14 +1,14 @@
 import { Stream } from '@libp2p/interface-connection';
 import { ServerPeerStatus } from '../../worker-messaging';
 import { logger } from '../logging';
-import { WrappedStream } from '../p2p-client/stream-factory';
+import { RequestStream } from '../p2p-client/stream-factory';
 
 import { P2pClient } from '../p2p-client';
 
 const waitFor = async (t: number): Promise<void> =>
     new Promise(r => setTimeout(r, t));
 
-class Deferred<T> {
+export class Deferred<T> {
     promise: Promise<T>;
     resolve!: (value: T) => void;
     reject!: (reason?: unknown) => void;
@@ -34,7 +34,7 @@ class RequestAttempt {
     private log = logger.getLogger('worker/p2p-fetch/attempt');
 
     private deferredResponse?: Deferred<Buffer[]>;
-    private stream?: WrappedStream;
+    private stream?: RequestStream;
 
     private hasReceivedChunk = false;
     private lastChunkTime = 0;
@@ -48,7 +48,7 @@ class RequestAttempt {
         private responseTimeout: number
     ) {}
 
-    private async pipe(stream: WrappedStream) {
+    private async pipe(stream: RequestStream) {
         // track the time we received our last chunk
         this.lastChunkTime = Date.now();
 
@@ -182,7 +182,7 @@ class RequestAttempt {
 
         // open a new stream, track the time it takes to open
         const streamOpenTime = Date.now();
-        this.stream = await this.p2pClient.getProxyStream();
+        this.stream = await this.p2pClient.getRequestStream();
         this.log.debug(
             `Request: ${this.requestId} - Timing: opened stream in ` +
                 `${Date.now() - streamOpenTime}ms`
@@ -209,7 +209,7 @@ class RequestAttempt {
             this.inProgress = false;
 
             // release stream now that we're done
-            this.p2pClient.releaseProxyStream(this.stream);
+            this.p2pClient.releaseRequestStream(this.stream);
         }
 
         // return our settled promise (may be resolved or rejected)

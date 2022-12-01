@@ -6,22 +6,16 @@ import { ServerPeerStatus } from '../../worker-messaging';
 import { logger } from '../logging';
 import status from '../status';
 import { decode } from '../p2p-fetch/lob-enc';
-
-type Trigger = (value?: unknown) => void;
+import { Deferred } from '../p2p-fetch/p2p-request';
 
 const waitFor = async (t: number): Promise<void> =>
     new Promise(r => setTimeout(r, t));
 
-export class WrappedStream {
+export class RequestStream {
     private log = logger.getLogger('worker/p2p/wrapped-stream');
-    private outbox: Uint8Array[] = [];
-    private inbox: Uint8Array[] = [];
-    outboxTrigger: Trigger = () => {
-        // noop
-    };
-    private inboxTrigger: Trigger = () => {
-        // noop
-    };
+    private outbox = new Deferred<Buffer[]>();
+    private inbox = new Deferred<Buffer[]>();
+    private hasOpened = false;
 
     get isOpen(): boolean {
         return this.stream.stat.timeline.close === undefined;
@@ -29,65 +23,82 @@ export class WrappedStream {
 
     constructor(private readonly stream: Stream) {}
 
-    public async request(chunks: Uint8Array[]): Promise<Buffer[]> {
-        this.outbox = chunks;
-        this.outboxTrigger();
-        await new Promise(r => {
-            this.inboxTrigger = r;
-        });
-        console.log('inboxTrigger called');
-        const bufs = this.inbox.map(Buffer.from);
-        this.inbox = [];
-        return bufs;
-    }
-
-    public close(): void {
-        this.stream.close();
-    }
-
+    // set up stream for continual send/receive
     public async open(): Promise<void> {
+        this.hasOpened = true;
+        // we can only call sink once, so we need to provide a generator
+        // that will yield chunks from the outbox
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
+        const that = this;
         this.stream.sink(
-            (async function* (wrapped) {
+            (async function* () {
                 while (true) {
-                    await new Promise(r => {
-                        wrapped.outboxTrigger = r;
-                    });
+                    const chunks = await that.outbox.promise;
 
-                    for await (const chunk of wrapped.outbox) {
-                        // console.log('sending chunk', chunk);
+                    for await (const chunk of chunks) {
                         yield chunk;
                     }
                 }
-            })(this)
+            })()
         );
 
+        // we can read from the stream source as many times as we want
+        // so we can just read chunks and put them in the inbox
+        let inboxLocal = [];
         let currentLength = 0;
         let headLength = 0;
         let totalLength = 0;
         for await (const chunk of this.stream.source) {
             const buf = Buffer.from(chunk.subarray());
-            // console.log('got chunk', buf);
-            this.inbox.push(buf);
+            inboxLocal.push(buf);
+            // first 2 bytes are the length of the packet json portion
             if (headLength === 0) {
                 headLength = buf.readUInt16BE(0) + 2;
             }
             currentLength += buf.length;
+            // if we haven't read the packet json yet, we don't know the
+            // total length of the packet, so we can't know when we're done
             if (totalLength === 0 && currentLength >= headLength) {
-                const packet = decode(Buffer.concat(this.inbox));
+                const packet = decode(Buffer.concat(inboxLocal));
                 totalLength =
                     ((packet?.json?.bodyLength as number) ?? 0) + headLength;
             }
+            // if we've read the packet json and we've got the total length
+            // of the packet, we can resolve the inbox
             if (currentLength === totalLength) {
                 currentLength = 0;
                 headLength = 0;
                 totalLength = 0;
-                this.inboxTrigger();
+                this.receive(inboxLocal);
+                inboxLocal = [];
             }
         }
 
         this.log.debug('stream stopped receiving data');
 
         this.close();
+    }
+
+    private async send(chunks: Buffer[]): Promise<void> {
+        this.outbox.resolve(chunks);
+        this.outbox = new Deferred<Buffer[]>();
+    }
+
+    private async receive(chunks: Buffer[]): Promise<void> {
+        this.inbox.resolve(chunks);
+        this.inbox = new Deferred<Buffer[]>();
+    }
+
+    public async request(chunks: Buffer[]): Promise<Buffer[]> {
+        if (!this.hasOpened) {
+            throw new Error('send: Stream not opened');
+        }
+        await this.send(chunks);
+        return this.inbox.promise;
+    }
+
+    public close(): void {
+        this.stream.close();
     }
 }
 
@@ -97,7 +108,7 @@ export class StreamFactory {
     private inTimeout = false;
     private retryTimeout = 0;
     private dialTimeout: number;
-    private availableStreams: WrappedStream[] = [];
+    private requestStreamPool: RequestStream[] = [];
 
     public constructor(
         private maxDialTimeout: number,
@@ -223,26 +234,21 @@ export class StreamFactory {
         return this.makeStream(protocol);
     }
 
-    public async getProxyStream() {
+    public async getRequestStream(protocol = '/samizdapp-proxy/2.0.0') {
+        // TODO - we should have a proper abstraction for this
         do {
-            const stream = this.availableStreams.pop();
+            const stream = this.requestStreamPool.pop();
             if (stream?.isOpen) {
                 return stream;
             }
-        } while (this.availableStreams.length > 0);
-
-        const wrapped = new WrappedStream(
-            await this.getStream('/samizdapp-proxy/2.0.0')
-        );
-        wrapped.open();
-        return wrapped;
+        } while (this.requestStreamPool.length > 0);
+        const rawStream = await this.getStream(protocol);
+        const stream = new RequestStream(rawStream);
+        stream.open();
+        return stream;
     }
 
-    public releaseProxyStream(stream: WrappedStream) {
-        this.availableStreams.push(stream);
-    }
-
-    public closeStream(stream: WrappedStream) {
-        stream.close();
+    public releaseRequestStream(stream: RequestStream) {
+        this.requestStreamPool.push(stream);
     }
 }

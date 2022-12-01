@@ -283,6 +283,7 @@ export class P2pFetchRequest {
         }
         // else, we successfully decoded, hydrate our headers
         resp.json.res.headers = new Headers(resp.json.res.headers);
+        // create a new response to return	
         const response = new Response(resp.body, resp.json.res);
         // this log line fills in for the lack of a network log in our DevTools
         this.log.info(`Request: ${this.requestId} - Response: `, response);

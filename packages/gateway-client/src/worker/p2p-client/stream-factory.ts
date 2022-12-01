@@ -22,13 +22,14 @@ class Deferred<T> {
 const waitFor = async (t: number): Promise<void> =>
     new Promise(r => setTimeout(r, t));
 
+declare type ChunkCallback = () => void;
 export class RequestStream {
     private log = logger.getLogger('worker/p2p/wrapped-stream');
     private outbox = new Deferred<Buffer[]>();
     private inbox = new Deferred<Buffer[]>();
     private hasOpened = false;
     // eslint-disable-next-line @typescript-eslint/no-empty-function
-    private chunkCB = () => {};
+    private chunkCallback: ChunkCallback | undefined;
 
     get isOpen(): boolean {
         return this.stream.stat.timeline.close === undefined;
@@ -85,7 +86,7 @@ export class RequestStream {
                 this.receive(inboxLocal);
                 inboxLocal = [];
             }
-            this.chunkCB();
+            this.chunkCallback?.();
         }
 
         this.log.debug('stream stopped receiving data');
@@ -106,9 +107,9 @@ export class RequestStream {
     public async request(
         chunks: Buffer[],
         // eslint-disable-next-line @typescript-eslint/no-empty-function
-        chunkCB = () => {}
+        chunkCallback?: ChunkCallback
     ): Promise<Buffer[]> {
-        this.chunkCB = chunkCB;
+        this.chunkCallback = chunkCallback;
         if (!this.hasOpened) {
             throw new Error('send: Stream not opened');
         }

@@ -1,7 +1,7 @@
 import { Stream } from '@libp2p/interface-connection';
-import { pipe } from 'it-pipe';
 import { ServerPeerStatus } from '../../worker-messaging';
 import { logger } from '../logging';
+import { WrappedStream } from '../p2p-client/stream-factory';
 
 import { P2pClient } from '../p2p-client';
 
@@ -34,7 +34,7 @@ class RequestAttempt {
     private log = logger.getLogger('worker/p2p-fetch/attempt');
 
     private deferredResponse?: Deferred<Buffer[]>;
-    private stream?: Stream;
+    private stream?: WrappedStream;
 
     private hasReceivedChunk = false;
     private lastChunkTime = 0;
@@ -48,51 +48,53 @@ class RequestAttempt {
         private responseTimeout: number
     ) {}
 
-    private async pipe(stream: Stream) {
+    private async pipe(stream: WrappedStream) {
         // track the time we received our last chunk
         this.lastChunkTime = Date.now();
 
-        // send our buffer through the stream
-        return pipe(this.parts, stream, async source => {
-            // build a response buffer
-            const responseParts: Buffer[] = [];
-            // loop incoming chunks
-            for await (const msg of source) {
-                // calculate time since we received last chunk
-                const timeSinceLastChunk = Date.now() - this.lastChunkTime;
-                // if we haven't gotten a chunk yet
-                if (!this.hasReceivedChunk) {
-                    // we have now
-                    this.log.debug(
-                        `Request: ${this.requestId} - Timing: received first ` +
-                            `chunk in ${timeSinceLastChunk}ms.`
-                    );
-                    this.hasReceivedChunk = true;
-                }
-                // else, we've already gotten chunks previously
-                else {
-                    // update the longest time since last chunk
-                    this.longestChunkTime = Math.max(
-                        this.longestChunkTime,
-                        timeSinceLastChunk
-                    );
-                }
-                // track the time we received our last chunk
-                this.lastChunkTime = Date.now();
+        return stream.request(this.parts);
 
-                // store our chunk in our response buffer
-                const buf = Buffer.from(msg.subarray());
-                if (msg.subarray().length === 1 && buf[0] === 0x00) {
-                    // when we encounter the null byte at the end, we're done
-                    // receiving the response
-                    break;
-                } else {
-                    responseParts.push(buf);
-                }
-            }
-            // return our response buffer
-            return responseParts;
-        });
+        // send our buffer through the stream
+        // return pipe(this.parts, stream, async source => {
+        //     // build a response buffer
+        //     const responseParts: Buffer[] = [];
+        //     // loop incoming chunks
+        //     for await (const msg of source) {
+        //         // calculate time since we received last chunk
+        //         const timeSinceLastChunk = Date.now() - this.lastChunkTime;
+        //         // if we haven't gotten a chunk yet
+        //         if (!this.hasReceivedChunk) {
+        //             // we have now
+        //             this.log.debug(
+        //                 `Request: ${this.requestId} - Timing: received first ` +
+        //                     `chunk in ${timeSinceLastChunk}ms.`
+        //             );
+        //             this.hasReceivedChunk = true;
+        //         }
+        //         // else, we've already gotten chunks previously
+        //         else {
+        //             // update the longest time since last chunk
+        //             this.longestChunkTime = Math.max(
+        //                 this.longestChunkTime,
+        //                 timeSinceLastChunk
+        //             );
+        //         }
+        //         // track the time we received our last chunk
+        //         this.lastChunkTime = Date.now();
+
+        //         // store our chunk in our response buffer
+        //         const buf = Buffer.from(msg.subarray());
+        //         if (msg.subarray().length === 1 && buf[0] === 0x00) {
+        //             // when we encounter the null byte at the end, we're done
+        //             // receiving the response
+        //             break;
+        //         } else {
+        //             responseParts.push(buf);
+        //         }
+        //     }
+        //     // return our response buffer
+        //     return responseParts;
+        // });
     }
 
     private async send(): Promise<void> {
@@ -180,7 +182,7 @@ class RequestAttempt {
 
         // open a new stream, track the time it takes to open
         const streamOpenTime = Date.now();
-        this.stream = await this.p2pClient.getStream('/samizdapp-proxy');
+        this.stream = await this.p2pClient.getProxyStream();
         this.log.debug(
             `Request: ${this.requestId} - Timing: opened stream in ` +
                 `${Date.now() - streamOpenTime}ms`
@@ -198,11 +200,16 @@ class RequestAttempt {
         try {
             // wait for our promise to settle
             await this.deferredResponse.promise;
+        } catch (e) {
+            // if we get an error, we need to close our stream
+            this.log.warn(e);
+            this.stream?.close();
         } finally {
             // our promise has settled, which means we're done
             this.inProgress = false;
-            // close our stream now that we're done
-            this.stream.close();
+
+            // release stream now that we're done
+            this.p2pClient.releaseProxyStream(this.stream);
         }
 
         // return our settled promise (may be resolved or rejected)

@@ -6,7 +6,18 @@ import { ServerPeerStatus } from '../../worker-messaging';
 import { logger } from '../logging';
 import status from '../status';
 import { decode } from '../p2p-fetch/lob-enc';
-import { Deferred } from '../p2p-fetch/p2p-request';
+class Deferred<T> {
+    promise: Promise<T>;
+    resolve!: (value: T) => void;
+    reject!: (reason?: unknown) => void;
+
+    constructor() {
+        this.promise = new Promise((resolve, reject) => {
+            this.resolve = resolve;
+            this.reject = reject;
+        });
+    }
+}
 
 const waitFor = async (t: number): Promise<void> =>
     new Promise(r => setTimeout(r, t));

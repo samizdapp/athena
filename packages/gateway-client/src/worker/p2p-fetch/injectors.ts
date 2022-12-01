@@ -31,7 +31,9 @@ const injectSWMonitor: Injector = (headers, body) => {
                 '<head>',
                 `<script>
                     document.addEventListener("visibilitychange", () => {
-                        if (document.visibilityState === 'visible' && navigator.serviceWorker.controller.state === 'activated') {
+                        console.log('visibilitychange', document.visibilityState, navigator.serviceWorker.controller?.state);
+                        if (document.visibilityState === 'visible' && navigator.serviceWorker.controller?.state === 'activated') {
+                            console.log('test service worker responsiveness');
                             navigator.serviceWorker.controller?.postMessage({
                                 type: '${ClientMessageType.SW_MONITOR}'
                             });
@@ -44,7 +46,7 @@ const injectSWMonitor: Injector = (headers, body) => {
                                     console.log('Service worker is responsive', Date.now() - start);
                                     clearTimeout(timeout);
                                 }
-                            });
+                            };
                         }
                     });
                 </script>`,

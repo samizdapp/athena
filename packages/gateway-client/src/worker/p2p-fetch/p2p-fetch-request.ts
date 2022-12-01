@@ -5,6 +5,7 @@ import { logger } from '../logging';
 import { P2pClient } from '../p2p-client';
 import { decode, encode } from './lob-enc';
 import { P2pRequest } from './p2p-request';
+import Injectors from './injectors';
 
 type PatchedBody = ReturnType<P2pFetchRequest['patchArgs']>['body'];
 type PatchedRequest = ReturnType<P2pFetchRequest['patchArgs']>['reqObj'];
@@ -283,7 +284,9 @@ export class P2pFetchRequest {
         }
         // else, we successfully decoded, hydrate our headers
         resp.json.res.headers = new Headers(resp.json.res.headers);
-        const response = new Response(resp.body, resp.json.res);
+        // create a new response to return
+        const tbody = Injectors.inject(resp.json.res.headers, resp.body);
+        const response = new Response(tbody, resp.json.res);
         // this log line fills in for the lack of a network log in our DevTools
         this.log.info(`Request: ${this.requestId} - Response: `, response);
         return response;

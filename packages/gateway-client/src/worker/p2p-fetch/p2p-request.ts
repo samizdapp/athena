@@ -53,48 +53,6 @@ class RequestAttempt {
         this.lastChunkTime = Date.now();
 
         return stream.request(this.parts);
-
-        // send our buffer through the stream
-        // return pipe(this.parts, stream, async source => {
-        //     // build a response buffer
-        //     const responseParts: Buffer[] = [];
-        //     // loop incoming chunks
-        //     for await (const msg of source) {
-        //         // calculate time since we received last chunk
-        //         const timeSinceLastChunk = Date.now() - this.lastChunkTime;
-        //         // if we haven't gotten a chunk yet
-        //         if (!this.hasReceivedChunk) {
-        //             // we have now
-        //             this.log.debug(
-        //                 `Request: ${this.requestId} - Timing: received first ` +
-        //                     `chunk in ${timeSinceLastChunk}ms.`
-        //             );
-        //             this.hasReceivedChunk = true;
-        //         }
-        //         // else, we've already gotten chunks previously
-        //         else {
-        //             // update the longest time since last chunk
-        //             this.longestChunkTime = Math.max(
-        //                 this.longestChunkTime,
-        //                 timeSinceLastChunk
-        //             );
-        //         }
-        //         // track the time we received our last chunk
-        //         this.lastChunkTime = Date.now();
-
-        //         // store our chunk in our response buffer
-        //         const buf = Buffer.from(msg.subarray());
-        //         if (msg.subarray().length === 1 && buf[0] === 0x00) {
-        //             // when we encounter the null byte at the end, we're done
-        //             // receiving the response
-        //             break;
-        //         } else {
-        //             responseParts.push(buf);
-        //         }
-        //     }
-        //     // return our response buffer
-        //     return responseParts;
-        // });
     }
 
     private async send(): Promise<void> {

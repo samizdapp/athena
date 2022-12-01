@@ -1,4 +1,3 @@
-import { Stream } from '@libp2p/interface-connection';
 import { ServerPeerStatus } from '../../worker-messaging';
 import { logger } from '../logging';
 import { RequestStream } from '../p2p-client/stream-factory';
@@ -8,7 +7,7 @@ import { P2pClient } from '../p2p-client';
 const waitFor = async (t: number): Promise<void> =>
     new Promise(r => setTimeout(r, t));
 
-export class Deferred<T> {
+class Deferred<T> {
     promise: Promise<T>;
     resolve!: (value: T) => void;
     reject!: (reason?: unknown) => void;

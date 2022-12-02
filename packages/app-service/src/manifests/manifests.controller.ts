@@ -10,16 +10,26 @@ import {
     NotFoundException,
     HttpStatus,
     HttpCode,
+    HttpException,
 } from '@nestjs/common';
-import { ManifestsManager } from './manifests.manager';
+
+import { ManifestsManager, DuplicateNameError } from './manifests.manager';
 
 @Controller('manifests')
 export class ManifestsController {
     constructor(private readonly manifestsManager: ManifestsManager) {}
 
     @Post()
-    create(@Body() newManifest: Dto.Create) {
-        return this.manifestsManager.create(newManifest);
+    async create(@Body() newManifest: Dto.Create) {
+        try {
+            const manifest = await this.manifestsManager.create(newManifest);
+            return manifest;
+        } catch (e) {
+            if (e instanceof DuplicateNameError) {
+                throw new HttpException(e.message, HttpStatus.CONFLICT);
+            }
+            throw e;
+        }
     }
 
     @Get()
@@ -41,7 +51,15 @@ export class ManifestsController {
     @Patch(':id')
     @HttpCode(HttpStatus.NO_CONTENT)
     async update(@Param('id') id: string, @Body() newManifest: Dto.Update) {
-        const manifest = await this.manifestsManager.update(id, newManifest);
+        let manifest;
+        try {
+            manifest = await this.manifestsManager.update(id, newManifest);
+        } catch (e) {
+            if (e instanceof DuplicateNameError) {
+                throw new HttpException(e.message, HttpStatus.CONFLICT);
+            }
+            throw e;
+        }
         if (!manifest) {
             throw new NotFoundException(
                 `Manifest with id: \`${id}\` not found.`

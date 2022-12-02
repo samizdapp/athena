@@ -234,7 +234,11 @@ export class P2pFetchRequest {
         const bodyBuffer = await this.createBuffer(await this.body);
         // encode our body into a LOB packet
         const packet = encode(
-            { reqObj: this.reqObj, reqInit: this.reqInit },
+            {
+                reqObj: this.reqObj,
+                reqInit: this.reqInit,
+                bodyLength: bodyBuffer?.length ?? 0,
+            },
             bodyBuffer
         );
         this.log.trace(
@@ -249,8 +253,7 @@ export class P2pFetchRequest {
                 packet.subarray(i * this.chunkSize, (i + 1) * this.chunkSize)
             );
         }
-        // append a null byte at the end of our buffer list
-        parts.push(Buffer.from([0x00]));
+
         if (this.log.getLevel() === levels.TRACE) {
             this.log.trace(
                 `Request: ${this.requestId} - Chunked parts: `,

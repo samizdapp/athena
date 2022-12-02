@@ -10,6 +10,12 @@ type ManifestsDb = {
     };
 };
 
+export class DuplicateNameError extends Error {
+    constructor(name: string) {
+        super(`Manifest with name: \`${name}\` already exists.`);
+    }
+}
+
 @Injectable()
 export class ManifestsManager {
     private dbJsonFile = `${process.env.APP_MANIFESTS_VOLUME}/manifests.json`;
@@ -54,9 +60,7 @@ export class ManifestsManager {
 
         // check unique name
         if (db.indexes.name[manifest.name]) {
-            throw new Error(
-                `Manifest with name: \`${manifest.name}\` already exists.`
-            );
+            throw new DuplicateNameError(manifest.name);
         }
 
         // add manifest to database
@@ -100,9 +104,7 @@ export class ManifestsManager {
         if (newManifest.name && newManifest.name !== manifest.name) {
             // check unique name
             if (db.indexes.name[newManifest.name]) {
-                throw new Error(
-                    `Manifest with name: \`${newManifest.name}\` already exists.`
-                );
+                throw new DuplicateNameError(manifest.name);
             }
 
             // update indexes

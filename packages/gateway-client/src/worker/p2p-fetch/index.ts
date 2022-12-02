@@ -2,6 +2,9 @@ import { isBootstrapAppUrl } from '../client';
 import { logger } from '../logging';
 import { P2pClient } from '../p2p-client';
 import { P2pFetchRequest } from './p2p-fetch-request';
+declare const self: {
+    nativeFetch: typeof fetch;
+} & ServiceWorkerGlobalScope;
 
 const log = logger.getLogger('worker/p2p-fetch/override');
 
@@ -21,7 +24,9 @@ const p2pFetch = async (
     return request.execute();
 };
 
-export const nativeFetch = self.fetch;
+self.nativeFetch = self.nativeFetch || self.fetch;
+
+export const nativeFetch = self.nativeFetch;
 
 export const overrideFetch = (client: P2pClient) => {
     const p2pClient = client;

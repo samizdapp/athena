@@ -1,5 +1,6 @@
 import { ClientMessageType, WorkerMessageType } from '../../worker-messaging';
 import messenger from '../messenger';
+import { WebsocketStreamStatus } from '../p2p-client/stream-factory';
 
 declare type Injector = (headers: Headers, body: Buffer) => Buffer;
 
@@ -29,6 +30,7 @@ messenger.addListener(ClientMessageType.HEARTBEAT, () => {
 
 // we want to inject this script into the parent page at the very top of the <head> tag
 const HEARTBEAT_SPLIT = '<head>';
+const HEARTBEAT_CONTENT_TYPE = 'text/html';
 
 // this is the script that will be injected, it issues a postMessage to the service worker
 // when the document becomes visible, and listens for a response within 1 second
@@ -56,23 +58,119 @@ const HEARTBEAT_SNIPPET = `<script>
     }
 </script>`;
 
-// this is the injector function that will be called for each response
-const injectSWHeartbeat: Injector = (headers, body) => {
-    // check if the response is html
-    if (headers.get('content-type')?.startsWith('text/html')) {
-        const [start, end] = body.toString().split(HEARTBEAT_SPLIT);
-        // check if the response contains the <head> tag
-        if (start && end) {
-            const parts = [start, HEARTBEAT_SPLIT, HEARTBEAT_SNIPPET, end];
-            const newBody = Buffer.from(parts.join(''));
-            // update the headers to have the correct content-length
-            headers.set('content-length', newBody.byteLength.toString());
-            return newBody;
+const makeInjector =
+    (content_type: string, split: string, snippet: string) =>
+    (headers: Headers, body: Buffer) => {
+        // check if the response is html
+        if (headers.get('content-type')?.startsWith(content_type)) {
+            const [start, end] = body.toString().split(split);
+            // check if the response contains the <head> tag
+            if (start && end) {
+                const parts = [start, split, snippet, end];
+                const newBody = Buffer.from(parts.join(''));
+                // update the headers to have the correct content-length
+                headers.set('content-length', newBody.byteLength.toString());
+                return newBody;
+            }
+        }
+
+        // if the response is not html or does not contain the <head> tag, return the original body
+        return body;
+    };
+
+const WEBSOCKET_CONTENT_TYPE = 'text/html';
+
+const WEBSOCKET_SPLIT = '<head>';
+
+const WEBSOCKET_SNIPPET = `<script>
+window.nativeWebSocket = window.WebSocket;
+class SamizdappWebSocket {
+    constructor(url, protocols) {
+        return makeSamizdappWebSocket(url, protocols);
+    }
+}
+
+function makeSamizdappWebSocket(url, protocols) {
+    console.log('makeSamizdappWebSocket', url, protocols);
+    const ws = Object.create(window.nativeWebSocket);
+
+    const messageChannel = new MessageChannel();
+    const statusChannel = new MessageChannel();
+    const commandChannel = new MessageChannel();
+    ws._messagePort = messageChannel.port1;
+    ws._statusPort = statusChannel.port1;
+    ws._commandPort = commandChannel.port1;
+
+    ws._messagePort.onmessage = (e) => {
+        console.log('message', e.data, new TextDecoder('ascii').decode(e.data));
+        const newEvent = new MessageEvent(e.type, {
+            ...e,
+            data: String.raw\`\${new TextDecoder('ascii').decode(e.data)}\`
+        });
+        ws.onmessage?.(newEvent);
+    }
+    ws._statusPort.onmessage = (e) => {
+        const {status, error} = JSON.parse(new TextDecoder('ascii').decode(e.data));
+        console.log('status', status, error);
+        if (error) {
+            Object.defineProperty(ws, 'readyState', {
+                value: window.nativeWebSocket.CLOSED,
+                writable: false,
+                configurable: true,
+            });
+            if (ws.onerror) {
+                ws.onerror(error);
+            } else {
+                throw error;
+            }
+        } else if (status === '${WebsocketStreamStatus.OPENED}') {
+            Object.defineProperty(ws, 'readyState', {
+                value: window.nativeWebSocket.OPEN,
+                writable: false,
+                configurable: true,
+            });
+            return ws.onopen?.();
+        } else if (status === '${WebsocketStreamStatus.CLOSED}') {
+            Object.defineProperty(ws, 'readyState', {
+                value: window.nativeWebSocket.CLOSED,
+                writable: false,
+                configurable: true,
+            });
+            return ws.onclose?.();
         }
     }
 
-    // if the response is not html or does not contain the <head> tag, return the original body
-    return body;
-};
+    const openCommand = new TextEncoder().encode(JSON.stringify({method: 'OPEN', detail: {url, protocols}}));
+    
+    if (navigator.serviceWorker.controller?.state === 'activated') {
+        navigator.serviceWorker.controller.postMessage({
+            type: '${ClientMessageType.WEBSOCKET}',
+        }, [statusChannel.port2, messageChannel.port2, commandChannel.port2]);
+        ws._commandPort.postMessage(openCommand, [openCommand.buffer]);
+        Object.defineProperty(ws, 'readyState', {
+            value: window.nativeWebSocket.CONNECTING,
+            writable: false,
+            configurable: true,
+        });
+    }
 
-export default new Injectors([injectSWHeartbeat]);
+    ws.send = function(message) {
+        message = typeof message === 'string' ? new TextEncoder().encode(message) : message;
+        ws._messagePort.postMessage(message, [message.buffer]);
+    }
+
+    ws.close = function() {
+        const closeCommand = new TextEncoder().encode(JSON.stringify({method: 'CLOSE'}));
+        ws._commandPort.postMessage(closeCommand, [closeCommand.buffer]);
+    }
+
+    return ws
+}
+window.WebSocket = SamizdappWebSocket;
+</script>
+`;
+
+export default new Injectors([
+    makeInjector(HEARTBEAT_CONTENT_TYPE, HEARTBEAT_SPLIT, HEARTBEAT_SNIPPET),
+    makeInjector(WEBSOCKET_CONTENT_TYPE, WEBSOCKET_SPLIT, WEBSOCKET_SNIPPET),
+]);

@@ -15,8 +15,10 @@ export enum ClientMessageType {
     REQUEST_STATUS = 'REQUEST_STATUS',
     OPENED = 'OPENED',
     HEARTBEAT = 'HEARTBEAT',
+    WEBSOCKET = 'WEBSOCKET',
 }
 
 export type Message<T extends WorkerMessageType | ClientMessageType> = {
     type: T;
+    ports?: MessagePort[];
 } & Record<string, unknown>;

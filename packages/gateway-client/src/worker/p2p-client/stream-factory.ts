@@ -2,10 +2,10 @@ import { Stream } from '@libp2p/interface-connection';
 import { PeerId } from '@libp2p/interface-peer-id';
 
 import type { P2pClient } from '.';
-import { ServerPeerStatus } from '../../worker-messaging';
+import { ServerPeerStatus, WorkerMessageType } from '../../worker-messaging';
 import { logger } from '../logging';
 import status from '../status';
-import { decode } from '../p2p-fetch/lob-enc';
+import { decode, encode, Packet } from '../p2p-fetch/lob-enc';
 class Deferred<T> {
     promise: Promise<T>;
     resolve!: (value: T) => void;
@@ -24,7 +24,7 @@ const waitFor = async (t: number): Promise<void> =>
 
 declare type ChunkCallback = () => void;
 export class RequestStream {
-    private log = logger.getLogger('worker/p2p/wrapped-stream');
+    private log = logger.getLogger('worker/p2p/request-stream');
     private outbox = new Deferred<Buffer[]>();
     private inbox = new Deferred<Buffer[]>();
     private hasOpened = false;
@@ -119,6 +119,187 @@ export class RequestStream {
 
     public close(): void {
         this.stream.close();
+    }
+}
+
+enum WebsocketStreamMessageType {
+    COMMAND = 'COMMAND',
+    MESSAGE = 'MESSAGE',
+    STATUS = 'STATUS',
+}
+
+enum WebsocketStreamCommand {
+    OPEN = 'OPEN',
+    CLOSE = 'CLOSE',
+}
+
+export enum WebsocketStreamStatus {
+    OPENED = 'OPENED',
+    CLOSED = 'CLOSED',
+}
+
+export class WebsocketStream {
+    private chunkSize = 1024 * 64;
+    private log = logger.getLogger('worker/p2p/websocket-stream');
+    private outbox = new Deferred<Packet>();
+    private inbox = new Deferred<Buffer[]>();
+    private hasOpened = false;
+
+    get isOpen(): boolean {
+        return this.stream.stat.timeline.close === undefined;
+    }
+
+    constructor(
+        private readonly stream: Stream,
+        private readonly statusPort: MessagePort,
+        private readonly messagePort: MessagePort,
+        private readonly commandPort: MessagePort
+    ) {
+        this.commandPort.onmessage = this.onCommand.bind(this);
+        this.messagePort.onmessage = this.onMessage.bind(this);
+        this.statusPort.onmessage = this.onStatus.bind(this);
+    }
+
+    private encodeMessageToPacket(
+        type: WebsocketStreamMessageType,
+        buffer: Buffer
+    ): Packet {
+        return encode({ type, bodyLength: buffer.byteLength }, buffer);
+    }
+
+    private onCommand(event: MessageEvent): void {
+        this.log.debug('onCommand', event.data);
+        const message = this.encodeMessageToPacket(
+            WebsocketStreamMessageType.COMMAND,
+            Buffer.from(event.data)
+        );
+        this.send(message);
+    }
+
+    private onMessage(event: MessageEvent): void {
+        this.log.debug('onMessage', event.data);
+        const message = this.encodeMessageToPacket(
+            WebsocketStreamMessageType.MESSAGE,
+            Buffer.from(event.data)
+        );
+        this.send(message);
+    }
+
+    private onStatus(event: MessageEvent): void {
+        this.log.debug('onStatus', event.data);
+        const message = this.encodeMessageToPacket(
+            WebsocketStreamMessageType.STATUS,
+            Buffer.from(event.data)
+        );
+        this.send(message);
+    }
+
+    private async send(packet: Packet): Promise<void> {
+        this.outbox.resolve(packet);
+        this.outbox = new Deferred<Packet>();
+    }
+
+    private getClientPort(type: WebsocketStreamMessageType): MessagePort {
+        switch (type) {
+            case WebsocketStreamMessageType.MESSAGE:
+                return this.messagePort;
+            case WebsocketStreamMessageType.STATUS:
+                return this.statusPort;
+            case WebsocketStreamMessageType.COMMAND:
+                return this.commandPort;
+            default:
+                throw new Error('Invalid websocket message type: ' + type);
+        }
+    }
+
+    private dispatch(packet: Packet): void {
+        this.getClientPort(
+            packet.json.type as WebsocketStreamMessageType
+        ).postMessage(packet.body, [packet.body.buffer]);
+    }
+
+    private dispatchStatus(
+        status: WebsocketStreamStatus,
+        detail?: string
+    ): void {
+        const body = Buffer.from(JSON.stringify({ status, detail }));
+        this.getClientPort(WebsocketStreamMessageType.STATUS).postMessage(
+            body,
+            [body.buffer]
+        );
+    }
+
+    // set up stream for continual send/receive
+    public async open(): Promise<void> {
+        this.hasOpened = true;
+        // we can only call sink once, so we need to provide a generator
+        // that will yield chunks from the outbox
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
+        const that = this;
+        this.stream.sink(
+            (async function* () {
+                while (true) {
+                    const packet = await that.outbox.promise;
+
+                    const parts: Buffer[] = [];
+                    for (
+                        let i = 0;
+                        i <= Math.floor(packet.length / that.chunkSize);
+                        i++
+                    ) {
+                        parts.push(
+                            packet.subarray(
+                                i * that.chunkSize,
+                                (i + 1) * that.chunkSize
+                            )
+                        );
+                    }
+
+                    for await (const chunk of parts) {
+                        yield chunk;
+                    }
+                }
+            })()
+        );
+
+        // we can read from the stream source as many times as we want
+        // so we can just read chunks and put them in the inbox
+        let inboxLocal = [];
+        let currentLength = 0;
+        let headLength = 0;
+        let totalLength = 0;
+        for await (const chunk of this.stream.source) {
+            const buf = Buffer.from(chunk.subarray());
+            this.log.trace('received chunk', buf);
+            inboxLocal.push(buf);
+            // first 2 bytes are the length of the packet json portion
+            if (headLength === 0) {
+                headLength = buf.readUInt16BE(0) + 2;
+            }
+            currentLength += buf.length;
+            // if we haven't read the packet json yet, we don't know the
+            // total length of the packet, so we can't know when we're done
+            let packet;
+            if (totalLength === 0 && currentLength >= headLength) {
+                packet = decode(Buffer.concat(inboxLocal));
+                totalLength =
+                    ((packet?.json?.bodyLength as number) ?? 0) + headLength;
+            }
+            // if we've read the packet json and we've got the total length
+            // of the packet, we can resolve the inbox
+            if (currentLength === totalLength) {
+                packet = packet || decode(Buffer.concat(inboxLocal));
+                currentLength = 0;
+                headLength = 0;
+                totalLength = 0;
+                inboxLocal = [];
+                this.dispatch(packet as Packet);
+            }
+        }
+
+        this.log.debug('stream stopped receiving data');
+
+        this.dispatchStatus(WebsocketStreamStatus.CLOSED);
     }
 }
 
@@ -270,5 +451,18 @@ export class StreamFactory {
 
     public releaseRequestStream(stream: RequestStream) {
         this.requestStreamPool.push(stream);
+    }
+
+    public async getWebsocketStream(ports: MessagePort[]) {
+        this.log.debug('Get websocket stream');
+        const rawStream = await this.getStream('/samizdapp-websocket');
+        const stream = new WebsocketStream(
+            rawStream,
+            ports[0],
+            ports[1],
+            ports[2]
+        );
+        stream.open();
+        return stream;
     }
 }

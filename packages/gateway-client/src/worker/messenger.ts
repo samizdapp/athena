@@ -18,6 +18,7 @@ class Messenger {
     init() {
         self.addEventListener('message', event => {
             const msg = event.data;
+            msg.ports = event.ports;
             this.log.debug('Received client message: ', msg);
             this.eventTarget.dispatchEvent(
                 new CustomEvent(msg.type, { detail: msg })

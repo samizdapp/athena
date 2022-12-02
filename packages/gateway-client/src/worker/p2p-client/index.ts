@@ -11,12 +11,13 @@ import { all as filtersAll } from '@libp2p/websockets/filters';
 import { Multiaddr as MultiaddrType } from '@multiformats/multiaddr';
 import { createLibp2p, Libp2p } from 'libp2p';
 
-import { ServerPeerStatus } from '../../worker-messaging';
+import { ClientMessageType, ServerPeerStatus } from '../../worker-messaging';
 import { logger } from '../logging';
 import status from '../status';
 import { BootstrapList } from './bootstrap-list';
 import { initLibp2pLogging } from './libp2p-logging';
 import { StreamFactory, RequestStream } from './stream-factory';
+import messenger from '../messenger';
 
 const waitFor = async (t: number): Promise<void> =>
     new Promise(r => setTimeout(r, t));
@@ -298,12 +299,25 @@ export class P2pClient {
         await this.node.start();
         this.log.info('Started libp2p.');
 
+        this.handleWebsocketMessages();
+
         // update status
         this.connectionStatus = ServerPeerStatus.CONNECTING;
         waitFor(30000).then(() => {
             if (this.connectionStatus === ServerPeerStatus.CONNECTING) {
                 this.connectionStatus = ServerPeerStatus.OFFLINE;
             }
+        });
+    }
+
+    private async handleWebsocketMessages() {
+        // listen for websocket messages
+        this.log.debug('Listening for websocket messages...');
+        messenger.addListener(ClientMessageType.WEBSOCKET, async msg => {
+            this.log.debug('got websocket message', msg);
+            await this.streamFactory?.getWebsocketStream(
+                msg.ports as MessagePort[]
+            );
         });
     }
 

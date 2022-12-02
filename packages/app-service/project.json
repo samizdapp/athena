@@ -11,7 +11,10 @@
         "outputPath": "dist/packages/app-service",
         "main": "packages/app-service/src/main.ts",
         "tsConfig": "packages/app-service/tsconfig.app.json",
-        "assets": ["packages/app-service/src/assets"]
+        "assets": [
+          "packages/app-service/src/assets",
+          "packages/app-service/src/supervisor.py"
+        ]
       },
       "configurations": {
         "production": {

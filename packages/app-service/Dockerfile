@@ -13,9 +13,16 @@ RUN npm run build app-service
 
 FROM node:18-alpine as run
 
-RUN apk add --no-cache bash docker-cli docker-cli-compose
+RUN apk add --no-cache bash python3 py3-pip docker-cli docker-cli-compose poetry
+
+RUN ln -s /usr/bin/python3 /usr/bin/python
 
 WORKDIR /usr/src/athena
+
+COPY pyproject.toml pyproject.toml
+COPY poetry.lock poetry.lock
+
+RUN POETRY_VIRTUALENVS_CREATE=0 poetry install
 
 RUN mkdir -p dist/packages/app-service
 

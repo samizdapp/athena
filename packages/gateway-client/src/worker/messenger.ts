@@ -52,6 +52,13 @@ class Messenger {
         this.log.debug('Sending worker message: ', msg);
         client?.postMessage(msg);
     }
+
+    async broadcastMessage(msg: Message<WorkerMessageType>) {
+        const clients = await self.clients.matchAll();
+        clients.forEach(client => {
+            client.postMessage(msg);
+        });
+    }
 }
 
 export default new Messenger();

@@ -171,7 +171,12 @@ export class StreamFactory {
                     this.dialTimeout
                 )
                 .catch(e => {
-                    this.log.trace('dialProtocol error: ', e);
+                    const log = ['dialProtocol error: ', e];
+                    if (['ERR_UNSUPPORTED_PROTOCOL'].includes(e.code)) {
+                        this.log.error(...log);
+                    } else {
+                        this.log.debug(...log);
+                    }
                     this.log.trace('Time: ', Date.now() - start);
                     return null;
                 });

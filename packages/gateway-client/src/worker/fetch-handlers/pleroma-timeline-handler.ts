@@ -1,7 +1,7 @@
 import { getWindowClient } from '../client';
 import { Handler } from './fetch-handlers';
 
-export const pleromaTimelineHandler: Handler = (request, respondWith) => {
+export const pleromaTimelineHandler: Handler = request => {
     // handle requests to the pleroma timeline
     const { pathname, searchParams } = new URL(request.url);
     if (pathname === '/api/v1/timelines/public' && searchParams.get('local')) {
@@ -14,8 +14,7 @@ export const pleromaTimelineHandler: Handler = (request, respondWith) => {
         });
     }
 
-    // always pass the request to fetch regardless
-    respondWith(fetch(request));
+    // always allow request to continue regardless
 };
 
 export default pleromaTimelineHandler;

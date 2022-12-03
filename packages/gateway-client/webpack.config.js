@@ -10,6 +10,10 @@ module.exports = (config, _context) => {
     // then override your config.
     return {
         ...config,
+        entry: {
+            ...config.entry,
+            // 'worker-app': 'packages/gateway-client/src/worker/app.ts',
+        },
         devServer: {
             ...(config.devServer || {}),
             headers: {
@@ -64,6 +68,10 @@ module.exports = (config, _context) => {
             new InjectManifest({
                 swSrc: 'packages/gateway-client/src/worker/service-worker.ts',
                 swDest: 'service-worker.js',
+            }),
+            new InjectManifest({
+                swSrc: 'packages/gateway-client/src/worker/app.ts',
+                swDest: 'worker-app.js',
             }),
         ],
     };

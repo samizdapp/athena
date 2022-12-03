@@ -72,29 +72,31 @@ class EventTargetImpl implements EventTarget {
 
 const eventDelegate = new EventTargetImpl();
 
-const selfAddEventListener = self.addEventListener.bind(self);
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const selfRemoveEventListener = self.removeEventListener.bind(self);
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const selfSkipWaiting = self.skipWaiting.bind(self);
-
-Object.assign(self, {
-    addEventListener: (
-        type: string,
-        listener: EventListener,
-        options: AddEventListenerOptions
-    ) => eventDelegate.addEventListener(type, listener, options),
-    removeEventListener: (
-        type: string,
-        listener: EventListener,
-        options: EventListenerOptions
-    ) => eventDelegate.removeEventListener(type, listener, options),
-    skipWaiting: () => {
-        // skipWaiting() will typically be called by the app in an asynchronous context,
-        // and so will be invalid
-        // make this a no-op
-    },
-});
+self.createProxy = () =>
+    ({
+        ...Object.fromEntries(
+            [
+                ...Object.getOwnPropertyNames(self),
+                ...inheritedPropertiesOfSelf,
+            ].map(key => [key, self[key as keyof typeof self]])
+        ),
+        createProxy: () => self.createProxy(),
+        addEventListener: (
+            type: string,
+            listener: EventListener,
+            options: AddEventListenerOptions
+        ) => eventDelegate.addEventListener(type, listener, options),
+        removeEventListener: (
+            type: string,
+            listener: EventListener,
+            options: EventListenerOptions
+        ) => eventDelegate.removeEventListener(type, listener, options),
+        skipWaiting: () => {
+            // skipWaiting() will typically be called by the app in an asynchronous context,
+            // and so will be invalid
+            // make this a no-op
+        },
+    } as unknown as typeof self);
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const WB_MANIFEST = self.__WB_MANIFEST;
@@ -107,7 +109,10 @@ const appExecuted = (async () => {
     // eslint-disable-next-line no-new-func
     const appFn = new Function(`
         //# sourceURL=/smz/pwa/
-        ${text}
+        (parentSelf => {
+            const self = parentSelf.createProxy();
+            ${text}
+        })(self);
     `);
     appFn();
 })();
@@ -130,7 +135,7 @@ const appExecuted = (async () => {
     // WorkerGlobalScope
     'error',
 ].forEach(type => {
-    selfAddEventListener(type, async event => {
+    self.addEventListener(type, async event => {
         await appExecuted;
         try {
             eventDelegate.dispatchEvent(event);

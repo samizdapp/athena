@@ -165,7 +165,12 @@ export class StreamFactory {
             stream = await this.client.node
                 .dialProtocol(this.serverPeer, protocol, { signal })
                 .catch(e => {
-                    this.log.trace('dialProtocol error: ', e);
+                    const log = ['dialProtocol error: ', e];
+                    if (e.code === 'ERR_UNSUPPORTED_PROTOCOL') {
+                        this.log.error(...log);
+                    } else {
+                        this.log.debug(...log);
+                    }
                     this.log.trace('Time: ', Date.now() - start);
                     return null;
                 });

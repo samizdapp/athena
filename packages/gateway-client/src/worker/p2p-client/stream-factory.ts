@@ -221,12 +221,12 @@ export class StreamFactory {
                 status.serverPeer = ServerPeerStatus.CONNECTING;
             }
 
-            // if our retry timeout reaches 5 seconds, then we'll have
-            // been retrying for 15 seconds (triangle number of 5).
+            // if our retry timeout reaches 7 seconds, then we'll have
+            // been retrying for 28 seconds (triangle number of 7).
             // By this point, we're probably offline.
             if (
                 status.serverPeer !== ServerPeerStatus.OFFLINE &&
-                this.retryTimeout >= 5000
+                this.retryTimeout >= 7000
             ) {
                 status.serverPeer = ServerPeerStatus.OFFLINE;
             }

@@ -4,7 +4,7 @@ import { PeerId } from '@libp2p/interface-peer-id';
 import type { Address } from '@libp2p/interface-peer-store';
 import { KEEP_ALIVE } from '@libp2p/interface-peer-store/tags';
 import { StreamMuxerFactory } from '@libp2p/interface-stream-muxer';
-import { Startable } from '@libp2p/interfaces/startable';
+import { DefaultDialer } from 'libp2p/connection-manager/dialer';
 import { Mplex } from '@libp2p/mplex';
 import { WebSockets } from '@libp2p/websockets';
 import { all as filtersAll } from '@libp2p/websockets/filters';
@@ -26,6 +26,7 @@ export class P2pClient {
     private log = logger.getLogger('worker/p2p/client');
 
     private DIAL_TIMEOUT = 3000;
+    private MAX_PARALLEL_DIALS = 20;
 
     private streamFactory?: StreamFactory;
     private bootstrapList: BootstrapList;
@@ -114,6 +115,14 @@ export class P2pClient {
         this.setDisconnectedStatus();
         this.log.debug('Closing existing server connections...');
         await this.node.hangUp(this.serverPeer);
+        // clear away any pending dials
+        // (it is possible for pending dials to hang indefinitely)
+        const dialer = (
+            this.node as Libp2pNode
+        ).components.getDialer() as DefaultDialer;
+        await dialer.stop();
+        dialer.tokens = [...Array(this.MAX_PARALLEL_DIALS).keys()];
+        await dialer.start();
 
         // at some point, addresses for our peer can get removed
         // re-add everything from our bootstrap list before
@@ -234,7 +243,7 @@ export class P2pClient {
                 autoDial: false,
                 minConnections: 3,
                 maxDialsPerPeer: 20,
-                maxParallelDials: 20,
+                maxParallelDials: this.MAX_PARALLEL_DIALS,
                 addressSorter: (a: Address, b: Address) =>
                     this.bootstrapList.libp2pAddressSorter(a, b),
             },

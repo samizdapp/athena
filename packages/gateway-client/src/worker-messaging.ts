@@ -15,7 +15,10 @@ export enum ClientMessageType {
     REQUEST_STATUS = 'REQUEST_STATUS',
     OPENED = 'OPENED',
     HEARTBEAT = 'HEARTBEAT',
+<<<<<<< HEAD
     WEBSOCKET = 'WEBSOCKET',
+=======
+>>>>>>> develop
 }
 
 export type Message<T extends WorkerMessageType | ClientMessageType> = {

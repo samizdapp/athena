@@ -128,11 +128,6 @@ enum WebsocketStreamMessageType {
     STATUS = 'STATUS',
 }
 
-enum WebsocketStreamCommand {
-    OPEN = 'OPEN',
-    CLOSE = 'CLOSE',
-}
-
 export enum WebsocketStreamStatus {
     OPENED = 'OPENED',
     CLOSED = 'CLOSED',

@@ -66,6 +66,38 @@ export class P2pClient {
         return this.streamFactory.getStream(protocol);
     }
 
+    private async getExistingServerConnection() {
+        // if we don't already have a connection (completed or pending)
+        if (!this.serverConnection) {
+            return;
+        } // else, we have an existing connection of some sort
+
+        // get the connection so we can take a closer look at it
+        let connection;
+        try {
+            connection = await this.serverConnection;
+        } catch (e) {
+            // ignore errors
+        }
+        // if this connection:
+        // - exists
+        // - is open
+        // - and is less than a minute old
+        if (
+            connection?.stat?.status === 'OPEN' &&
+            connection.stat?.timeline.open > Date.now() - 60 * 1000
+        ) {
+            // this is a newly opened connection
+            // instead of creating a second one
+            // just return the connection we just made
+            return this.serverConnection;
+        }
+        // else, this connection may have failed, be closed,
+        // or be old (could have failed more exotically)
+        // we should discard it and create a new connection
+        return;
+    }
+
     public async connectToServer(retryTimeout = 1000): Promise<Connection> {
         // if we haven't started yet
         if (!this.node) {
@@ -82,30 +114,10 @@ export class P2pClient {
         }
 
         // if we already have a connection (completed or pending)
-        if (this.serverConnection) {
-            // get the connection so we can take a closer look at it
-            let connection;
-            try {
-                connection = await this.serverConnection;
-            } catch (e) {
-                // ignore errors
-            }
-            // if this connection:
-            // - exists
-            // - is open
-            // - and is less than a minute old
-            if (
-                connection?.stat?.status === 'OPEN' &&
-                connection.stat?.timeline.open > Date.now() - 60 * 1000
-            ) {
-                // this is a newly opened connection
-                // instead of creating a second one
-                // just return the connection we just made
-                return this.serverConnection;
-            }
-            // else, this connection may have failed, be closed,
-            // or be old (could have failed more exotically)
-            // we should discard it and create a new connection
+        let existingConnection = await this.getExistingServerConnection();
+        if (existingConnection) {
+            // return it
+            return existingConnection;
         }
 
         // first, close any open connections to our server
@@ -120,6 +132,14 @@ export class P2pClient {
             this.serverPeer,
             this.bootstrapList.all().map(it => it.multiaddr)
         );
+
+        // while we were hanging up, a new connection could have been created,
+        // if that is the case
+        existingConnection = await this.getExistingServerConnection();
+        if (existingConnection) {
+            // return it
+            return existingConnection;
+        }
 
         // now, attempt to dial our server
         this.log.info('Dialing server...');

@@ -157,13 +157,19 @@ export class StreamFactory {
 
             // attempt to dial our peer, track the time it takes
             const start = Date.now();
-            // timeout after configured timeout
-            const abortController = new AbortController();
-            const signal = abortController.signal;
-            waitFor(this.dialTimeout).then(() => abortController.abort());
-            // initiate dial
-            stream = await this.client.node
-                .dialProtocol(this.serverPeer, protocol, { signal })
+            stream = await this.client
+                .performDialAction(
+                    signal =>
+                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                        this.client.node!.dialProtocol(
+                            this.serverPeer,
+                            protocol,
+                            {
+                                signal,
+                            }
+                        ),
+                    this.dialTimeout
+                )
                 .catch(e => {
                     this.log.trace('dialProtocol error: ', e);
                     this.log.trace('Time: ', Date.now() - start);
@@ -221,7 +227,7 @@ export class StreamFactory {
             }
 
             // wait awhile before retrying the stream again
-            this.log.info('Dial timeout, waiting to reset...', {
+            this.log.info('Dial timeout, waiting to retry...', {
                 dialTimeout: this.dialTimeout,
                 retryTimeout: this.retryTimeout,
             });
@@ -240,9 +246,7 @@ export class StreamFactory {
             // 5 minutes
             this.dialTimeout = Math.min(1000 * 60 * 5, this.dialTimeout * 4);
 
-            // now that we've waited awhile, we can attempt to reconnect to our server
-            await this.client.connectToServer();
-            // and try again
+            // now that we've waited awhile, we can try again
             this.inTimeout = false;
         }
 

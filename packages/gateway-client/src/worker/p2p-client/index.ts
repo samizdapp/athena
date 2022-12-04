@@ -1,22 +1,23 @@
 import { Noise } from '@chainsafe/libp2p-noise';
 import { ConnectionEncrypter } from '@libp2p/interface-connection-encrypter';
-import { Connection } from '@libp2p/interface-connection';
 import { PeerId } from '@libp2p/interface-peer-id';
 import type { Address } from '@libp2p/interface-peer-store';
 import { KEEP_ALIVE } from '@libp2p/interface-peer-store/tags';
 import { StreamMuxerFactory } from '@libp2p/interface-stream-muxer';
+import { DefaultDialer } from 'libp2p/connection-manager/dialer';
 import { Mplex } from '@libp2p/mplex';
 import { WebSockets } from '@libp2p/websockets';
 import { all as filtersAll } from '@libp2p/websockets/filters';
 import { Multiaddr as MultiaddrType } from '@multiformats/multiaddr';
 import { createLibp2p, Libp2p } from 'libp2p';
+import { Libp2pNode } from 'libp2p/libp2p';
 
 import { ServerPeerStatus } from '../../worker-messaging';
 import { logger } from '../logging';
 import status from '../status';
 import { BootstrapList } from './bootstrap-list';
 import { initLibp2pLogging } from './libp2p-logging';
-import { StreamFactory, RequestStream } from './stream-factory';
+import { RequestStream, StreamFactory } from './stream-factory';
 
 const waitFor = async (t: number): Promise<void> =>
     new Promise(r => setTimeout(r, t));
@@ -25,13 +26,13 @@ export class P2pClient {
     private log = logger.getLogger('worker/p2p/client');
 
     private DIAL_TIMEOUT = 3000;
+    private MAX_PARALLEL_DIALS = 20;
 
     private streamFactory?: StreamFactory;
     private bootstrapList: BootstrapList;
     private eventTarget = new EventTarget();
 
     private serverPeer?: PeerId;
-    private serverConnection?: Promise<Connection>;
     public node?: Libp2p;
     private _connectionStatus: ServerPeerStatus = ServerPeerStatus.OFFLINE;
 
@@ -66,7 +67,36 @@ export class P2pClient {
         return this.streamFactory.getStream(protocol);
     }
 
-    public async connectToServer(retryTimeout = 1000): Promise<Connection> {
+    public async performDialAction<T>(
+        action: (signal: AbortSignal) => Promise<T>,
+        timeout = this.DIAL_TIMEOUT
+    ) {
+        const abortController = new AbortController();
+        const signal = abortController.signal;
+        waitFor(timeout).then(() => abortController.abort());
+        return Promise.race([
+            action(signal),
+            waitFor(timeout + 1000).then(() => {
+                throw new Error(
+                    'Abort controller failed to abort within 1 second past timeout.'
+                );
+            }),
+        ]);
+    }
+
+    private setDisconnectedStatus() {
+        // if our status has already been set
+        if (this.connectionStatus !== ServerPeerStatus.CONNECTED) {
+            // then we don't need to set it again
+            return;
+        }
+
+        // update status
+        this.connectionStatus = ServerPeerStatus.CONNECTING;
+        this.dispatchEvent('disconnected');
+    }
+
+    private async connectToServer(retryTimeout = 1000): Promise<void> {
         // if we haven't started yet
         if (!this.node) {
             throw new Error(
@@ -81,36 +111,18 @@ export class P2pClient {
             );
         }
 
-        // if we already have a connection (completed or pending)
-        if (this.serverConnection) {
-            // get the connection so we can take a closer look at it
-            let connection;
-            try {
-                connection = await this.serverConnection;
-            } catch (e) {
-                // ignore errors
-            }
-            // if this connection:
-            // - exists
-            // - is open
-            // - and is less than a minute old
-            if (
-                connection?.stat?.status === 'OPEN' &&
-                connection.stat?.timeline.open > Date.now() - 60 * 1000
-            ) {
-                // this is a newly opened connection
-                // instead of creating a second one
-                // just return the connection we just made
-                return this.serverConnection;
-            }
-            // else, this connection may have failed, be closed,
-            // or be old (could have failed more exotically)
-            // we should discard it and create a new connection
-        }
-
         // first, close any open connections to our server
+        this.setDisconnectedStatus();
         this.log.debug('Closing existing server connections...');
         await this.node.hangUp(this.serverPeer);
+        // clear away any pending dials
+        // (it is possible for pending dials to hang indefinitely)
+        const dialer = (
+            this.node as Libp2pNode
+        ).components.getDialer() as DefaultDialer;
+        await dialer.stop();
+        dialer.tokens = [...Array(this.MAX_PARALLEL_DIALS).keys()];
+        await dialer.start();
 
         // at some point, addresses for our peer can get removed
         // re-add everything from our bootstrap list before
@@ -123,26 +135,86 @@ export class P2pClient {
 
         // now, attempt to dial our server
         this.log.info('Dialing server...');
-        this.serverConnection = this.node
-            .dial(this.serverPeer)
-            .catch(async e => {
-                // we weren't able to dial
-                this.log.error('Error dialing server: ', e);
-                this.log.debug('Retrying dial in: ', retryTimeout);
-                this.serverConnection = undefined;
-                // wait before retrying
-                await waitFor(retryTimeout);
-                // refresh our stats so that the dial gets an updated order
-                await this.bootstrapList.refreshStats();
-                // retry
-                this.log.info('Redialing server...');
-                return this.connectToServer(
-                    retryTimeout > 30000 ? retryTimeout : retryTimeout + 1000
-                );
-            });
+        try {
+            const connection = await this.performDialAction(
+                signal =>
+                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                    this.node!.dial(this.serverPeer!, {
+                        signal,
+                    }),
+                retryTimeout * 2
+            );
+            this.log.debug(
+                'Successfully dialed: ',
+                connection.remoteAddr.toString()
+            );
+        } catch (e) {
+            // we weren't able to dial
+            this.log.error('Error dialing server: ', e);
+            this.log.debug('Retrying dial in: ', retryTimeout);
+            // wait before retrying
+            await waitFor(retryTimeout);
+            // refresh our stats so that the dial gets an updated order
+            await this.bootstrapList.refreshStats();
+            // retry
+            this.log.info('Redialing server...');
+            return this.connectToServer(
+                retryTimeout > 30000 ? 1000 : retryTimeout + 1000
+            );
+        }
+    }
 
-        // return our connection
-        return this.serverConnection;
+    private async loopConnectionStatus(failedAttempts = 0) {
+        const loopInterval = 5000;
+        // keep our connection status in sync
+        if (
+            (!this.node || !this.serverPeer) &&
+            this.connectionStatus === ServerPeerStatus.CONNECTED
+        ) {
+            this.connectionStatus = ServerPeerStatus.CONNECTING;
+        }
+        // if we're not connected
+        if (this.connectionStatus !== ServerPeerStatus.CONNECTED) {
+            // then there is nothing to loop
+            this.log.trace(
+                'Skipping connection status loop. Status: ',
+                this.connectionStatus
+            );
+            await waitFor(loopInterval);
+            this.loopConnectionStatus();
+            return;
+        }
+
+        // else, we want to make sure our connection is still good
+        // if we've had failed attempts, then wait a bit
+        await waitFor(failedAttempts * 1000);
+        try {
+            // now, ping our server
+            this.log.trace('Pinging server: ', this.serverPeer?.toString());
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            await this.node!.ping(this.serverPeer!);
+            // if our ping was successful, then our connection is still good
+            this.log.trace('Ping successful!');
+        } catch (e) {
+            // if we haven't failed two times yet
+            if (++failedAttempts < 2) {
+                // then try again
+                this.log.debug(
+                    `Ping failed, retrying (failed attempts: ${failedAttempts})`
+                );
+                this.loopConnectionStatus(failedAttempts);
+                return;
+            }
+            // else, we've tried enough, we've lost our connection
+            this.log.warn('Server connection lost (error pinging server): ', e);
+            this.setDisconnectedStatus();
+            // try to reconnect
+            this.connectToServer();
+        }
+
+        // we've reached the end our our loop
+        await waitFor(loopInterval);
+        this.loopConnectionStatus();
     }
 
     public async start() {
@@ -171,7 +243,7 @@ export class P2pClient {
                 autoDial: false,
                 minConnections: 3,
                 maxDialsPerPeer: 20,
-                maxParallelDials: 20,
+                maxParallelDials: this.MAX_PARALLEL_DIALS,
                 addressSorter: (a: Address, b: Address) =>
                     this.bootstrapList.libp2pAddressSorter(a, b),
             },
@@ -211,8 +283,11 @@ export class P2pClient {
                 // if this is our server peer
                 if (this.bootstrapList.serverId === peerId) {
                     this.serverPeer = evt.detail.id;
-                    // connect to our server (autodial is disabled)
-                    this.connectToServer();
+                    // if we're not connected
+                    if (this.connectionStatus !== ServerPeerStatus.CONNECTED) {
+                        // connect to our server (autodial is disabled)
+                        this.connectToServer();
+                    }
                 }
             }
         });
@@ -243,20 +318,23 @@ export class P2pClient {
                     }
 
                     // else, we've connected to our server
-                    this.log.info('Connected to server.');
+                    this.log.info('Gained connection to server.');
 
-                    if (!this.serverConnection) {
-                        this.serverConnection = Promise.resolve(connection);
+                    // if we were already connected
+                    if (this.connectionStatus === ServerPeerStatus.CONNECTED) {
+                        // then there is no more to do
+                        return;
                     }
+
+                    // update status
+                    this.connectionStatus = ServerPeerStatus.CONNECTED;
+
                     this.streamFactory = new StreamFactory(
                         this.DIAL_TIMEOUT,
                         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                         this.serverPeer!,
                         this
                     );
-
-                    // update status
-                    this.connectionStatus = ServerPeerStatus.CONNECTED;
 
                     // set keep-alive on connection
                     try {
@@ -277,19 +355,15 @@ export class P2pClient {
         // Listen for peers disconnecting
         this.node.connectionManager.addEventListener('peer:disconnect', evt => {
             const connection = evt.detail;
-            this.log.info(
-                `Disconnected from ${connection.remotePeer.toString()}`
-            );
+            this.log.info('Disconnected from: ', {
+                server: connection.remotePeer.toString(),
+                via: connection.remoteAddr.toString(),
+            });
             if (
-                this.serverPeer &&
-                connection.remotePeer.equals(this.serverPeer)
+                this.connectionStatus === ServerPeerStatus.CONNECTED &&
+                connection.remotePeer.equals(this.serverPeer ?? '')
             ) {
-                this.log.warn('Disconnected from server.');
-                this.serverConnection = undefined;
-                // update status
-                this.connectionStatus = ServerPeerStatus.CONNECTING;
-                this.dispatchEvent('disconnected');
-                this.connectToServer();
+                this.log.warn('Lost connection from server.');
             }
         });
 
@@ -297,6 +371,8 @@ export class P2pClient {
         this.log.debug('Starting libp2p...');
         await this.node.start();
         this.log.info('Started libp2p.');
+        // start our connection status loop
+        this.loopConnectionStatus();
 
         // update status
         this.connectionStatus = ServerPeerStatus.CONNECTING;

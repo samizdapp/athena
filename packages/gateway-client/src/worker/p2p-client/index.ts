@@ -16,7 +16,7 @@ import { logger } from '../logging';
 import status from '../status';
 import { BootstrapList } from './bootstrap-list';
 import { initLibp2pLogging } from './libp2p-logging';
-import { StreamFactory, RequestStream } from './stream-factory';
+import { StreamFactory } from './stream-factory';
 import messenger from '../messenger';
 
 const waitFor = async (t: number): Promise<void> =>
@@ -326,10 +326,6 @@ export class P2pClient {
             throw new Error('Stream factory not initialized');
         }
         return this.streamFactory.getRequestStream();
-    }
-
-    releaseRequestStream(stream: RequestStream) {
-        this.streamFactory?.releaseRequestStream(stream);
     }
 
     private dispatchEvent<T>(type: string, detail?: T) {

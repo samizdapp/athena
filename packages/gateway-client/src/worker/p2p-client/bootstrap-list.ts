@@ -291,35 +291,35 @@ export class BootstrapList extends Bootstrap {
         const stream = await this.client.getStream('/samizdapp-relay');
         this.log.trace('Got relay stream: ', stream);
 
+        let buffer = null;
+
         // receive messages from relay protocol
-        await pipe(stream.source, async source => {
-            for await (const msg of source) {
-                // this message is an address
-                const addressString = Buffer.from(msg.subarray()).toString();
-                this.log.debug(
-                    `Received relay address from stream: ${addressString}`
-                );
-                // add it to our list
-                const addedAddress = await this.addAddress(addressString, {
-                    statsTimeout: this.defaultStatsTimeout,
-                });
-                // if NOT successfully added
-                if (!addedAddress) {
-                    // nothing more to do
-                    continue;
-                }
-                // else, we just added a new address
-                this.log.info(`Got new relay address: ${addedAddress}`);
-                // update our cache
-                await this.dumpCache();
-                // add this new address to the client
-                this.client.addServerPeerAddress(addedAddress.multiaddr);
-                // update status
-                status.relays.push(addedAddress.address);
+        while ((buffer = await stream.read()) !== null) {
+            // this message is an address
+            const addressString = buffer.toString();
+
+            this.log.debug(
+                `Received relay address from stream: ${addressString}`
+            );
+            // add it to our list
+            const addedAddress = await this.addAddress(addressString, {
+                statsTimeout: this.defaultStatsTimeout,
+            });
+            // if NOT successfully added
+            if (!addedAddress) {
+                // nothing more to do
+                continue;
             }
-        }).catch(e => {
-            this.log.warn('Error in pipe: ', e);
-        });
+            // else, we just added a new address
+            this.log.info(`Got new relay address: ${addedAddress}`);
+            // update our cache
+            await this.dumpCache();
+            // add this new address to the client
+            this.client.addServerPeerAddress(addedAddress.multiaddr);
+            // update status
+            status.relays.push(addedAddress.address);
+        }
+
         // we wan't fetch streams to have priority, so let's ease up this loop
         await new Promise(r => setTimeout(r, 20000));
     }

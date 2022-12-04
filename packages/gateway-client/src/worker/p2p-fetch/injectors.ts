@@ -1,6 +1,6 @@
 import { ClientMessageType, WorkerMessageType } from '../../worker-messaging';
 import messenger from '../messenger';
-import { WebsocketStreamStatus } from '../p2p-client/stream-factory';
+import { WebsocketStreamStatus } from '../p2p-client/streams';
 
 declare type Injector = (headers: Headers, body: Buffer) => Buffer;
 
@@ -84,6 +84,7 @@ const WEBSOCKET_SPLIT = '<head>';
 
 const WEBSOCKET_SNIPPET = `<script>
 window.nativeWebSocket = window.WebSocket;
+// create a class so we can use 'new'
 class SamizdappWebSocket {
     constructor(url, protocols) {
         return makeSamizdappWebSocket(url, protocols);
@@ -91,7 +92,7 @@ class SamizdappWebSocket {
 }
 
 function makeSamizdappWebSocket(url, protocols) {
-    console.log('makeSamizdappWebSocket', url, protocols);
+    // create a real websocket object
     const ws = Object.create(window.nativeWebSocket);
 
     const messageChannel = new MessageChannel();
@@ -102,7 +103,6 @@ function makeSamizdappWebSocket(url, protocols) {
     ws._commandPort = commandChannel.port1;
 
     ws._messagePort.onmessage = (e) => {
-        console.log('message', e.data, new TextDecoder('ascii').decode(e.data));
         const newEvent = new MessageEvent(e.type, {
             ...e,
             data: String.raw\`\${new TextDecoder('ascii').decode(e.data)}\`
@@ -111,7 +111,6 @@ function makeSamizdappWebSocket(url, protocols) {
     }
     ws._statusPort.onmessage = (e) => {
         const {status, error} = JSON.parse(new TextDecoder('ascii').decode(e.data));
-        console.log('status', status, error);
         if (error) {
             Object.defineProperty(ws, 'readyState', {
                 value: window.nativeWebSocket.CLOSED,
@@ -160,6 +159,11 @@ function makeSamizdappWebSocket(url, protocols) {
     }
 
     ws.close = function() {
+        Object.defineProperty(ws, 'readyState', {
+            value: window.nativeWebSocket.CLOSING,
+            writable: false,
+            configurable: true,
+        });
         const closeCommand = new TextEncoder().encode(JSON.stringify({method: 'CLOSE'}));
         ws._commandPort.postMessage(closeCommand, [closeCommand.buffer]);
     }

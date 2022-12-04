@@ -26,7 +26,6 @@ describe('pleromaTimelineHandler() should', () => {
         };
         const respondWith = jest.fn();
         pleromaTimelineHandler(request as Request, respondWith);
-        expect(respondWith).toHaveBeenCalledWith(fetch(request as Request));
         await getWindowClient(() => true);
         expect(mockClient.navigate).toHaveBeenCalledWith('/timeline/fediverse');
     });

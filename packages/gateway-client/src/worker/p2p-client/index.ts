@@ -18,6 +18,7 @@ import { BootstrapList } from './bootstrap-list';
 import { initLibp2pLogging } from './libp2p-logging';
 import { StreamFactory } from './stream-factory';
 import messenger from '../messenger';
+import { HeartbeatStream } from './streams';
 
 const waitFor = async (t: number): Promise<void> =>
     new Promise(r => setTimeout(r, t));
@@ -33,6 +34,7 @@ export class P2pClient {
 
     private serverPeer?: PeerId;
     private serverConnection?: Promise<Connection>;
+    private heartbeat?: HeartbeatStream;
     public node?: Libp2p;
     private _connectionStatus: ServerPeerStatus = ServerPeerStatus.OFFLINE;
 
@@ -264,6 +266,9 @@ export class P2pClient {
                         await this.node?.peerStore
                             .tagPeer(connection.remotePeer, KEEP_ALIVE)
                             .catch(_ => null);
+
+                        this.heartbeat =
+                            await this.streamFactory.getHeartbeatStream();
                     } catch (e) {
                         // ignore tagging errors
                     }

@@ -12,6 +12,7 @@ import {
     PooledLobStream,
     RequestStream,
     SamizdappStream,
+    HeartbeatStream,
 } from './streams';
 
 const waitFor = async (t: number): Promise<void> =>
@@ -187,5 +188,13 @@ export class StreamFactory {
             WebsocketStream,
             ports
         ) as Promise<WebsocketStream>;
+    }
+
+    public async getHeartbeatStream(): Promise<HeartbeatStream> {
+        this.log.debug('Get heartbeat stream');
+        return this.getStream(
+            '/samizdapp-heartbeat',
+            HeartbeatStream
+        ) as Promise<HeartbeatStream>;
     }
 }

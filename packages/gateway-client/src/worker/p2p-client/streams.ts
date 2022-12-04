@@ -19,7 +19,7 @@ class Deferred<T> {
 declare type Callback = (err?: Error) => void;
 
 export class RawStream extends EventEmitter {
-    log = logger.getLogger('worker/p2p/streams');
+    log = logger.getLogger('worker/p2p-client/streams');
     private readDeferred = new Deferred<Buffer | null>();
     private writeDeferred = new Deferred<Buffer | null>();
 
@@ -87,6 +87,26 @@ export class RawStream extends EventEmitter {
         this.libp2pStream.close();
         this.readDeferred.resolve(null);
         this.writeDeferred.resolve(null);
+    }
+}
+
+export class HeartbeatStream extends RawStream {
+    constructor(libp2pStream: Stream, ports?: MessagePort[]) {
+        super(libp2pStream, ports);
+        this.listen();
+    }
+
+    private async listen() {
+        let data = null,
+            timeout;
+        while (this.isOpen && (data = await this.read()) != null) {
+            this.log.trace('heartbeat', data);
+            if (data.equals(Buffer.from('deadbeef', 'hex'))) {
+                this.log.trace('heartbeat', 'received');
+                clearTimeout(timeout);
+                timeout = setTimeout(this.close.bind(this), 10000);
+            }
+        }
     }
 }
 
@@ -294,7 +314,7 @@ export class WebsocketStream extends LobStream {
     private async startReceiving() {
         let packet = null;
 
-        while ((packet = await this.receive()) !== null) {
+        while (this.isOpen && (packet = await this.receive()) !== null) {
             this.dispatch(packet);
         }
 

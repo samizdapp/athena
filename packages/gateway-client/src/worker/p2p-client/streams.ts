@@ -41,10 +41,9 @@ export class RawStream extends EventEmitter {
     }
 
     public async read(): Promise<Buffer | null> {
-        return this.readDeferred.promise.then(data => {
-            this.log.trace('read', data);
-            return data;
-        });
+         const data = await this.readDeferred.promise;
+         this.log.trace('read', data);
+         return data;
     }
 
     public async write(data: Buffer): Promise<void> {

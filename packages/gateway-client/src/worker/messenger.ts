@@ -11,7 +11,6 @@ declare const self: ServiceWorkerGlobalScope;
 type MessageHandler = (msg: Message<ClientMessageType>) => void;
 type NativeMessageHandler = (ev: ExtendableMessageEvent) => void;
 
-
 class Messenger {
     private eventTarget = new EventTarget();
     private listeners: Map<MessageHandler, EventListener> = new Map();

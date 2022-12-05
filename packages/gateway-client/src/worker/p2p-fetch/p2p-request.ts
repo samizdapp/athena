@@ -214,7 +214,7 @@ export class P2pRequest {
     ) {}
 
     private async loopAttempts(
-        responseTimeout = 5000,
+        responseTimeout = 60 * 1000,
         counter = 1
     ): Promise<void> {
         this.log.debug(
@@ -246,7 +246,7 @@ export class P2pRequest {
             // if this was due to a response timeout
             if (e instanceof ResponseTimeoutError) {
                 // then increase our response timeout before trying again
-                responseTimeout += 5000;
+                responseTimeout += responseTimeout;
             }
             this.log.debug(
                 `Request: ${this.requestId} - Timing: attempt failed in ` +

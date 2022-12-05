@@ -4,20 +4,22 @@ import { PeerId } from '@libp2p/interface-peer-id';
 import type { Address } from '@libp2p/interface-peer-store';
 import { KEEP_ALIVE } from '@libp2p/interface-peer-store/tags';
 import { StreamMuxerFactory } from '@libp2p/interface-stream-muxer';
-import { DefaultDialer } from 'libp2p/connection-manager/dialer';
 import { Mplex } from '@libp2p/mplex';
 import { WebSockets } from '@libp2p/websockets';
 import { all as filtersAll } from '@libp2p/websockets/filters';
 import { Multiaddr as MultiaddrType } from '@multiformats/multiaddr';
 import { createLibp2p, Libp2p } from 'libp2p';
+import { DefaultDialer } from 'libp2p/connection-manager/dialer';
 import { Libp2pNode } from 'libp2p/libp2p';
 
-import { ServerPeerStatus } from '../../worker-messaging';
+import { ClientMessageType, ServerPeerStatus } from '../../worker-messaging';
 import { logger } from '../logging';
+import messenger from '../messenger';
 import status from '../status';
 import { BootstrapList } from './bootstrap-list';
 import { initLibp2pLogging } from './libp2p-logging';
-import { RequestStream, StreamFactory } from './stream-factory';
+import { StreamFactory } from './stream-factory';
+import { HeartbeatStream } from './streams';
 
 const waitFor = async (t: number): Promise<void> =>
     new Promise(r => setTimeout(r, t));
@@ -33,6 +35,7 @@ export class P2pClient {
     private eventTarget = new EventTarget();
 
     private serverPeer?: PeerId;
+    private _heartbeat?: HeartbeatStream;
     public node?: Libp2p;
     private _connectionStatus: ServerPeerStatus = ServerPeerStatus.OFFLINE;
 
@@ -341,6 +344,9 @@ export class P2pClient {
                         await this.node?.peerStore
                             .tagPeer(connection.remotePeer, KEEP_ALIVE)
                             .catch(_ => null);
+
+                        this._heartbeat =
+                            await this.streamFactory.getHeartbeatStream();
                     } catch (e) {
                         // ignore tagging errors
                     }
@@ -374,6 +380,8 @@ export class P2pClient {
         // start our connection status loop
         this.loopConnectionStatus();
 
+        this.handleWebsocketMessages();
+
         // update status
         this.connectionStatus = ServerPeerStatus.CONNECTING;
         waitFor(30000).then(() => {
@@ -383,15 +391,24 @@ export class P2pClient {
         });
     }
 
+    private async handleWebsocketMessages() {
+        // listen for websocket messages
+        this.log.debug('Listening for websocket messages...');
+        messenger.addNativeHandler(event => {
+            this.log.debug('Received websocket message:', event);
+            if (event.data.type === ClientMessageType.WEBSOCKET) {
+                this.streamFactory?.getWebsocketStream(
+                    event.ports as MessagePort[]
+                );
+            }
+        });
+    }
+
     public async getRequestStream() {
         if (!this.streamFactory) {
             throw new Error('Stream factory not initialized');
         }
         return this.streamFactory.getRequestStream();
-    }
-
-    releaseRequestStream(stream: RequestStream) {
-        this.streamFactory?.releaseRequestStream(stream);
     }
 
     private dispatchEvent<T>(type: string, detail?: T) {

@@ -1,8 +1,9 @@
 import { ServerPeerStatus } from '../../worker-messaging';
 import { logger } from '../logging';
-import { RequestStream } from '../p2p-client/stream-factory';
+import { RequestStream } from '../p2p-client/streams';
 
 import { P2pClient } from '../p2p-client';
+import { Packet } from './lob-enc';
 
 const waitFor = async (t: number): Promise<void> =>
     new Promise(r => setTimeout(r, t));
@@ -32,7 +33,7 @@ class ResponseTimeoutError extends Error {
 class RequestAttempt {
     private log = logger.getLogger('worker/p2p-fetch/attempt');
 
-    private deferredResponse?: Deferred<Buffer[]>;
+    private deferredResponse?: Deferred<Packet>;
     private stream?: RequestStream;
 
     private hasReceivedChunk = false;
@@ -43,7 +44,7 @@ class RequestAttempt {
     constructor(
         private readonly requestId: string,
         private readonly p2pClient: P2pClient,
-        private readonly parts: Buffer[],
+        private readonly packet: Packet,
         private responseTimeout: number
     ) {}
 
@@ -51,7 +52,8 @@ class RequestAttempt {
         // track the time we received our last chunk
         this.lastChunkTime = Date.now();
 
-        return stream.request(this.parts, () => {
+        this.log.debug('Request: ' + this.requestId + ' - Sending request.');
+        return stream.request(this.packet, () => {
             // calculate time since we received last chunk
             const timeSinceLastChunk = Date.now() - this.lastChunkTime;
             // if we haven't gotten a chunk yet
@@ -88,7 +90,11 @@ class RequestAttempt {
             // receive a response
             const response = await this.pipe(this.stream);
             // once our response is received, resolve our promise with it
-            this.deferredResponse?.resolve(response);
+            if (response) {
+                this.deferredResponse?.resolve(response);
+            } else {
+                throw new Error('No response received.');
+            }
         } catch (e) {
             // handle any errors by rejecting our promise
             this.deferredResponse?.reject(e);
@@ -155,9 +161,9 @@ class RequestAttempt {
         this.loopStats();
     }
 
-    public async execute(): Promise<Buffer[]> {
+    public async execute(): Promise<Packet> {
         // create a deferred object to hold our response in
-        this.deferredResponse = new Deferred<Buffer[]>();
+        this.deferredResponse = new Deferred<Packet>();
 
         // open a new stream, track the time it takes to open
         const streamOpenTime = Date.now();
@@ -188,7 +194,7 @@ class RequestAttempt {
             this.inProgress = false;
 
             // release stream now that we're done
-            this.p2pClient.releaseRequestStream(this.stream);
+            this.stream.release();
         }
 
         // return our settled promise (may be resolved or rejected)
@@ -199,16 +205,16 @@ class RequestAttempt {
 export class P2pRequest {
     private log = logger.getLogger('worker/p2p-fetch/p2p-request');
 
-    private deferredResponse?: Deferred<Buffer[]>;
+    private deferredResponse?: Deferred<Packet>;
 
     constructor(
         private readonly requestId: string,
         private readonly p2pClient: P2pClient,
-        private readonly parts: Buffer[]
+        private readonly packet: Packet
     ) {}
 
     private async loopAttempts(
-        responseTimeout = this.parts.length * 5000,
+        responseTimeout = 5000,
         counter = 1
     ): Promise<void> {
         this.log.debug(
@@ -218,29 +224,29 @@ export class P2pRequest {
         // track the time it takes to complete our attempt
         const startTime = Date.now();
         // create a new attempt for our request
-        let responseParts: Buffer[] = [];
+        let response: Packet | null = null;
         const requestAttempt = new RequestAttempt(
             this.requestId,
             this.p2pClient,
-            this.parts,
+            this.packet,
             responseTimeout
         );
         try {
             // execute our attempt, wait for a response
-            responseParts = await requestAttempt.execute();
+            response = await requestAttempt.execute();
             this.log.debug(
                 `Request: ${this.requestId} - Timing: response received in ` +
                     `${Date.now() - startTime}ms`
             );
             // we received a response, use it to resolve our promise
-            this.deferredResponse?.resolve(responseParts);
+            this.deferredResponse?.resolve(response);
             // we're done looping
             return;
         } catch (e) {
             // if this was due to a response timeout
             if (e instanceof ResponseTimeoutError) {
                 // then increase our response timeout before trying again
-                responseTimeout += this.parts.length * 5000;
+                responseTimeout += 5000;
             }
             this.log.debug(
                 `Request: ${this.requestId} - Timing: attempt failed in ` +
@@ -254,7 +260,7 @@ export class P2pRequest {
 
     public async execute() {
         // create a new deferred object to hold our response
-        this.deferredResponse = new Deferred<Buffer[]>();
+        this.deferredResponse = new Deferred<Packet>();
 
         // start attempting the request
         this.loopAttempts();

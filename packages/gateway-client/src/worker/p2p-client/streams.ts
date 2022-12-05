@@ -64,13 +64,18 @@ export class RawStream {
     }
 
     private async *_source() {
-        for await (const data of this.libp2pStream.source) {
-            this.log.trace('source', data);
-            yield Buffer.from(data.subarray());
-        }
+        try {
+            for await (const data of this.libp2pStream.source) {
+                this.log.trace('source', data);
+                yield Buffer.from(data.subarray());
+            }
 
-        this.log.trace('source', 'end');
-        this.close();
+            this.log.trace('source', 'end');
+        } catch (e) {
+            this.log.warn('source error', e);
+        } finally {
+            this.close();
+        }
     }
 
     public close() {

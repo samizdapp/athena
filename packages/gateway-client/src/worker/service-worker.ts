@@ -10,6 +10,10 @@ import {
     staticCacheHandler,
 } from './fetch-handlers';
 import fetchHandlers from './fetch-handlers/fetch-handlers';
+import injectors, {
+    proxyWebSocketInjector,
+    pingServiceWorkerInjector,
+} from './injectors';
 import { logger } from './logging';
 
 // Mark the workbox-precaching import as being used with this line:
@@ -39,6 +43,8 @@ fetchHandlers
     .use(staticCacheHandler)
     .use(pleromaTimelineHandler)
     .use(passThroughHandler);
+
+injectors.use(proxyWebSocketInjector).use(pingServiceWorkerInjector);
 
 bootstrap();
 

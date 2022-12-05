@@ -22,7 +22,10 @@ export class RawStream {
     private source: AsyncIterator<Buffer> | null = null;
 
     constructor(private readonly libp2pStream: Stream) {
-        this.libp2pStream.sink(this.sink());
+        this.libp2pStream.sink(this.sink()).catch(e => {
+            this.log.warn('sink error', e);
+            this.close();
+        });
         this.source = this._source();
     }
 

@@ -18,12 +18,15 @@ class Messenger {
     init() {
         self.addEventListener('message', event => {
             const msg = event.data;
-            msg.ports = event.ports;
             this.log.debug('Received client message: ', msg);
             this.eventTarget.dispatchEvent(
                 new CustomEvent(msg.type, { detail: msg })
             );
         });
+    }
+
+    addNativeListener(handler: (event: ExtendableMessageEvent) => void) {
+        self.addEventListener('message', handler);
     }
 
     addListener<K extends ClientMessageType>(type: K, handler: MessageHandler) {

@@ -194,7 +194,7 @@ export class StreamFactory {
         this.log.debug('Get websocket stream');
         return this.getStream(
             '/samizdapp-websocket',
-            WebsocketStream,
+            WebsocketStream as unknown as StreamConstructor,
             ports
         ) as Promise<WebsocketStream>;
     }

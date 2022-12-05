@@ -394,11 +394,12 @@ export class P2pClient {
     private async handleWebsocketMessages() {
         // listen for websocket messages
         this.log.debug('Listening for websocket messages...');
-        messenger.addListener(ClientMessageType.WEBSOCKET, async msg => {
-            this.log.debug('got websocket message', msg);
-            await this.streamFactory?.getWebsocketStream(
-                msg.ports as MessagePort[]
-            );
+        messenger.addNativeListener(async (event: ExtendableMessageEvent) => {
+            if (event.data.type === ClientMessageType.WEBSOCKET) {
+                this.streamFactory?.getWebsocketStream(
+                    event.ports as MessagePort[]
+                );
+            }
         });
     }
 

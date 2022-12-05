@@ -110,7 +110,7 @@ function makeSamizdappWebSocket(url, protocols) {
         ws.onmessage?.(newEvent);
     }
     ws._statusPort.onmessage = (e) => {
-        const {status, error} = JSON.parse(new TextDecoder('ascii').decode(e.data));
+        const {status, detail} = JSON.parse(new TextDecoder('ascii').decode(e.data));
         if (error) {
             Object.defineProperty(ws, 'readyState', {
                 value: window.nativeWebSocket.CLOSED,
@@ -118,7 +118,7 @@ function makeSamizdappWebSocket(url, protocols) {
                 configurable: true,
             });
             if (ws.onerror) {
-                ws.onerror(error);
+                ws.onerror(new Error(detail.message, detail));
             } else {
                 throw error;
             }
@@ -128,14 +128,14 @@ function makeSamizdappWebSocket(url, protocols) {
                 writable: false,
                 configurable: true,
             });
-            return ws.onopen?.();
+            return ws.onopen?.(new Event(detail.type, detail));
         } else if (status === '${WebsocketStreamStatus.CLOSED}') {
             Object.defineProperty(ws, 'readyState', {
                 value: window.nativeWebSocket.CLOSED,
                 writable: false,
                 configurable: true,
             });
-            return ws.onclose?.();
+            return ws.onclose?.(new CloseEvent(detail.type, detail));
         }
     }
 

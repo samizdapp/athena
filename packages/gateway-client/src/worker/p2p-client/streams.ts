@@ -1,5 +1,4 @@
 import { Stream } from '@libp2p/interface-connection';
-import { EventEmitter } from 'events';
 import { logger } from '../logging';
 import { encode, decode, Packet } from '../p2p-fetch/lob-enc';
 
@@ -18,10 +17,12 @@ class Deferred<T> {
 
 declare type Callback = (err?: Error) => void;
 
-export class RawStream extends EventEmitter {
-    log = logger.getLogger('worker/p2p-client/streams');
+export class RawStream {
+    protected eventTarget = new EventTarget();
+    protected log = logger.getLogger('worker/p2p-client/streams');
     private readDeferred = new Deferred<Buffer | null>();
     private writeDeferred = new Deferred<Buffer | null>();
+    private source: AsyncIterator<Buffer> | null = null;
 
     get isOpen(): boolean {
         return this.libp2pStream.stat.timeline.close === undefined;
@@ -31,19 +32,14 @@ export class RawStream extends EventEmitter {
         return this.libp2pStream.stat.protocol;
     }
 
-    constructor(
-        private readonly libp2pStream: Stream,
-        private readonly ports?: MessagePort[]
-    ) {
-        super();
+    constructor(private readonly libp2pStream: Stream) {
         this.libp2pStream.sink(this.sink());
-        this.source();
+        this.source = this._source();
     }
 
     public async read(): Promise<Buffer | null> {
-         const data = await this.readDeferred.promise;
-         this.log.trace('read', data);
-         return data;
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        return (await this.source!.next()).value || null;
     }
 
     public async write(data: Buffer): Promise<void> {
@@ -67,15 +63,9 @@ export class RawStream extends EventEmitter {
         this.writeDeferred = new Deferred<Buffer | null>();
     }
 
-    private _read(data: Buffer | null) {
-        this.log.trace('_read', data);
-        this.readDeferred.resolve(data);
-        this.readDeferred = new Deferred<Buffer | null>();
-    }
-
-    private async source() {
+    private async *_source() {
         for await (const data of this.libp2pStream.source) {
-            this._read(Buffer.from(data.subarray()));
+            yield Buffer.from(data.subarray());
         }
 
         this.log.trace('source', 'end');
@@ -90,8 +80,8 @@ export class RawStream extends EventEmitter {
 }
 
 export class HeartbeatStream extends RawStream {
-    constructor(libp2pStream: Stream, ports?: MessagePort[]) {
-        super(libp2pStream, ports);
+    constructor(libp2pStream: Stream) {
+        super(libp2pStream);
         this.listen();
     }
 
@@ -113,13 +103,10 @@ export class LobStream extends RawStream {
     private chunkSize = 64 * 1024;
     private outbox = new Deferred<Packet>();
     private inbox = new Deferred<Packet | null>();
-    private onChunk?: Callback;
-    private onClose?: Callback;
-    private onError?: Callback;
     public hasInitialized = false;
 
-    constructor(libp2pStream: Stream, ports?: MessagePort[]) {
-        super(libp2pStream, ports);
+    constructor(libp2pStream: Stream) {
+        super(libp2pStream);
         this.initOutbox();
         this.initInbox().then(() => {
             this.log.debug('stream is closed');
@@ -189,7 +176,9 @@ export class LobStream extends RawStream {
                 this._receive(packet as Packet);
             }
 
-            this.emit('chunk', chunk);
+            this.eventTarget.dispatchEvent(
+                new CustomEvent('chunk', { detail: chunk })
+            );
         }
 
         this.log.debug('stream stopped receiving data');
@@ -243,15 +232,15 @@ export class PooledLobStream extends LobStream {
 export class RequestStream extends PooledLobStream {
     public async request(
         packet: Packet,
-        onChunk?: Callback
+        onChunk?: EventListenerOrEventListenerObject
     ): Promise<Packet | null> {
         if (onChunk) {
-            this.addListener('chunk', onChunk);
+            this.eventTarget.addEventListener('chunk', onChunk);
         }
         this.send(packet);
         const response = await this.receive();
         if (onChunk) {
-            this.removeListener('chunk', onChunk);
+            this.eventTarget.removeEventListener('chunk', onChunk);
         }
 
         return response;
@@ -270,13 +259,19 @@ export enum WebsocketStreamStatus {
     ERROR = 'ERROR',
 }
 
-// TODO: ask joshua how to stop ts complaining about overrides
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
 export class WebsocketStream extends LobStream {
-    private statusPort: MessagePort;
-    private commandPort: MessagePort;
-    private messagePort: MessagePort;
+    private portMap: Record<WebsocketStreamMessageType, MessagePort>;
+
+    constructor(libp2pStream: Stream, ports: MessagePort[]) {
+        super(libp2pStream);
+        this.portMap = {
+            [WebsocketStreamMessageType.STATUS]: ports[0],
+            [WebsocketStreamMessageType.MESSAGE]: ports[1],
+            [WebsocketStreamMessageType.COMMAND]: ports[2],
+        };
+        this.startSending();
+        this.startReceiving();
+    }
 
     private makePortMessageHandler(type: WebsocketStreamMessageType) {
         return (event: MessageEvent) => {
@@ -289,25 +284,13 @@ export class WebsocketStream extends LobStream {
         };
     }
 
-    constructor(libp2pStream: Stream, ports: MessagePort[]) {
-        super(libp2pStream, ports);
-        this.statusPort = ports[0];
-        this.messagePort = ports[1];
-        this.commandPort = ports[2];
-        this.startSending();
-        this.startReceiving();
-    }
-
     private startSending() {
-        this.commandPort.onmessage = this.makePortMessageHandler(
-            WebsocketStreamMessageType.COMMAND
-        );
-        this.messagePort.onmessage = this.makePortMessageHandler(
-            WebsocketStreamMessageType.MESSAGE
-        );
-        this.statusPort.onmessage = this.makePortMessageHandler(
-            WebsocketStreamMessageType.STATUS
-        );
+        for (const [type, port] of Object.entries(this.portMap)) {
+            port.addEventListener(
+                'message',
+                this.makePortMessageHandler(type as WebsocketStreamMessageType)
+            );
+        }
     }
 
     private async startReceiving() {
@@ -317,7 +300,14 @@ export class WebsocketStream extends LobStream {
             this.dispatch(packet);
         }
 
-        this.dispatchStatus(WebsocketStreamStatus.CLOSED);
+        this.dispatchStatus(
+            WebsocketStreamStatus.CLOSED,
+            JSON.stringify({
+                code: 1001,
+                reason: 'Stream closed',
+                wasClean: true,
+            })
+        );
     }
 
     private encodeMessageToPacket(
@@ -328,16 +318,11 @@ export class WebsocketStream extends LobStream {
     }
 
     private getClientPort(type: WebsocketStreamMessageType): MessagePort {
-        switch (type) {
-            case WebsocketStreamMessageType.MESSAGE:
-                return this.messagePort;
-            case WebsocketStreamMessageType.STATUS:
-                return this.statusPort;
-            case WebsocketStreamMessageType.COMMAND:
-                return this.commandPort;
-            default:
-                throw new Error('Invalid websocket message type: ' + type);
+        const port = this.portMap[type];
+        if (!port) {
+            throw new Error(`No port for type ${type}`);
         }
+        return port;
     }
 
     private dispatch(packet: Packet): void {
@@ -358,11 +343,10 @@ export class WebsocketStream extends LobStream {
     }
 }
 
-export declare type StreamConstructor =
-    | typeof RawStream
-    | typeof LobStream
-    | typeof WebsocketStream
-    | typeof RequestStream;
+export type StreamConstructor = new (
+    raw: Stream,
+    ports?: MessagePort[]
+) => SamizdappStream;
 
 export declare type SamizdappStream =
     | RawStream

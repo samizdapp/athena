@@ -1,11 +1,10 @@
 import { Buffer } from 'buffer';
-import { levels } from 'loglevel';
 
 import { logger } from '../logging';
 import { P2pClient } from '../p2p-client';
-import { decode, encode } from './lob-enc';
+import { encode, Packet } from './lob-enc';
 import { P2pRequest } from './p2p-request';
-import Injectors from './injectors';
+import injectors from '../injectors';
 
 type PatchedBody = ReturnType<P2pFetchRequest['patchArgs']>['body'];
 type PatchedRequest = ReturnType<P2pFetchRequest['patchArgs']>['reqObj'];
@@ -238,7 +237,6 @@ export class P2pFetchRequest {
             {
                 reqObj: this.reqObj,
                 reqInit: this.reqInit,
-                bodyLength: bodyBuffer?.length ?? 0,
             },
             bodyBuffer
         );
@@ -247,36 +245,20 @@ export class P2pFetchRequest {
                 `${packet.toString('hex')}, `,
             packet
         );
-        // chunk our packet
-        const parts: Buffer[] = [];
-        for (let i = 0; i <= Math.floor(packet.length / this.chunkSize); i++) {
-            parts.push(
-                packet.subarray(i * this.chunkSize, (i + 1) * this.chunkSize)
-            );
-        }
-
-        if (this.log.getLevel() === levels.TRACE) {
-            this.log.trace(
-                `Request: ${this.requestId} - Chunked parts: `,
-                parts.map(it => it.toString('hex'))
-            );
-        }
 
         // create a new p2p request
         const p2pRequest = new P2pRequest(
             this.requestId,
             this.p2pClient,
-            parts
+            packet
         );
         // and execute it
         this.log.trace(`Request: ${this.requestId} - Executing p2p request`);
-        const res_parts = await p2pRequest.execute();
-
-        // decode our response parts into a lob buffer
-        const resp = decode<{
+        const resp = (await p2pRequest.execute()) as Packet<{
             res: { headers: Record<string, unknown> | Headers } & Response;
             error: Error;
-        }>(Buffer.concat(res_parts));
+        }>;
+
         // if we didn't get back a response
         if (!resp?.json.res) {
             // there must have been an error
@@ -285,7 +267,7 @@ export class P2pFetchRequest {
         // else, we successfully decoded, hydrate our headers
         resp.json.res.headers = new Headers(resp.json.res.headers);
         // create a new response to return
-        const tbody = Injectors.inject(resp.json.res.headers, resp.body);
+        const tbody = injectors.inject(resp.json.res.headers, resp.body);
         const response = new Response(tbody, resp.json.res);
         // this log line fills in for the lack of a network log in our DevTools
         this.log.info(`Request: ${this.requestId} - Response: `, response);

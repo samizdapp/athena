@@ -1,18 +1,6 @@
-import { ClientMessageType, WorkerMessageType } from '../../worker-messaging';
+import { CompiledInjector } from './injectors';
 import messenger from '../messenger';
-
-declare type Injector = (headers: Headers, body: Buffer) => Buffer;
-
-class Injectors {
-    constructor(private readonly injectors: Injector[]) {}
-
-    inject(headers: Headers, body: Buffer): Buffer {
-        for (const injector of this.injectors) {
-            body = injector(headers, body);
-        }
-        return body;
-    }
-}
+import { WorkerMessageType, ClientMessageType } from '../../worker-messaging';
 
 // HEARTBEAT Injector
 
@@ -29,6 +17,7 @@ messenger.addListener(ClientMessageType.HEARTBEAT, () => {
 
 // we want to inject this script into the parent page at the very top of the <head> tag
 const HEARTBEAT_SPLIT = '<head>';
+const HEARTBEAT_CONTENT_TYPE = 'text/html';
 
 // this is the script that will be injected, it issues a postMessage to the service worker
 // when the document becomes visible, and listens for a response within 1 second
@@ -56,23 +45,8 @@ const HEARTBEAT_SNIPPET = `<script>
     }
 </script>`;
 
-// this is the injector function that will be called for each response
-const injectSWHeartbeat: Injector = (headers, body) => {
-    // check if the response is html
-    if (headers.get('content-type')?.startsWith('text/html')) {
-        const [start, end] = body.toString().split(HEARTBEAT_SPLIT);
-        // check if the response contains the <head> tag
-        if (start && end) {
-            const parts = [start, HEARTBEAT_SPLIT, HEARTBEAT_SNIPPET, end];
-            const newBody = Buffer.from(parts.join(''));
-            // update the headers to have the correct content-length
-            headers.set('content-length', newBody.byteLength.toString());
-            return newBody;
-        }
-    }
-
-    // if the response is not html or does not contain the <head> tag, return the original body
-    return body;
-};
-
-export default new Injectors([injectSWHeartbeat]);
+export default new CompiledInjector(
+    HEARTBEAT_CONTENT_TYPE,
+    HEARTBEAT_SPLIT,
+    HEARTBEAT_SNIPPET
+);

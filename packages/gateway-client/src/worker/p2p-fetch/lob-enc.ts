@@ -28,6 +28,7 @@ export const encode = function <J = Record<string, unknown>>(
     body?: Body
 ) {
     // support different arg types
+    if (typeof body == 'string') body = Buffer.from(body, 'binary');
     if (head === null) head = false; // grrrr
     if (typeof head == 'number') head = Buffer.from(String.fromCharCode(head));
     if (typeof head == 'object') {
@@ -39,13 +40,16 @@ export const encode = function <J = Record<string, unknown>>(
         }
         // serialize raw json
         if (!Buffer.isBuffer(head)) {
+            head = {
+                ...head,
+                bodyLength: body ? body.length : 0,
+            };
             head = Buffer.from(JSON.stringify(head));
             // require real json object
             if (head.length < 7) head = false;
         }
     }
     head = (head as Buffer) || Buffer.alloc(0);
-    if (typeof body == 'string') body = Buffer.from(body, 'binary');
     body = body || Buffer.alloc(0);
     const len = Buffer.alloc(2);
     len.writeInt16BE(head.length, 0);

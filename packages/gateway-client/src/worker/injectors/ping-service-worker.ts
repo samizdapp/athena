@@ -45,26 +45,6 @@ const HEARTBEAT_SNIPPET = `<script>
     }
 </script>`;
 
-const makeInjector =
-    (content_type: string, split: string, snippet: string) =>
-    (headers: Headers, body: Buffer) => {
-        // check if the response is html
-        if (headers.get('content-type')?.startsWith(content_type)) {
-            const [start, end] = body.toString().split(split);
-            // check if the response contains the <head> tag
-            if (start && end) {
-                const parts = [start, split, snippet, end];
-                const newBody = Buffer.from(parts.join(''));
-                // update the headers to have the correct content-length
-                headers.set('content-length', newBody.byteLength.toString());
-                return newBody;
-            }
-        }
-
-        // if the response is not html or does not contain the <head> tag, return the original body
-        return body;
-    };
-
 export default new CompiledInjector(
     HEARTBEAT_CONTENT_TYPE,
     HEARTBEAT_SPLIT,

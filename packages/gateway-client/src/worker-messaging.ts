@@ -20,5 +20,4 @@ export enum ClientMessageType {
 
 export type Message<T extends WorkerMessageType | ClientMessageType> = {
     type: T;
-    ports?: MessagePort[];
 } & Record<string, unknown>;

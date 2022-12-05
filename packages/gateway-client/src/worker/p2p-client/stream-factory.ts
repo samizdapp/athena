@@ -2,7 +2,7 @@ import { Stream } from '@libp2p/interface-connection';
 import { PeerId } from '@libp2p/interface-peer-id';
 
 import type { P2pClient } from '.';
-import { ServerPeerStatus, WorkerMessageType } from '../../worker-messaging';
+import { ServerPeerStatus } from '../../worker-messaging';
 import { logger } from '../logging';
 import status from '../status';
 import {

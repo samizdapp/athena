@@ -15,13 +15,16 @@ class Deferred<T> {
     }
 }
 
-declare type Callback = (err?: Error) => void;
-
 export class RawStream {
     protected eventTarget = new EventTarget();
     protected log = logger.getLogger('worker/p2p-client/streams');
     private writeDeferred = new Deferred<Buffer | null>();
     private source: AsyncIterator<Buffer> | null = null;
+
+    constructor(private readonly libp2pStream: Stream) {
+        this.libp2pStream.sink(this.sink());
+        this.source = this._source();
+    }
 
     get isOpen(): boolean {
         return this.libp2pStream.stat.timeline.close === undefined;
@@ -29,11 +32,6 @@ export class RawStream {
 
     get protocol(): string | undefined {
         return this.libp2pStream.stat.protocol;
-    }
-
-    constructor(private readonly libp2pStream: Stream) {
-        this.libp2pStream.sink(this.sink());
-        this.source = this._source();
     }
 
     public async read(): Promise<Buffer | null> {

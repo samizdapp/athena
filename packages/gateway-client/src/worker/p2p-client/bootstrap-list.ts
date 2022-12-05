@@ -6,8 +6,6 @@ import { peerIdFromString } from '@libp2p/peer-id';
 import { WebSockets } from '@libp2p/websockets';
 import { P2P } from '@multiformats/mafmt';
 import { multiaddr, Multiaddr } from '@multiformats/multiaddr';
-import { Buffer } from 'buffer';
-import { pipe } from 'it-pipe';
 import localforage from 'localforage';
 
 import type { P2pClient } from '.';

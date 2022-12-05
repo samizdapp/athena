@@ -13,7 +13,7 @@ type NativeMessageHandler = (ev: ExtendableMessageEvent) => void;
 class Messenger {
     private eventTarget = new EventTarget();
     private listeners: Map<MessageHandler, EventListener> = new Map();
-    private nativeListeners: Set<NativeMessageHandler> = new Set();
+    private nativeHandlers: Set<NativeMessageHandler> = new Set();
     private log = logger.getLogger('worker/messenger');
 
     init() {
@@ -23,15 +23,19 @@ class Messenger {
             this.eventTarget.dispatchEvent(
                 new CustomEvent(msg.type, { detail: msg })
             );
+
+            for (const handler of this.nativeHandlers) {
+                handler(event);
+            }
         });
     }
 
     addNativeHandler(handler: NativeMessageHandler) {
-        this.nativeListeners.add(handler);
+        this.nativeHandlers.add(handler);
     }
 
     removeNativeHandler(handler: NativeMessageHandler) {
-        this.nativeListeners.delete(handler);
+        this.nativeHandlers.delete(handler);
     }
 
     addListener<K extends ClientMessageType>(type: K, handler: MessageHandler) {

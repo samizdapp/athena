@@ -35,7 +35,7 @@ export class P2pClient {
     private eventTarget = new EventTarget();
 
     private serverPeer?: PeerId;
-    private heartbeat?: HeartbeatStream;
+    private _heartbeat?: HeartbeatStream;
     public node?: Libp2p;
     private _connectionStatus: ServerPeerStatus = ServerPeerStatus.OFFLINE;
 
@@ -345,7 +345,7 @@ export class P2pClient {
                             .tagPeer(connection.remotePeer, KEEP_ALIVE)
                             .catch(_ => null);
 
-                        this.heartbeat =
+                        this._heartbeat =
                             await this.streamFactory.getHeartbeatStream();
                     } catch (e) {
                         // ignore tagging errors

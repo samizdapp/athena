@@ -20,7 +20,6 @@ declare type Callback = (err?: Error) => void;
 export class RawStream {
     protected eventTarget = new EventTarget();
     protected log = logger.getLogger('worker/p2p-client/streams');
-    private readDeferred = new Deferred<Buffer | null>();
     private writeDeferred = new Deferred<Buffer | null>();
     private source: AsyncIterator<Buffer> | null = null;
 
@@ -65,6 +64,7 @@ export class RawStream {
 
     private async *_source() {
         for await (const data of this.libp2pStream.source) {
+            this.log.trace('source', data);
             yield Buffer.from(data.subarray());
         }
 
@@ -74,7 +74,6 @@ export class RawStream {
 
     public close() {
         this.libp2pStream.close();
-        this.readDeferred.resolve(null);
         this.writeDeferred.resolve(null);
     }
 }
@@ -140,7 +139,7 @@ export class LobStream extends RawStream {
             headLength = 0,
             totalLength = 0;
 
-        while ((chunk = await this.read()) !== null) {
+        while (this.isOpen && (chunk = await this.read()) !== null) {
             this.log.trace('inbox', chunk);
             chunks.push(chunk);
 
@@ -286,9 +285,8 @@ export class WebsocketStream extends LobStream {
 
     private startSending() {
         for (const [type, port] of Object.entries(this.portMap)) {
-            port.addEventListener(
-                'message',
-                this.makePortMessageHandler(type as WebsocketStreamMessageType)
+            port.onmessage = this.makePortMessageHandler(
+                type as WebsocketStreamMessageType
             );
         }
     }
@@ -299,6 +297,8 @@ export class WebsocketStream extends LobStream {
         while (this.isOpen && (packet = await this.receive()) !== null) {
             this.dispatch(packet);
         }
+
+        this.log.debug('websocket stream stopped receiving data');
 
         this.dispatchStatus(
             WebsocketStreamStatus.CLOSED,
@@ -326,6 +326,7 @@ export class WebsocketStream extends LobStream {
     }
 
     private dispatch(packet: Packet): void {
+        this.log.debug('dispatch', packet.json.type);
         this.getClientPort(
             packet.json.type as WebsocketStreamMessageType
         ).postMessage(packet.body, [packet.body.buffer]);

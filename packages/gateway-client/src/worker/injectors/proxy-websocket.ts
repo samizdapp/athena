@@ -35,7 +35,7 @@ function makeSamizdappWebSocket(url, protocols) {
     }
     ws._statusPort.onmessage = (e) => {
         const {status, detail} = JSON.parse(new TextDecoder('ascii').decode(e.data));
-        if (error) {
+        if (status === '${WebsocketStreamStatus.ERROR}') {
             Object.defineProperty(ws, 'readyState', {
                 value: window.nativeWebSocket.CLOSED,
                 writable: false,

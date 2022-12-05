@@ -1,3 +1,5 @@
+// TODO: Refactor service worker so that it can be updated over p2p
+
 // The workbox-precaching import includes a type definition for
 // <self dot __WB_MANIFEST>.
 // Import it even though we're not using any of the imports,

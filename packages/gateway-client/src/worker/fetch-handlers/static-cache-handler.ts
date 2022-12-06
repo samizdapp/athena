@@ -34,6 +34,11 @@ export const staticCacheHandler: Handler = (request, respondWith) => {
         return;
     }
 
+    // don't cache if we were given a header telling us not to
+    if (request.headers.get('X-Smz-Worker-Cache') === 'no-cache') {
+        return;
+    }
+
     // respond with asset from either cache or fetch
     respondWith(
         caches.open('pwa-static-cache').then(cache => {

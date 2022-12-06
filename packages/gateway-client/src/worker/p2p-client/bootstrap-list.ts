@@ -364,7 +364,7 @@ export class BootstrapList extends Bootstrap {
         // server id from our box)
         const addedBootstrap = await this.addAddress(
             newBootstrapAddress ?? '',
-            { overrideServerId: true }
+            { overrideServerId: true, statsTimeout: 3000 }
         );
         // if it was added successfully
         if (addedBootstrap) {
@@ -394,7 +394,10 @@ export class BootstrapList extends Bootstrap {
         // now that we've added all of our addresses,
         // give our slower addresses another chance to be seen using the
         // default timeout, but don't wait for them
-        this.refreshStats();
+        this.refreshStats().then(() => {
+            // update our cache
+            this.dumpCache();
+        });
 
         // log list
         const addressList = this.addressList.map(it => it.address);

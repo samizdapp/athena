@@ -364,7 +364,7 @@ export class BootstrapList extends Bootstrap {
         // server id from our box)
         const addedBootstrap = await this.addAddress(
             newBootstrapAddress ?? '',
-            { overrideServerId: true }
+            { overrideServerId: true, statsTimeout: 3000 }
         );
         // if it was added successfully
         if (addedBootstrap) {

@@ -3,9 +3,90 @@
 // Import it even though we're not using any of the imports,
 import type * as _ from 'workbox-precaching';
 
-declare const self: {
-    createProxy: () => typeof self;
-} & ServiceWorkerGlobalScope;
+declare const self: ServiceWorkerGlobalScope;
+
+type LogKey = 'trace' | 'debug' | 'info' | 'log' | 'warn' | 'error';
+const logKeys: LogKey[] = ['error', 'warn', 'log', 'info', 'debug', 'trace'];
+const logger = Object.fromEntries(
+    logKeys.map(key => [
+        key,
+        (...args: unknown[]) => {
+            console[key]('[ROOT WORKER]', ...args);
+        },
+    ])
+) as Record<LogKey, (...args: unknown[]) => void>;
+
+logger.info('Executing root worker...');
+
+class Deferred<T> {
+    promise: Promise<T>;
+    resolve!: (value: T | Promise<T>) => void;
+    reject!: (reason?: unknown) => void;
+
+    constructor() {
+        this.promise = new Promise((resolve, reject) => {
+            this.resolve = resolve;
+            this.reject = reject;
+        });
+    }
+}
+
+const appWorkerUrl = 'worker-app.js';
+const appExecuted = new Deferred<string>();
+
+const openCache = () => {
+    return caches.open('/smz/worker/root');
+};
+
+const fetchWorkerUrl = () => {
+    return fetch(
+        new Request(appWorkerUrl, {
+            headers: {
+                'X-Smz-Worker-Cache': 'no-cache',
+            },
+        })
+    );
+};
+
+const fetchWorkerScript = async () => {
+    const cache = await openCache();
+    // Go to the cache first
+    let response = await cache.match(appWorkerUrl);
+    // if we didn't find a cached response
+    if (!response) {
+        logger.info('Cache hit miss, fetching app worker at: ', appWorkerUrl);
+        // Hit the network
+        response = await fetchWorkerUrl();
+        // Add the network response to the cache for later visits
+        cache.put(appWorkerUrl, response.clone());
+    }
+    // by now, we should have a response
+    logger.info('Fetched app worker at: ', appWorkerUrl);
+    // return the text
+    const text = await response.text();
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    return text;
+};
+
+const updateWorkerScript = async () => {
+    // wait for our app worker to be executed
+    const executedScript = await appExecuted.promise;
+    // by now, our fetch method should have been overridden
+    // use our overridden fetch method to fetch a new app worker script via our
+    // existing app worker
+    const response = await fetchWorkerUrl();
+    const responseToCache = response.clone();
+    const text = await response.text();
+    // if the scripts have changed
+    if (text !== executedScript) {
+        // update the cache
+        const cache = await openCache();
+        await cache.put(appWorkerUrl, responseToCache);
+        // the next time this root worker is executed,
+        // it will load the updated version of our app worker
+        logger.info(`Updated app worker at: ${appWorkerUrl}`);
+    }
+};
 
 /*
  * In JavaScript, many events can't be re-dispatched, so I get to implement my
@@ -62,14 +143,19 @@ class EventTargetImpl implements EventTarget {
         return true;
     }
 }
-
+// create an event target for delegating events from app to root worker
 const eventDelegate = new EventTargetImpl();
 
+// we override these methods so that our app worker can use them
 const selfAddEventListener = self.addEventListener.bind(self);
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const selfRemoveEventListener = self.removeEventListener.bind(self);
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const selfSkipWaiting = self.skipWaiting.bind(self);
+
+// our app worker will override these methods
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const selfFetch = self.fetch.bind(self);
 
 Object.assign(self, {
     addEventListener: (
@@ -92,18 +178,19 @@ Object.assign(self, {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const WB_MANIFEST = self.__WB_MANIFEST;
 
-const appExecuted = (async () => {
-    const response = await fetch('worker-app.js');
-    const text = await response.text();
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-
-    // eslint-disable-next-line no-new-func
-    const appFn = new Function(`
-        //# sourceURL=/smz/pwa/
-        ${text}
-    `);
-    appFn();
-})();
+// ensure non-responding fetch event handlers are added before the
+// termination of the fetch event chain
+selfAddEventListener('fetch', async event => {
+    // update our worker on page navigation
+    if (event.request.mode === 'navigate') {
+        // use a timeout so that hopefully this request will appear in the
+        // devtools (i.e. wait until the page loads enough for devtools to
+        // start logging requests)
+        setTimeout(() => {
+            updateWorkerScript();
+        }, 1000);
+    }
+});
 
 [
     // ServiceWorkerGlobalScope
@@ -132,3 +219,20 @@ const appExecuted = (async () => {
         }
     });
 });
+
+appExecuted.resolve(
+    (async () => {
+        const script = await fetchWorkerScript();
+        logger.info('Executing app worker script...');
+        // eslint-disable-next-line no-new-func
+        const appFn = new Function(`
+            //# sourceURL=/smz/pwa/
+            ${script}
+        `);
+        appFn();
+        logger.info('App worker script executed.');
+        return script;
+    })()
+);
+
+logger.info('Root worker executed.');

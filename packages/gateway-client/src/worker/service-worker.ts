@@ -184,12 +184,22 @@ appExecuted.resolve(
     (async () => {
         const script = await fetchWorkerScript();
         logger.info('Executing app worker script...');
-        // eslint-disable-next-line no-new-func
-        const appFn = new Function(`
-            //# sourceURL=/smz/pwa/
-            ${script}
-        `);
-        appFn();
+
+        /*
+         * Using the Function() constructor resulted in the line offsets for
+         * source maps being off (due to the fact that the constructor adds a
+         * minimum of two extra lines of code to the source).
+         *
+         * Without being able to find a way to offset this somehow (in webpack
+         * or some other way), we'll instead use an indirect eval. This should
+         * avoid a performance hit, and we weren't currently relying on the
+         * function's isolated scope.
+         */
+
+        // eslint-disable-next-line no-eval
+        eval?.(`${script}
+        //# sourceURL=/smz/pwa/worker-app.js`);
+
         logger.info('App worker script executed.');
         return script;
     })()

@@ -214,7 +214,7 @@ export class P2pRequest {
     ) {}
 
     private async loopAttempts(
-        responseTimeout = 5000,
+        responseTimeout = 60000,
         counter = 1
     ): Promise<void> {
         this.log.debug(

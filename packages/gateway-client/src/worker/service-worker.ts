@@ -18,21 +18,7 @@ const logger = Object.fromEntries(
 
 logger.info('Executing root worker...');
 
-class Deferred<T> {
-    promise: Promise<T>;
-    resolve!: (value: T | Promise<T>) => void;
-    reject!: (reason?: unknown) => void;
-
-    constructor() {
-        this.promise = new Promise((resolve, reject) => {
-            this.resolve = resolve;
-            this.reject = reject;
-        });
-    }
-}
-
 const appWorkerUrl = 'worker-app.js';
-const appExecuted = new Deferred<string>();
 
 const openCache = () => {
     return caches.open('/smz/worker/root');
@@ -180,29 +166,27 @@ const WB_MANIFEST = self.__WB_MANIFEST;
     });
 });
 
-appExecuted.resolve(
-    (async () => {
-        const script = await fetchWorkerScript();
-        logger.info('Executing app worker script...');
+const appExecuted = (async () => {
+    const script = await fetchWorkerScript();
+    logger.info('Executing app worker script...');
 
-        /*
-         * Using the Function() constructor resulted in the line offsets for
-         * source maps being off (due to the fact that the constructor adds a
-         * minimum of two extra lines of code to the source).
-         *
-         * Without being able to find a way to offset this somehow (in webpack
-         * or some other way), we'll instead use an indirect eval. This should
-         * avoid a performance hit, and we weren't currently relying on the
-         * function's isolated scope.
-         */
+    /*
+     * Using the Function() constructor resulted in the line offsets for
+     * source maps being off (due to the fact that the constructor adds a
+     * minimum of two extra lines of code to the source).
+     *
+     * Without being able to find a way to offset this somehow (in webpack
+     * or some other way), we'll instead use an indirect eval. This should
+     * avoid a performance hit, and we weren't currently relying on the
+     * function's isolated scope.
+     */
 
-        // eslint-disable-next-line no-eval
-        eval?.(`${script}
-        //# sourceURL=/smz/pwa/worker-app.js`);
+    // eslint-disable-next-line no-eval
+    eval?.(`${script}
+    //# sourceURL=/smz/pwa/worker-app.js`);
 
-        logger.info('App worker script executed.');
-        return script;
-    })()
-);
+    logger.info('App worker script executed.');
+    return script;
+})();
 
 logger.info('Root worker executed.');

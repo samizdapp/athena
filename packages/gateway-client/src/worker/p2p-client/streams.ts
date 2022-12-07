@@ -18,7 +18,8 @@ class Deferred<T> {
 export class RawStream {
     protected eventTarget = new EventTarget();
     protected log = logger.getLogger('worker/p2p-client/streams');
-    private writeDeferred = new Deferred<Buffer | null>();
+    private writeBuffer: Buffer[] = [];
+    private writeDeferred = new Deferred<null>();
     private source: AsyncIterator<Buffer> | null = null;
 
     constructor(private readonly libp2pStream: Stream) {
@@ -47,20 +48,23 @@ export class RawStream {
     }
 
     private async *sink() {
-        let data = null;
-        while (
-            this.isOpen &&
-            (data = await this.writeDeferred.promise) != null
-        ) {
-            this.log.trace('sink', data);
-            yield data;
+        while (this.isOpen) {
+            let next;
+            while ((next = this.writeBuffer.shift())) {
+                this.log.trace('sink', next);
+                yield next;
+            }
+            await this.writeDeferred.promise;
+            this.writeDeferred = new Deferred<null>();
         }
     }
 
     private _write(data: Buffer | null) {
         this.log.trace('_write', data);
-        this.writeDeferred.resolve(data);
-        this.writeDeferred = new Deferred<Buffer | null>();
+        if (data) {
+            this.writeBuffer.push(data);
+        }
+        this.writeDeferred.resolve(null);
     }
 
     private async *_source() {

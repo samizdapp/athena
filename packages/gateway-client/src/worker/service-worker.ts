@@ -39,13 +39,7 @@ const openCache = () => {
 };
 
 const fetchWorkerUrl = () => {
-    return fetch(
-        new Request(appWorkerUrl, {
-            headers: {
-                'X-Smz-Worker-Cache': 'no-cache',
-            },
-        })
-    );
+    return fetch(new Request(appWorkerUrl));
 };
 
 const fetchWorkerScript = async () => {
@@ -66,26 +60,6 @@ const fetchWorkerScript = async () => {
     const text = await response.text();
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     return text;
-};
-
-const updateWorkerScript = async () => {
-    // wait for our app worker to be executed
-    const executedScript = await appExecuted.promise;
-    // by now, our fetch method should have been overridden
-    // use our overridden fetch method to fetch a new app worker script via our
-    // existing app worker
-    const response = await fetchWorkerUrl();
-    const responseToCache = response.clone();
-    const text = await response.text();
-    // if the scripts have changed
-    if (text !== executedScript) {
-        // update the cache
-        const cache = await openCache();
-        await cache.put(appWorkerUrl, responseToCache);
-        // the next time this root worker is executed,
-        // it will load the updated version of our app worker
-        logger.info(`Updated app worker at: ${appWorkerUrl}`);
-    }
 };
 
 /*
@@ -177,20 +151,6 @@ Object.assign(self, {
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const WB_MANIFEST = self.__WB_MANIFEST;
-
-// ensure non-responding fetch event handlers are added before the
-// termination of the fetch event chain
-selfAddEventListener('fetch', async event => {
-    // update our worker on page navigation
-    if (event.request.mode === 'navigate') {
-        // use a timeout so that hopefully this request will appear in the
-        // devtools (i.e. wait until the page loads enough for devtools to
-        // start logging requests)
-        setTimeout(() => {
-            updateWorkerScript();
-        }, 1000);
-    }
-});
 
 [
     // ServiceWorkerGlobalScope

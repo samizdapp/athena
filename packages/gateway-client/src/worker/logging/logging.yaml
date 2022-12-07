@@ -3,4 +3,6 @@ loggers:
   worker/p2p/libp2p: ERROR
   worker/p2p/bootstrap: DEBUG
   worker/p2p/client: DEBUG
-  worker/p2p-client/streams: DEBUG
+  worker/p2p-client/streams: TRACE
+  worker/transjectors/base-path: TRACE
+  worker/p2p-fetch/fetch-request: TRACE

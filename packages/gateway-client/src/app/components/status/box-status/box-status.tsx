@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { ArcherContainer, ArcherElement } from 'react-archer';
 import styled from 'styled-components';
 
-import { useSelectStatusLogsByService } from '../../redux/status-log/statusLog.api';
+import { useSelectStatusLogsByService } from '../../../redux/status-log/statusLog.api';
 import Service from './service';
 import ServiceDetails from './service-details';
 

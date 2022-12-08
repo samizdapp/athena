@@ -9,6 +9,10 @@ COPY packages/gateway-client packages/gateway-client
 COPY packages/shared/api packages/shared/api
 COPY packages/shared/service-worker packages/shared/service-worker
 
+ARG NX_BUILD_NUMBER
+ARG NX_BUILD_COMMIT
+ARG NX_BUILD_BRANCH
+
 RUN npm run build gateway-client
 
 

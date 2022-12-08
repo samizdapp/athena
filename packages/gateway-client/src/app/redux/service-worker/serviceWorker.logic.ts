@@ -29,6 +29,9 @@ export class ServiceWorkerLogic {
         LOADED_RELAYS: (msg, dispatch) => {
             dispatch(setRelayAddresses(msg.relays as string[]));
         },
+        VERSION: (msg, _dispatch) => {
+            console.log('Received worker version: ', msg.version);
+        },
         HEARTBEAT: (_msg, _dispatch) => {
             //noop
         },

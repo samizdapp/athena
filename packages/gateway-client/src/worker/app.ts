@@ -1,7 +1,7 @@
 // The workbox-precaching import includes a type definition for
 // <self dot __WB_MANIFEST>.
 // Import it even though we're not using any of the imports,
-import * as workboxPrecaching from 'workbox-precaching';
+import type * as _ from 'workbox-precaching';
 
 import bootstrap from './bootstrap';
 import {
@@ -16,9 +16,7 @@ import injectors, {
     pingServiceWorkerInjector,
 } from './injectors';
 import { logger } from './logging';
-
-// Mark the workbox-precaching import as being used with this line:
-const _ = workboxPrecaching;
+import './version';
 
 declare const self: ServiceWorkerGlobalScope;
 

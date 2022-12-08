@@ -2,8 +2,25 @@
 // <self dot __WB_MANIFEST>.
 // Import it even though we're not using any of the imports,
 import type * as _ from 'workbox-precaching';
+import type { WorkerVersionManifest } from '../worker-messaging';
 
-declare const self: ServiceWorkerGlobalScope;
+declare const self: {
+    version: WorkerVersionManifest;
+} & ServiceWorkerGlobalScope;
+
+// if version not initialized
+if (!self.version) {
+    self.version = {
+        root: {},
+    };
+}
+
+self.version.root = {
+    version: '0.1.0',
+    build: process.env.NX_BUILD_NUMBER,
+    branch: process.env.NX_BUILD_BRANCH,
+    commit: process.env.NX_BUILD_COMMIT,
+};
 
 type LogKey = 'trace' | 'debug' | 'info' | 'log' | 'warn' | 'error';
 const logKeys: LogKey[] = ['error', 'warn', 'log', 'info', 'debug', 'trace'];

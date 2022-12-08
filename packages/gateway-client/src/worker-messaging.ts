@@ -1,3 +1,15 @@
+export type WorkerVersionManifest = Partial<{
+    root: WorkerVersion;
+    app: WorkerVersion;
+}>;
+
+export type WorkerVersion = Partial<{
+    version: string;
+    commit: string;
+    build: string;
+    branch: string;
+}>;
+
 export enum ServerPeerStatus {
     BOOTSTRAPPED = 'BOOTSTRAPPED',
     CONNECTING = 'CONNECTING',
@@ -8,6 +20,7 @@ export enum ServerPeerStatus {
 export enum WorkerMessageType {
     SERVER_PEER_STATUS = 'SERVER_PEER_STATUS',
     LOADED_RELAYS = 'LOADED_RELAYS',
+    VERSION = 'VERSION',
     HEARTBEAT = 'HEARTBEAT',
 }
 

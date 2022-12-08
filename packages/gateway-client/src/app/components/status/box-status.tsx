@@ -262,7 +262,7 @@ const StyledStatus = styled.div`
 /* eslint-disable-next-line */
 export interface StatusProps {}
 
-export function Status(_props: StatusProps) {
+export const BoxStatus = (_props: StatusProps) => {
     const { data: allLogs } = useSelectStatusLogsByService({
         pollingInterval: 10000,
     });
@@ -398,6 +398,6 @@ export function Status(_props: StatusProps) {
             />
         </StyledStatus>
     );
-}
+};
 
-export default Status;
+export default BoxStatus;

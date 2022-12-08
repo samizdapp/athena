@@ -2,7 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import styled from 'styled-components';
 
 import Home from './components/home/home';
-import Status from './components/status/status';
+import Status from './components/status/box-status';
 
 const StyledApp = styled.div`
     overflow: hidden;

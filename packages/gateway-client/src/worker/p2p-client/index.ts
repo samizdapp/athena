@@ -411,6 +411,13 @@ export class P2pClient {
         return this.streamFactory.getRequestStream();
     }
 
+    public async getNativeRequestStream() {
+        if (!this.streamFactory) {
+            throw new Error('Stream factory not initialized');
+        }
+        return this.streamFactory.getNativeRequestStream();
+    }
+
     private dispatchEvent<T>(type: string, detail?: T) {
         this.eventTarget.dispatchEvent(new CustomEvent(type, { detail }));
     }

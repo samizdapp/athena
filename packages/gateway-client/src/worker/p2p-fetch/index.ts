@@ -13,9 +13,13 @@ const p2pFetch = async (
     const request = new P2pFetchRequest(p2pClient, givenReqObj, givenReqInit);
 
     // apply filtering to the request
-    const url = new URL(request.reqObj.url);
-    if (process.env.NX_LOCAL === 'true' && isBootstrapAppUrl(url)) {
-        return nativeFetch(givenReqObj, givenReqInit);
+    try {
+        const url = new URL(givenReqObj as unknown as string);
+        if (process.env.NX_LOCAL === 'true' && isBootstrapAppUrl(url)) {
+            return nativeFetch(givenReqObj, givenReqInit);
+        }
+    } catch (e) {
+        // ignore
     }
 
     return request.execute();

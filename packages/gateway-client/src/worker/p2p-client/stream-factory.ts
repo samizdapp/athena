@@ -9,8 +9,9 @@ import {
     StreamConstructor,
     RawStream,
     WebsocketStream,
-    PooledLobStream,
+    StreamPool,
     RequestStream,
+    NativeRequestStream,
     SamizdappStream,
     HeartbeatStream,
 } from './streams';
@@ -159,16 +160,9 @@ export class StreamFactory {
         ports: MessagePort[] = []
     ): Promise<SamizdappStream> {
         let stream = null;
-        // if our constructor is a subclass of PooledLobStream, try to get it
-        // from the pool
-        if (Constructor.prototype instanceof PooledLobStream) {
-            stream = PooledLobStream.getFromPool(
-                protocol,
-                Constructor as unknown as typeof PooledLobStream
-            );
-            if (stream) {
-                return stream;
-            }
+        stream = StreamPool.getFromPool(protocol, Constructor);
+        if (stream) {
+            return stream;
         }
 
         // either it's not a pooled stream, or the pool didn't have one
@@ -186,6 +180,16 @@ export class StreamFactory {
             protocol,
             RequestStream
         ) as Promise<RequestStream>;
+    }
+
+    public async getNativeRequestStream(
+        protocol = '/samizdapp-proxy/2.0.0'
+    ): Promise<NativeRequestStream> {
+        this.log.debug('get request stream');
+        return this.getStream(
+            protocol,
+            NativeRequestStream
+        ) as Promise<NativeRequestStream>;
     }
 
     public async getWebsocketStream(

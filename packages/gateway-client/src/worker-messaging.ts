@@ -16,6 +16,7 @@ export enum ClientMessageType {
     OPENED = 'OPENED',
     HEARTBEAT = 'HEARTBEAT',
     WEBSOCKET = 'WEBSOCKET',
+    UPDATE_WORKER = 'UPDATE_WORKER',
 }
 
 export type Message<T extends WorkerMessageType | ClientMessageType> = {

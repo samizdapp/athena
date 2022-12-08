@@ -10,6 +10,7 @@ import {
     staticCacheHandler,
 } from './fetch-handlers';
 import fetchHandlers from './fetch-handlers/fetch-handlers';
+import updateWorkerHandler from './fetch-handlers/update-worker-handler';
 import injectors, {
     proxyWebSocketInjector,
     pingServiceWorkerInjector,
@@ -40,6 +41,7 @@ const WB_MANIFEST = self.__WB_MANIFEST;
 log.trace(WB_MANIFEST);
 
 fetchHandlers
+    .use(updateWorkerHandler)
     .use(staticCacheHandler)
     .use(pleromaTimelineHandler)
     .use(passThroughHandler);

@@ -3,9 +3,50 @@
 // Import it even though we're not using any of the imports,
 import type * as _ from 'workbox-precaching';
 
-declare const self: {
-    createProxy: () => typeof self;
-} & ServiceWorkerGlobalScope;
+declare const self: ServiceWorkerGlobalScope;
+
+type LogKey = 'trace' | 'debug' | 'info' | 'log' | 'warn' | 'error';
+const logKeys: LogKey[] = ['error', 'warn', 'log', 'info', 'debug', 'trace'];
+const logger = Object.fromEntries(
+    logKeys.map(key => [
+        key,
+        (...args: unknown[]) => {
+            console[key]('[ROOT WORKER]', ...args);
+        },
+    ])
+) as Record<LogKey, (...args: unknown[]) => void>;
+
+logger.info('Executing root worker...');
+
+const appWorkerUrl = 'worker-app.js';
+
+const openCache = () => {
+    return caches.open('/smz/worker/root');
+};
+
+const fetchWorkerUrl = () => {
+    return fetch(new Request(appWorkerUrl));
+};
+
+const fetchWorkerScript = async () => {
+    const cache = await openCache();
+    // Go to the cache first
+    let response = await cache.match(appWorkerUrl);
+    // if we didn't find a cached response
+    if (!response) {
+        logger.info('Cache hit miss, fetching app worker at: ', appWorkerUrl);
+        // Hit the network
+        response = await fetchWorkerUrl();
+        // Add the network response to the cache for later visits
+        cache.put(appWorkerUrl, response.clone());
+    }
+    // by now, we should have a response
+    logger.info('Fetched app worker at: ', appWorkerUrl);
+    // return the text
+    const text = await response.text();
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    return text;
+};
 
 /*
  * In JavaScript, many events can't be re-dispatched, so I get to implement my
@@ -62,14 +103,19 @@ class EventTargetImpl implements EventTarget {
         return true;
     }
 }
-
+// create an event target for delegating events from app to root worker
 const eventDelegate = new EventTargetImpl();
 
+// we override these methods so that our app worker can use them
 const selfAddEventListener = self.addEventListener.bind(self);
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const selfRemoveEventListener = self.removeEventListener.bind(self);
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const selfSkipWaiting = self.skipWaiting.bind(self);
+
+// our app worker will override these methods
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const selfFetch = self.fetch.bind(self);
 
 Object.assign(self, {
     addEventListener: (
@@ -91,19 +137,6 @@ Object.assign(self, {
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const WB_MANIFEST = self.__WB_MANIFEST;
-
-const appExecuted = (async () => {
-    const response = await fetch('worker-app.js');
-    const text = await response.text();
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-
-    // eslint-disable-next-line no-new-func
-    const appFn = new Function(`
-        //# sourceURL=/smz/pwa/
-        ${text}
-    `);
-    appFn();
-})();
 
 [
     // ServiceWorkerGlobalScope
@@ -132,3 +165,28 @@ const appExecuted = (async () => {
         }
     });
 });
+
+const appExecuted = (async () => {
+    const script = await fetchWorkerScript();
+    logger.info('Executing app worker script...');
+
+    /*
+     * Using the Function() constructor resulted in the line offsets for
+     * source maps being off (due to the fact that the constructor adds a
+     * minimum of two extra lines of code to the source).
+     *
+     * Without being able to find a way to offset this somehow (in webpack
+     * or some other way), we'll instead use an indirect eval. This should
+     * avoid a performance hit, and we weren't currently relying on the
+     * function's isolated scope.
+     */
+
+    // eslint-disable-next-line no-eval
+    eval?.(`${script}
+    //# sourceURL=/smz/pwa/worker-app.js`);
+
+    logger.info('App worker script executed.');
+    return script;
+})();
+
+logger.info('Root worker executed.');

@@ -1,6 +1,6 @@
 import 'whatwg-fetch';
 
-import { renderWithProviders } from '../../redux/testing';
+import { renderWithProviders } from '../../../redux/testing';
 import BoxStatus from './box-status';
 
 describe('Status', () => {

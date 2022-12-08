@@ -4,7 +4,7 @@ import { logger } from '../logging';
 import { P2pClient } from '../p2p-client';
 import { encode, Packet } from './lob-enc';
 import { P2pRequest } from './p2p-request';
-import transjectors from '../transjectors';
+import transformers from '../transformers';
 
 type PatchedBody = ReturnType<P2pFetchRequest['patchArgs']>['body'];
 type PatchedRequest = ReturnType<P2pFetchRequest['patchArgs']>['reqObj'];
@@ -71,7 +71,7 @@ export class P2pFetchRequest {
     private patchArgs(givenReqObj: Request, givenReqInit: RequestInit = {}) {
         // patch our request object
         this.givenReqObj = givenReqObj;
-        givenReqObj = transjectors.transform(givenReqObj);
+        givenReqObj = transformers.transformRequest(givenReqObj);
 
         // first extract our body from our request
         const body = Promise.resolve(
@@ -274,11 +274,11 @@ export class P2pFetchRequest {
         // else, we successfully decoded, hydrate our headers
         resp.json.res.headers = new Headers(resp.json.res.headers);
         // create a new response to return
-        const tbody = transjectors.inject(
-            resp.json.res.headers,
-            resp.body,
-            this.givenReqObj.url
-        );
+        const { body: tbody } = transformers.transformResponse({
+            headers: resp.json.res.headers,
+            body: resp.body,
+            url: this.givenReqObj.url,
+        });
         const response = new Response(tbody, resp.json.res);
         // this log line fills in for the lack of a network log in our DevTools
         this.log.info(`Request: ${this.requestId} - Response: `, response);

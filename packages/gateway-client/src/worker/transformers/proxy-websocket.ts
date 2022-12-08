@@ -1,4 +1,4 @@
-import { CompiledInjector } from './injectors';
+import { CompiledTransformer } from './transformers';
 import { WebsocketStreamStatus } from '../p2p-client/streams';
 import { ClientMessageType } from '../../worker-messaging';
 
@@ -98,7 +98,7 @@ window.WebSocket = SamizdappWebSocket;
 </script>
 `;
 
-export default new CompiledInjector(
+export default new CompiledTransformer(
     WEBSOCKET_CONTENT_TYPE,
     WEBSOCKET_SPLIT,
     WEBSOCKET_SNIPPET

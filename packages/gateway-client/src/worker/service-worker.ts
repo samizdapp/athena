@@ -11,10 +11,10 @@ import {
 } from './fetch-handlers';
 import fetchHandlers from './fetch-handlers/fetch-handlers';
 import injectors, {
-    proxyWebSocketInjector,
-    pingServiceWorkerInjector,
-    basePathInjector,
-} from './transjectors';
+    proxyWebSocketTransformer,
+    pingServiceWorkerTransformer,
+    basePathTransformer,
+} from './transformers';
 import { logger } from './logging';
 
 // Mark the workbox-precaching import as being used with this line:
@@ -46,9 +46,9 @@ fetchHandlers
     .use(passThroughHandler);
 
 injectors
-    .use(proxyWebSocketInjector)
-    .use(pingServiceWorkerInjector)
-    .use(basePathInjector);
+    .use(proxyWebSocketTransformer)
+    .use(pingServiceWorkerTransformer)
+    .use(basePathTransformer);
 
 bootstrap();
 

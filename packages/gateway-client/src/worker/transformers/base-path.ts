@@ -1,7 +1,11 @@
-import { AbstractTransjector, CompiledInjector } from './injectors';
+import {
+    AbstractTransformer,
+    CompiledTransformer,
+    SamizdappResponse,
+} from './transformers';
 import { logger } from '../logging';
 
-class BasePathTransjector extends AbstractTransjector {
+class BasePathTransformer extends AbstractTransformer {
     protected log = logger.getLogger('worker/transjectors/base-path');
     private readonly content_type = 'text/html';
     private readonly header = 'x-samizdapp-base-path';
@@ -51,7 +55,11 @@ class BasePathTransjector extends AbstractTransjector {
         ].includes(host);
     }
 
-    override inject(headers: Headers, body: Buffer, url: string): Buffer {
+    override transformResponse({
+        headers,
+        body,
+        url,
+    }: SamizdappResponse): SamizdappResponse {
         const contentType = headers.get('content-type');
         const targetHeaderRaw = headers.get(this.header);
         const [targetHeader, ...ports] = targetHeaderRaw?.split(',') || [];
@@ -78,19 +86,23 @@ class BasePathTransjector extends AbstractTransjector {
             // remove the first <base> tag in the body via regex
             const newBody = body.toString().replace(/<base[^>]*>/, '');
             // make a new compiled injector with the base path
-            const injector = new CompiledInjector(
+            const injector = new CompiledTransformer(
                 this.content_type,
                 '<head>',
-                `<base href="${url}">`
+                makeSnippet(targetHeader, url)
             );
 
             // inject the new base tag into the body
-            return injector.inject(headers, Buffer.from(newBody), url);
+            return injector.transformResponse({
+                headers,
+                body: Buffer.from(newBody),
+                url,
+            });
         }
-        return body;
+        return { url, body, headers };
     }
 
-    override transform(req: { duplex?: string } & Request): Request {
+    override transformRequest(req: { duplex?: string } & Request): Request {
         // get the host of the url and of the referrer
         const url = new URL(req.url);
         const hasSeenReferrer = this.hasSeenReferrer(req.referrer);
@@ -133,4 +145,77 @@ class BasePathTransjector extends AbstractTransjector {
     }
 }
 
-export default new BasePathTransjector();
+export default new BasePathTransformer();
+
+const makeSnippet = (basePath: string, url: string) => `
+<base href="${url}">
+<script>;
+const BASE_PATH = '${basePath}';
+
+function makeUpdateCallback(link) {
+    return () => {
+        const href = link.getAttribute('href');
+        console.log('checking link', href);
+        if (href && href.startsWith('http')) {
+            console.log('link is http');
+            const url = new URL(href);
+            console.log('url', url);
+            if (
+                url.host !== location.host &&
+                (url.hostname.endsWith('.localhost') ||
+                    ['localhost', '127.0.0.1', '::1', '0.0.0.0'].includes(
+                        url.hostname
+                    )) &&
+                !url.pathname.startsWith(BASE_PATH)
+            ) {
+                let basePath = BASE_PATH;
+                if (
+                    url.port &&
+                    !['80', '443', location.port].includes(url.port)
+                ) {
+                    console.log('adding port', url.port);
+                    basePath = \`\${basePath}/\${url.port}\`;
+                }
+
+                url.host = location.host;
+                url.pathname = \`\${basePath}\${url.pathname}\`;
+                console.log('new url', url);
+                link.setAttribute('href', url.toString());
+            }
+        } else if (href && href.startsWith('/') && !href.startsWith(BASE_PATH)) {
+            console.log('link is relative');
+            link.setAttribute('href', \`\${BASE_PATH}\${href}\`);
+        }
+    };
+}
+
+async function waitFor(timeout) {
+    return new Promise(resolve => setTimeout(resolve, timeout));
+}
+
+async function updateLinks() {
+    const linkSet = new Set();
+    let timeout = 1;
+    while (true) {
+        const links = Array.from(document.querySelectorAll('a'));
+        for (const link of links) {
+            if (linkSet.has(link)) {
+                continue;
+            }
+            linkSet.add(link);
+            const updateLink = makeUpdateCallback(link);
+            updateLink();
+            const observer = new MutationObserver(updateLink);
+            observer.observe(link, {
+                attributes: true,
+                attributeFilter: ['href'],
+            });
+        }
+
+        await waitFor(timeout);
+        timeout = Math.min(1000, timeout + 50);
+    }
+}
+updateLinks();
+</script>
+`;

@@ -51,6 +51,7 @@
     "regenerator-runtime": "0.13.7",
     "rxjs": "^7.0.0",
     "styled-components": "5.3.5",
+    "styled-container-query": "^1.3.5",
     "swr": "^1.3.0",
     "tslib": "^2.3.0"
   },
@@ -104,5 +105,12 @@
     "typescript": "~4.7.2",
     "whatwg-fetch": "^3.6.2",
     "workbox-webpack-plugin": "^6.5.4"
+  },
+  "overrides": {
+    "styled-container-query": {
+      "react": "18.2.0",
+      "react-dom": "18.2.0",
+      "styled-components": "5.3.5"
+    }
   }
 }

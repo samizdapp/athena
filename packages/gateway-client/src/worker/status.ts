@@ -2,8 +2,13 @@ import {
     ClientMessageType,
     ServerPeerStatus,
     WorkerMessageType,
+    WorkerVersionManifest,
 } from '../worker-messaging';
 import messenger from './messenger';
+
+declare const self: {
+    version: WorkerVersionManifest;
+} & ServiceWorkerGlobalScope;
 
 class Status {
     _serverPeer: ServerPeerStatus | null = null;
@@ -46,6 +51,10 @@ class Status {
         messenger.postMessage({
             type: WorkerMessageType.SERVER_PEER_STATUS,
             status: this.serverPeer,
+        });
+        messenger.postMessage({
+            type: WorkerMessageType.VERSION,
+            version: self.version,
         });
     }
 }

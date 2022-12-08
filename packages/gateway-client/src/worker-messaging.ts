@@ -20,6 +20,7 @@ export enum ServerPeerStatus {
 export enum WorkerMessageType {
     SERVER_PEER_STATUS = 'SERVER_PEER_STATUS',
     LOADED_RELAYS = 'LOADED_RELAYS',
+    VERSION = 'VERSION',
     HEARTBEAT = 'HEARTBEAT',
 }
 

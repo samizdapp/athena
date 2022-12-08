@@ -8,6 +8,7 @@ import { runMigrations } from './migrations';
 import { P2pClient } from './p2p-client';
 import { overrideFetch } from './p2p-fetch';
 import status from './status';
+import updateAppWorker from './update-app';
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -44,6 +45,10 @@ export default async () => {
 
     messenger.addListener(ClientMessageType.OPENED, () => {
         localforage.setItem('started', { started: true });
+    });
+
+    messenger.addListener(ClientMessageType.UPDATE_WORKER, () => {
+        updateAppWorker();
     });
 
     // init messenger

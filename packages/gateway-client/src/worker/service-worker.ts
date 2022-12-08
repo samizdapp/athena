@@ -11,9 +11,10 @@ import {
 } from './fetch-handlers';
 import fetchHandlers from './fetch-handlers/fetch-handlers';
 import injectors, {
-    proxyWebSocketInjector,
-    pingServiceWorkerInjector,
-} from './injectors';
+    proxyWebSocketTransformer,
+    pingServiceWorkerTransformer,
+    basePathTransformer,
+} from './transformers';
 import { logger } from './logging';
 
 // Mark the workbox-precaching import as being used with this line:
@@ -44,7 +45,10 @@ fetchHandlers
     .use(pleromaTimelineHandler)
     .use(passThroughHandler);
 
-injectors.use(proxyWebSocketInjector).use(pingServiceWorkerInjector);
+injectors
+    .use(proxyWebSocketTransformer)
+    .use(pingServiceWorkerTransformer)
+    .use(basePathTransformer);
 
 bootstrap();
 

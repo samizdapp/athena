@@ -1,8 +1,8 @@
-import { CompiledInjector } from './injectors';
+import { CompiledTransformer } from './transformers';
 import messenger from '../messenger';
 import { WorkerMessageType, ClientMessageType } from '../../worker-messaging';
 
-// HEARTBEAT Injector
+// HEARTBEAT Transformer
 
 // iOS service workers sporatically become unresponsive when the app is in the background
 // this injector injects a script into any html page that will check for responsiveness
@@ -45,7 +45,7 @@ const HEARTBEAT_SNIPPET = `<script>
     }
 </script>`;
 
-export default new CompiledInjector(
+export default new CompiledTransformer(
     HEARTBEAT_CONTENT_TYPE,
     HEARTBEAT_SPLIT,
     HEARTBEAT_SNIPPET

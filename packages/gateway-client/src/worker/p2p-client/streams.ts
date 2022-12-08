@@ -136,7 +136,7 @@ export class LobStream extends RawStream {
         let packet = null;
         while (this.isOpen && (packet = await this.outbox.promise) != null) {
             for (const chunk of this.packetToChunks(packet)) {
-                this.write(chunk);
+                await this.write(chunk);
             }
         }
         this.log.debug('outbox done');

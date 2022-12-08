@@ -11,10 +11,11 @@ import {
 } from './fetch-handlers';
 import fetchHandlers from './fetch-handlers/fetch-handlers';
 import updateWorkerHandler from './fetch-handlers/update-worker-handler';
-import injectors, {
-    proxyWebSocketInjector,
-    pingServiceWorkerInjector,
-} from './injectors';
+import transformers, {
+    proxyWebSocketTransformer,
+    pingServiceWorkerTransformer,
+    basePathTransformer,
+} from './transformers';
 import { logger } from './logging';
 import './version';
 
@@ -44,7 +45,10 @@ fetchHandlers
     .use(pleromaTimelineHandler)
     .use(passThroughHandler);
 
-injectors.use(proxyWebSocketInjector).use(pingServiceWorkerInjector);
+transformers
+    .use(proxyWebSocketTransformer)
+    .use(pingServiceWorkerTransformer)
+    .use(basePathTransformer);
 
 bootstrap();
 

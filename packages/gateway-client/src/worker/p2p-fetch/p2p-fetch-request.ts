@@ -4,7 +4,7 @@ import { logger } from '../logging';
 import { P2pClient } from '../p2p-client';
 import { encode, Packet } from './lob-enc';
 import { P2pRequest } from './p2p-request';
-import injectors from '../injectors';
+import transformers from '../transformers';
 
 type PatchedBody = ReturnType<P2pFetchRequest['patchArgs']>['body'];
 type PatchedRequest = ReturnType<P2pFetchRequest['patchArgs']>['reqObj'];
@@ -21,13 +21,15 @@ export class P2pFetchRequest {
     public reqObj: PatchedRequest;
     public reqInit: PatchedRequestInit;
 
+    private givenReqObj: Request;
+
     constructor(
         private p2pClient: P2pClient,
         givenReqObj: URL | RequestInfo,
         givenReqInit: RequestInit | undefined = {}
     ) {
-        // assert that we were given a request
-        givenReqObj = givenReqObj as Request;
+        // assert that we were given a request and store it
+        this.givenReqObj = givenReqObj = givenReqObj as Request;
         if (typeof givenReqObj.url != 'string') {
             throw new Error(
                 `Patched service worker \`fetch()\` method expects a full ` +
@@ -67,6 +69,10 @@ export class P2pFetchRequest {
     }
 
     private patchArgs(givenReqObj: Request, givenReqInit: RequestInit = {}) {
+        // patch our request object
+        this.givenReqObj = givenReqObj;
+        givenReqObj = transformers.transformRequest(givenReqObj);
+
         // first extract our body from our request
         const body = Promise.resolve(
             givenReqObj.body ??
@@ -106,7 +112,7 @@ export class P2pFetchRequest {
         reqObj: PatchedRequest,
         reqInit: PatchedRequestInit
     ) {
-        // resolve relative paths to localhost
+        // resolve relative paths to localhost, includine base path if needed
         const url = new URL(reqObj.url, 'http://localhost');
 
         // apply subdomain header
@@ -122,6 +128,7 @@ export class P2pFetchRequest {
             newUrl.host = 'localhost';
             newUrl.protocol = 'http:';
             newUrl.port = '80';
+            // update our request object
             reqObj.url = newUrl.toString();
         }
 
@@ -267,7 +274,11 @@ export class P2pFetchRequest {
         // else, we successfully decoded, hydrate our headers
         resp.json.res.headers = new Headers(resp.json.res.headers);
         // create a new response to return
-        const tbody = injectors.inject(resp.json.res.headers, resp.body);
+        const { body: tbody } = transformers.transformResponse({
+            headers: resp.json.res.headers,
+            body: resp.body,
+            url: this.givenReqObj.url,
+        });
         const response = new Response(tbody, resp.json.res);
         // this log line fills in for the lack of a network log in our DevTools
         this.log.info(`Request: ${this.requestId} - Response: `, response);

@@ -23,6 +23,4 @@ RUN mkdir -p dist/packages/networking-service
 COPY --from=build /usr/src/athena/dist/packages/networking-service dist/packages/networking-service
 RUN cd dist/packages/networking-service && npm install
 
-ENV YGGDRASIL_API_ROOT=tcp://localhost:2019
-
 CMD [ "/usr/local/bin/node", "dist/packages/networking-service/main.js"  ]

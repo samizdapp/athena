@@ -1,4 +1,5 @@
 import { Socket } from 'node:net';
+import config from './config';
 import { environment } from '../environments/environment';
 
 //eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -16,6 +17,7 @@ class Deferred {
         });
     }
 }
+
 
 const waitFor = (ms: number) => new Promise(resolve => setTimeout(() => resolve(null), ms));
 
@@ -76,7 +78,11 @@ type RPCResponse = {
     error?: string;
 };
 
-export class YggdrasilRPC {
+class RPCWorker {
+    static readonly poolSize = 10
+    static readonly available = new Set()
+    static readonly in_use = new Set()
+    static errorCount = 0
     private socket = new Socket();
     private inboxBuffer = Buffer.alloc(0);
     private inboxJSON = new Deferred();
@@ -86,8 +92,18 @@ export class YggdrasilRPC {
         this.initialize()
     }
 
+    static async error(){
+        this.errorCount++
+        if (this.errorCount > 2 * this.poolSize){
+            // 20 seconds of errors, trigger manual restart of yggdrasil
+            config.save(true)
+        }
+        await waitFor(20000 * this.poolSize)
+        this.errorCount--
+    }
+
     initialize() {
-        console.info('initializing yggdrasil rpc', environment.yggdrasil_admin_host, environment.yggdrasil_admin_port)
+        // console.info('initializing yggdrasil rpc', environment.yggdrasil_admin_host, environment.yggdrasil_admin_port)
         const socket = this.socket;
         let closed = false;
         this.socket.on('data', data => {
@@ -103,14 +119,16 @@ export class YggdrasilRPC {
                     }
                 },100)
             }
+
+            RPCWorker.error()
         });
         this.socket.on('connect', () => {
-            console.log('connected to yggdrasil rpc')
-            this._locked = false;
+            // console.log('connected to yggdrasil rpc')
+            this.unlock()
         })
         this.socket.on('close', () => {
             if (this.socket === socket){
-                console.log('yggdrasil rpc closed')
+                // console.log('yggdrasil rpc closed')
                 closed = true;
                 this.recover('socket closed')
             }
@@ -123,7 +141,7 @@ export class YggdrasilRPC {
 
     async recover(msg: string) {
         console.warn(msg)
-        this._locked = true;
+        this.lock()
         await waitFor(10000)
         this.socket = new Socket();
         this.inboxBuffer = Buffer.alloc(0);
@@ -142,10 +160,39 @@ export class YggdrasilRPC {
         }
     }
 
-    private async lock(){
+    
+    static async getFromPool(){
+        while (true){
+            if (RPCWorker.available.size > 0){
+                const worker = RPCWorker.available.values().next().value
+                RPCWorker.available.delete(worker)
+                RPCWorker.in_use.add(worker)
+                // console.log('got worker from pool', RPCWorker.in_use.size, RPCWorker.available.size)
+                return worker
+            }
+            if (RPCWorker.in_use.size < RPCWorker.poolSize){
+                const worker = new RPCWorker()
+                RPCWorker.in_use.add(worker)
+                // console.log('created worker', RPCWorker.in_use.size, RPCWorker.available.size)
+                return worker
+            }
+            await waitFor(100)
+        }
+    }
+
+    release(){
+        // console.log('releasing worker', RPCWorker.in_use.size, RPCWorker.available.size)
+        RPCWorker.in_use.delete(this)
+        RPCWorker.available.add(this)
+    }
+
+    private async ready(){
         while (this._locked){
             await waitFor(100)
         }
+    }
+
+    private async lock(){
         this._locked = true
     }
 
@@ -153,16 +200,25 @@ export class YggdrasilRPC {
         this._locked = false
     }
 
-    private async rpc(json: RPCRequest): Promise<RPCResponse| null> {
-        await this.lock();
+    async rpc(json: RPCRequest): Promise<RPCResponse> {
+        await this.ready()
+        // console.log('rpc', json)
         const data = Buffer.from(JSON.stringify(json) + '\n');
         this.inboxJSON = new Deferred();
         // console.log('rpc', json)
         this.socket.write(data);
-        const response = Promise.race([this.inboxJSON.promise, waitFor(5000)])
-        // console.log('rpc response', JSON.stringify(response,null, 4))
-        this.unlock();
-        return response;
+        const response = await Promise.race([this.inboxJSON.promise, waitFor(10000)])
+        // console.log('response', response)
+        return response
+    }
+}
+
+export class YggdrasilRPC {
+    private async rpc(json: RPCRequest): Promise<RPCResponse| null> {
+        const worker = await RPCWorker.getFromPool()
+        const response = await worker.rpc(json)
+        await worker.release()
+        return response
     }
 
     private transformRawNodeInfo(rawNodeInfo: getNodeInfoResponse): NodeInfo{

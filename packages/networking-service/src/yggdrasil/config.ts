@@ -1,22 +1,36 @@
 import { environment } from '../environments/environment'
-import { readFileSync, writeFile } from 'fs'
+import { readFileSync, readFile, writeFile } from 'fs'
 
 const waitFor = (ms: number) => new Promise(resolve => setTimeout(() => resolve(null), ms))
 
 export class YggdrasilConfig {
+    private saveDebounce = 60000
+    private saveTimeout?: NodeJS.Timeout
     private _locked = false
 
     constructor(
         private readonly json = JSON.parse(readFileSync(environment.yggdrasil_config, 'utf8'))
     ) {}
 
-    private save(){
-        console.log('saving yggdrasil config', this.json)
-        return new Promise<void>((resolve, reject) => {
-            writeFile(environment.yggdrasil_config, JSON.stringify(this.json, null, 4), (err) => {
-                if (err) reject(err)
-                else resolve()
-            })
+    save(force = false){
+        if (force) return this._save()
+        clearTimeout(this.saveTimeout)
+        this.saveTimeout = setTimeout(() => {
+            const json = JSON.stringify(this.json)
+            const oldContent = JSON.stringify(JSON.parse(readFileSync(environment.yggdrasil_config, 'utf8').trim()))
+            if (oldContent === json) return console.log('yggdrasil config unchanged, not saving')
+            console.log('yggdrasil config changed, saving')
+            console.log('old', oldContent)
+            console.log('new', json)
+            this._save()
+
+        }, this.saveDebounce)
+    }
+
+    private _save(){
+        writeFile(environment.yggdrasil_config, JSON.stringify(this.json, null, 4), (err) => {
+            if (err) console.warn(err)
+            else console.log('saved yggdrasil config', this.json)
         })
     }
 
@@ -41,7 +55,6 @@ export class YggdrasilConfig {
         if (existing.has(key)) return this.unlock();
         existing.add(key)
         this.json.AllowedPublicKeys = Array.from(existing)
-        await this.save()
         this.unlock()
     }
 
@@ -54,11 +67,19 @@ export class YggdrasilConfig {
         addr = addr.trim()
         const existing = new Set(this.json.Peers)
         if (existing.has(addr)) return this.unlock()
-        
+
         existing.add(addr)
         this.json.Peers = Array.from(existing)
-        await this.save()
         this.unlock()
+    }
+
+    private async read(){
+        return new Promise((resolve, reject) => {
+            readFile(environment.yggdrasil_config,'utf8', (err, data) => {
+                if (err) reject(err)
+                else resolve(data)
+            })
+        })
     }
 }
 

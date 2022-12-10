@@ -1,5 +1,5 @@
 import rpc from './rpc'
-import {readFileSync, writeFile, utimesSync, openSync, closeSync} from 'fs'
+import {readFileSync, readFile, writeFile, utimesSync, openSync, closeSync} from 'fs'
 import {environment} from '../environments/environment'
 
 const HOST_HEADER = `
@@ -21,6 +21,7 @@ try {
     const fd = openSync(environment.hostsfile, 'a');
     closeSync(fd);
 }
+
 
 type Key = string
 type Address = string
@@ -63,13 +64,12 @@ class YggdrasilDNS {
                     }, this.store)
     }
 
-    async consumeNodeInfo (key: Key, nodeInfo: NodeInfo): Promise<boolean>{
-        if (nodeInfo.samizdapp){
+    async consumeNodeInfo (key: Key, nodeInfo: NodeInfo | null): Promise<boolean>{
+        if (nodeInfo?.samizdapp){
             // TODO: this should perform a diff and only update the hosts file if there are changes
             // since we haven't implemented a way to chenge nodeInfo.samizdapp.groups yet, this is fine
             if (this.store.has(key)) return true;
             this.store.set(key, nodeInfo)
-            await this.save()
             return true;
         }
         return false;
@@ -96,6 +96,14 @@ class YggdrasilDNS {
         return this.store.keys()
     }
 
+    has(key: Key){
+        return this.store.has(key)
+    }
+
+    get(key: Key){
+        return this.store.get(key)
+    }
+
     async save(){
         const lines = [HOST_HEADER]
         for (const [key, nodeInfo] of this.store ){
@@ -109,6 +117,9 @@ class YggdrasilDNS {
             }
         }
         const content = lines.join('\n')
+        const oldContent = await this.read()
+        if (oldContent === content) return console.log('hosts file is up to date')
+        console.log('updating hosts file')
         return new Promise<void>(
             (resolve, reject) => 
                 writeFile(environment.hostsfile, content, (err) => {
@@ -116,7 +127,17 @@ class YggdrasilDNS {
                     resolve()
                 })
         )
+    }
 
+    private async read(){
+        const content = await new Promise<string>(
+            (resolve, reject) => 
+                readFile(environment.hostsfile, 'utf8', (err, data) => {
+                    if (err) return reject(err)
+                    resolve(data)
+                })
+        )
+        return content
     }
 }
 

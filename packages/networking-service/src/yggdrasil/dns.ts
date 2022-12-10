@@ -2,6 +2,16 @@ import rpc from './rpc'
 import {readFileSync, writeFile, utimesSync, openSync, closeSync} from 'fs'
 import {environment} from '../environments/environment'
 
+const HOST_HEADER = `
+127.0.0.1	localhost.localdomain		localhost
+
+# The following lines are desirable for IPv6 capable hosts
+::1     localhost ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+ff00::0 ip6-mcastprefix
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+`
 
 const time = new Date();
 
@@ -87,7 +97,7 @@ class YggdrasilDNS {
     }
 
     async save(){
-        const lines = []
+        const lines = [HOST_HEADER]
         for (const [key, nodeInfo] of this.store ){
             const address = nodeInfo.address
             const groups = nodeInfo.samizdapp?.groups || []

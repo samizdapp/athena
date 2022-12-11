@@ -13,6 +13,12 @@
         "tsConfig": "packages/networking-service/tsconfig.app.json",
         "assets": [
           "packages/networking-service/src/assets"
+        ],
+        "fileReplacements": [
+          {
+            "replace": "packages/shared/libp2p/src/index.ts",
+            "with": "dist/packages/shared/libp2p/main.js"
+          }
         ]
       },
       "configurations": {

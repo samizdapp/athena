@@ -4,10 +4,10 @@
   "projects": {
     "app-service": "packages/app-service",
     "gateway-client": "packages/gateway-client",
-    "libp2p": "packages/libp2p",
     "networking-service": "packages/networking-service",
     "shared-api": "packages/shared/api",
     "shared-service-worker": "packages/shared/service-worker",
-    "status-service": "packages/status-service"
+    "status-service": "packages/status-service",
+    "shared-libp2p": "packages/shared/libp2p"
   }
 }

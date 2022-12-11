@@ -1,11 +1,11 @@
-import create from './node'
-import { Libp2p } from 'libp2p'
+import create from './node';
+import { Libp2p } from 'libp2p';
 
 class libp2p {
     private libp2p?: Libp2p;
 
     async start() {
-        await create();
+        await create;
     }
 
     async stop() {
@@ -13,4 +13,4 @@ class libp2p {
     }
 }
 
-export default new libp2p()
+export default new libp2p();

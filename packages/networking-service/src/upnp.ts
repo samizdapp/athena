@@ -1,12 +1,13 @@
 import natMapping, { Mapping } from 'node-portmapping';
 import { environment } from './environments/environment';
-import localip from 'local-ip';
+import { internalIpV4 } from '@athena/shared/libp2p';
 
 class UPNPPortMapper {
     private port: number;
     private mapping?: Mapping;
     public publicPort?: number;
     public publicHost?: string;
+    public internalPort?: number;
     constructor(port: number) {
         this.port = port;
     }
@@ -25,6 +26,7 @@ class UPNPPortMapper {
                         if (info.state === 'Success') {
                             this.publicPort = info.externalPort;
                             this.publicHost = info.externalHost;
+                            this.internalPort = info.internalPort;
                             resolve(mapping);
                         } else {
                             reject(new Error('Failed to create mapping'));
@@ -73,25 +75,17 @@ export class UPNPService {
             libp2p: {
                 publicPort: this.libp2p.publicPort,
                 publicHost: this.libp2p.publicHost,
+                internalPort: this.libp2p.internalPort,
             },
             yggdrasil: {
                 publicPort: this.yggdrasil.publicPort,
                 publicHost: this.yggdrasil.publicHost,
+                internalPort: this.yggdrasil.internalPort,
             },
         };
     }
-    async getLocalIPS() {
-        const res = await Promise.all(
-            ['eth0', 'wlan0', 'en0'].map(
-                iface =>
-                    new Promise(resolve =>
-                        localip(iface, (err: Error, ip: string) =>
-                            resolve(err ? null : ip)
-                        )
-                    )
-            )
-        );
-        return res.filter(i => i);
+    async getLocalIP() {
+        return internalIpV4();
     }
 }
 

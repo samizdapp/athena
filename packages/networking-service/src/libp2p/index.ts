@@ -1,4 +1,4 @@
-import create from './create'
+import create from './node'
 import { Libp2p } from 'libp2p'
 
 class libp2p {

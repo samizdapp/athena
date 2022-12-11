@@ -4,6 +4,8 @@ import config from './config'
 import getAgent from '../fetch-agent'
 import fetch from 'node-fetch'
 import { environment } from '../environments/environment'
+import upnp from '../upnp'
+import {writeFile} from 'fs/promises'
 
 class YggdrasilManager {
     private saveDelay = 60000
@@ -14,9 +16,10 @@ class YggdrasilManager {
         crawler.on('found',this.handleFound.bind(this))
     }
 
-    start(){
+    async start(){
         console.log('starting yggdrasil crawler')
         crawler.start()
+        await this.writeYggdrasilPeerFile()
     }
 
     private getPeerQueryUrl(key: string) {
@@ -37,6 +40,13 @@ class YggdrasilManager {
             await config.addPeer(peer)
         }
         config.save()
+    }
+
+    private async writeYggdrasilPeerFile() {
+        await upnp.resolved
+        if (upnp.info.yggdrasil.publicPort){
+            writeFile(environment.yggdrasil_peer_file, 'tcp://' + upnp.info.yggdrasil.publicHost + ':' + upnp.info.yggdrasil.publicPort)
+        }
     }
 }
 

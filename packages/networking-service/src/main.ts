@@ -2,10 +2,10 @@
 import upnp from './upnp'
 import app from './app'
 import libp2p from './libp2p'
+import manager from './yggdrasil/manager'
 
 console.log('starting yggdrasil manager')
-// manager.start()
-upnp.start()
+manager.start()
 app.start()
 libp2p.start()
 

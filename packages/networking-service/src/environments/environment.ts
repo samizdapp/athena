@@ -6,5 +6,6 @@ export const environment = {
     yggdrasil_admin_host: 'samizdev.local',
     yggdrasil_admin_port: 9001,
     yggdrasil_config: __dirname + '/assets/yggdrasil.config.json',
+    yggdrasil_peer_file: __dirname + '/assets/yggdrasil.peer',
     hostsfile: __dirname + '/assets/hosts'
 };

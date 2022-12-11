@@ -34,7 +34,7 @@ class UPNPPortMapper {
         } catch (e) {
             console.error(e)
         }
-
+        console.log('created mapping', this.port, this.publicPort, this.publicHost)
     }
 
     async stop() {
@@ -47,10 +47,13 @@ class UPNPPortMapper {
 export class UPNPService {
     readonly libp2p = new UPNPPortMapper(environment.libp2p_listen_port)
     readonly yggdrasil = new UPNPPortMapper(environment.yggdrasil_listen_port)
+    resolved: Promise<void[]>
 
-    async start() {
-        await this.libp2p.start()
-        await this.yggdrasil.start()
+    constructor() {
+        this.resolved = Promise.all([
+            this.libp2p.start(),
+            this.yggdrasil.start()
+        ])
     }
 
     async stop() {

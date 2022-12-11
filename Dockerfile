@@ -4,7 +4,7 @@ RUN mkdir -p /usr/src/athena
 
 WORKDIR /usr/src/athena
 
-RUN apk add python3 make gcc g++ jq bash
+RUN apk add python3 make gcc g++ jq bash cmake
 
 COPY package.json .
 COPY package-lock.json .

@@ -2,11 +2,9 @@ import crawler from '../yggdrasil/crawler';
 import getAgent from '../fetch-agent';
 import { Libp2p } from '@athena/shared/libp2p';
 import upnp from '../upnp';
-import nodeProm from './node';
-import { multiaddr } from '@multiformats/multiaddr';
 import fetch from 'node-fetch';
 import { HeartbeatStream } from './streams/heartbeat';
-
+import node from './node';
 const waitFor = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 class ActiveRelay {
@@ -14,10 +12,14 @@ class ActiveRelay {
     private node?: Libp2p;
     private _keepAlive = true;
     constructor(private readonly relayAddr: string) {
-        nodeProm.then(node => {
-            this.node = node;
-            this.keepAlive();
+        this.start().catch(e => {
+            console.log('relay keep alive failed', e);
+            this.stop();
         });
+    }
+
+    stop() {
+        this._keepAlive = false;
     }
 
     private async start() {
@@ -38,10 +40,12 @@ class ActiveRelay {
 
     private async getHeartbeatStream() {
         let conn = null;
-        const addr = multiaddr(this.relayAddr);
         while (!conn) {
             console.log('poll dial', this.relayAddr);
-            conn = await this.node?.dialProtocol(addr, '/samizdapp-heartbeat');
+            conn = await node.dialProtocol(
+                this.relayAddr,
+                '/samizdapp-heartbeat'
+            );
             await waitFor(this.pollInterval);
         }
 

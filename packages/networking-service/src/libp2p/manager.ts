@@ -1,16 +1,11 @@
-import nodePromise from './node';
-import { Libp2p } from '@athena/shared/libp2p';
+import node from './node';
 import { writeFile } from 'fs/promises';
 import { environment } from '../environments/environment';
 import upnp from '../upnp';
 
 class Libp2pManager {
-    private node?: Libp2p;
     constructor() {
-        nodePromise.then(node => {
-            this.node = node;
-            this.writeLibp2pFiles();
-        });
+        this.writeLibp2pFiles();
     }
 
     private async writeLibp2pFiles() {
@@ -31,7 +26,8 @@ class Libp2pManager {
         const localIP = await upnp.getLocalIP();
         const upnpInfo = await upnp.info();
         const privatePort = upnpInfo.libp2p.internalPort;
-        return `/ip4/${localIP}/tcp/${privatePort}/ws/p2p/${this.node?.peerId.toString()}`;
+        const selfPeerString = await node.getSelfPeerString();
+        return `/ip4/${localIP}/tcp/${privatePort}/ws/p2p/${selfPeerString}`;
     }
 
     private async writeLibp2pRelayFile() {
@@ -46,8 +42,9 @@ class Libp2pManager {
         const upnpInfo = await upnp.info();
         const publicIP = upnpInfo.libp2p.publicHost;
         const publicPort = upnpInfo.libp2p.publicPort;
+        const selfPeerString = await node.getSelfPeerString();
         if (publicIP && publicPort) {
-            return `/ip4/${publicIP}/tcp/${publicPort}/ws/p2p/${this.node?.peerId.toString()}`;
+            return `/ip4/${publicIP}/tcp/${publicPort}/ws/p2p/${selfPeerString}`;
         }
         return null;
     }

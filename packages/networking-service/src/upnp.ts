@@ -57,6 +57,19 @@ export class UPNPService {
         await this.libp2p.stop()
         await this.yggdrasil.stop()
     }
+
+    get info(){
+        return {
+            libp2p: {
+                publicPort: this.libp2p.publicPort,
+                publicHost: this.libp2p.publicHost,
+            },
+            yggdrasil: {
+                publicPort: this.yggdrasil.publicPort,
+                publicHost: this.yggdrasil.publicHost,
+            }
+        }
+    }
 }
 
 export default new UPNPService()

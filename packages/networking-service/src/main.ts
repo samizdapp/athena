@@ -1,9 +1,11 @@
 // import manager from './yggdrasil/manager'
 import upnp from './upnp'
+import app from './app'
 
 console.log('starting yggdrasil manager')
 // manager.start()
 upnp.start()
+app.start()
 
 
 async function cleanup(){

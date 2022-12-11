@@ -56,9 +56,9 @@ class YggdrasilManager {
     }
 
     private async getSelfPeerString() {
-        await upnp.resolved;
-        const externalHost = upnp.info.yggdrasil.publicHost;
-        const externalPort = upnp.info.yggdrasil.publicPort;
+        const upnpInfo = await upnp.info();
+        const externalHost = upnpInfo.yggdrasil.publicHost;
+        const externalPort = upnpInfo.yggdrasil.publicPort;
         if (externalHost && externalPort) {
             return `tcp://${externalHost}:${externalPort}`;
         }

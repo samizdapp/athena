@@ -14,7 +14,6 @@ class Libp2pManager {
     }
 
     private async writeLibp2pFiles() {
-        await upnp.resolved;
         return Promise.all([
             this.writeLibp2pBootstrapFile(),
             this.writeLibp2pRelayFile(),
@@ -30,7 +29,8 @@ class Libp2pManager {
 
     private async getLocalMultiaddr() {
         const localIP = await upnp.getLocalIP();
-        const privatePort = upnp.info.libp2p.internalPort;
+        const upnpInfo = await upnp.info();
+        const privatePort = upnpInfo.libp2p.internalPort;
         return `/ip4/${localIP}/tcp/${privatePort}/ws/p2p/${this.node?.peerId.toString()}`;
     }
 
@@ -43,8 +43,9 @@ class Libp2pManager {
     }
 
     private async getRelayMultiaddr() {
-        const publicIP = upnp.info.libp2p.publicHost;
-        const publicPort = upnp.info.libp2p.publicPort;
+        const upnpInfo = await upnp.info();
+        const publicIP = upnpInfo.libp2p.publicHost;
+        const publicPort = upnpInfo.libp2p.publicPort;
         if (publicIP && publicPort) {
             return `/ip4/${publicIP}/tcp/${publicPort}/ws/p2p/${this.node?.peerId.toString()}`;
         }

@@ -82,8 +82,8 @@ class Libp2pRelays {
 
     private async addRelay(relayAddr: string) {
         this.potentialRelays.add(relayAddr);
-        await upnp.resolved;
-        if (!upnp.info.libp2p.publicPort) {
+        const upnpInfo = await upnp.info();
+        if (!upnpInfo.libp2p.publicPort) {
             this.activeRelays.set(relayAddr, new ActiveRelay(relayAddr));
         }
     }

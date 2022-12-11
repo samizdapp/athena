@@ -55,14 +55,11 @@ class UPNPPortMapper {
 export class UPNPService {
     readonly libp2p = new UPNPPortMapper(environment.libp2p_listen_port);
     readonly yggdrasil = new UPNPPortMapper(environment.yggdrasil_listen_port);
-    resolved: Promise<void[]>;
+    ready: Promise<void[]>;
 
     constructor() {
         natMapping.init();
-        this.resolved = Promise.all([
-            this.libp2p.start(),
-            this.yggdrasil.start(),
-        ]);
+        this.ready = Promise.all([this.libp2p.start(), this.yggdrasil.start()]);
     }
 
     async stop() {
@@ -70,7 +67,8 @@ export class UPNPService {
         await this.yggdrasil.stop();
     }
 
-    get info() {
+    async info() {
+        await this.ready;
         return {
             libp2p: {
                 publicPort: this.libp2p.publicPort,

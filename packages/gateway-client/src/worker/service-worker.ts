@@ -36,6 +36,8 @@ const logger = Object.fromEntries(
 logger.info('Executing root worker...');
 
 const appWorkerUrl = 'worker-app.js';
+const currentAppKey = appWorkerUrl.replace('.js', '-current.js');
+const newAppKey = appWorkerUrl.replace('.js', '-new.js');
 
 const openCache = () => {
     return caches.open('/smz/worker/root');
@@ -45,24 +47,53 @@ const fetchWorkerUrl = () => {
     return fetch(new Request(appWorkerUrl));
 };
 
+enum ScriptState {
+    CURRENT,
+    NEW,
+}
+
 const fetchWorkerScript = async () => {
     const cache = await openCache();
-    // Go to the cache first
-    let response = await cache.match(appWorkerUrl);
-    // if we didn't find a cached response
-    if (!response) {
-        logger.info('Cache hit miss, fetching app worker at: ', appWorkerUrl);
-        // Hit the network
-        response = await fetchWorkerUrl();
-        // Add the network response to the cache for later visits
-        cache.put(appWorkerUrl, response.clone());
+
+    // first check for a new script
+    const newResponse = await cache.match(newAppKey);
+    // if we found a new script
+    if (newResponse) {
+        logger.info('Found new app worker at: ', appWorkerUrl);
+        // consume the new script
+        await cache.delete(newAppKey);
+        await cache.put(currentAppKey, newResponse.clone());
+        // return the new script
+        return {
+            state: ScriptState.NEW,
+            script: await newResponse.text(),
+        };
     }
-    // by now, we should have a response
-    logger.info('Fetched app worker at: ', appWorkerUrl);
+
+    // now, check for a current script
+    const currentResponse = await cache.match(currentAppKey);
+    // if we found a current script
+    if (currentResponse) {
+        logger.info('Found current app worker at: ', appWorkerUrl);
+        // return the current script
+        return {
+            state: ScriptState.CURRENT,
+            script: await currentResponse.text(),
+        };
+    }
+
+    // we haven't found a script in our cache, so fetch it
+    logger.info('Cache hit miss, fetching app worker at: ', appWorkerUrl);
+    // Hit the network
+    const response = await fetchWorkerUrl();
+    // Add the network response to the cache for later visits
+    await cache.put(currentAppKey, response.clone());
     // return the text
-    const text = await response.text();
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    return text;
+    logger.info('Fetched app worker at: ', appWorkerUrl);
+    return {
+        state: ScriptState.NEW,
+        script: await response.text(),
+    };
 };
 
 /*
@@ -184,7 +215,7 @@ const WB_MANIFEST = self.__WB_MANIFEST;
 });
 
 const appExecuted = (async () => {
-    const script = await fetchWorkerScript();
+    const fetchedScript = await fetchWorkerScript();
     logger.info('Executing app worker script...');
 
     /*
@@ -199,7 +230,7 @@ const appExecuted = (async () => {
      */
 
     // eslint-disable-next-line no-eval
-    eval?.(`${script}
+    eval?.(`${fetchedScript.script}
     //# sourceURL=/smz/pwa/worker-app.js`);
 
     logger.info('App worker script executed.');

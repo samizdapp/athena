@@ -1,11 +1,13 @@
 // import manager from './yggdrasil/manager'
 import upnp from './upnp'
 import app from './app'
+import libp2p from './libp2p'
 
 console.log('starting yggdrasil manager')
 // manager.start()
 upnp.start()
 app.start()
+libp2p.start()
 
 
 async function cleanup(){

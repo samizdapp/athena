@@ -1,5 +1,6 @@
 export const environment = {
     production: true,
+    libp2p_id_file: __dirname + '/assets/libp2p.id',
     libp2p_listen_port: 9000,
     yggdrasil_listen_port: 5000,
     yggdrasil_admin_host: 'localhost',

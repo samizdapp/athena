@@ -186,6 +186,8 @@ Object.assign(self, {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const WB_MANIFEST = self.__WB_MANIFEST;
 
+const pendingDispatches: Event[] = [];
+
 [
     // ServiceWorkerGlobalScope
     'activate',
@@ -205,7 +207,13 @@ const WB_MANIFEST = self.__WB_MANIFEST;
     'error',
 ].forEach(type => {
     selfAddEventListener(type, async event => {
+        // create pending dispatch
+        pendingDispatches.push(event);
+        // wait for app to execute
         await appExecuted;
+        // remove pending dispatch
+        pendingDispatches.splice(pendingDispatches.indexOf(event), 1);
+        // dispatch the event
         try {
             eventDelegate.dispatchEvent(event);
         } catch (e) {
@@ -234,7 +242,37 @@ const appExecuted = (async () => {
     //# sourceURL=/smz/pwa/worker-app.js`);
 
     logger.info('App worker script executed.');
-    return script;
+
+    // if this is a new script
+    if (fetchedScript.state === ScriptState.NEW) {
+        // we may need to dispatch some lifecycle events for it
+        // if we've already installed and we do NOT have a pending install dispatch
+        if (
+            (self.registration.active ||
+                self.registration.waiting ||
+                self.registration.installing) &&
+            !pendingDispatches.find(it => it.type === 'install')
+        ) {
+            // dispatch an install event
+            logger.info(
+                'Dispatching emulated install event on executed app worker.'
+            );
+            eventDelegate.dispatchEvent(new ExtendableEvent('install'));
+        }
+        // if we've already activated and we do NOT have a pending activate dispatch
+        if (
+            self.registration.active &&
+            !pendingDispatches.find(it => it.type === 'activate')
+        ) {
+            // dispatch an activate event
+            logger.info(
+                'Dispatching emulated activate event on executed app worker.'
+            );
+            eventDelegate.dispatchEvent(new ExtendableEvent('activate'));
+        }
+    }
+
+    return fetchedScript;
 })();
 
 logger.info('Root worker executed.');

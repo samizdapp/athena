@@ -1,7 +1,6 @@
 import crawler from '../yggdrasil/crawler';
-import getAgent from '../fetch-agent';
+import fetchAgent from '../fetch-agent';
 import upnp from '../upnp';
-import fetch from 'node-fetch';
 import { HeartbeatStream, HeartbeatType } from './streams/heartbeat';
 import { Deferred } from './streams/raw';
 import node from './node';
@@ -69,9 +68,8 @@ class Libp2pRelays extends EventEmitter {
     async handleFound(key: string) {
         const relayQueryUrl = this.getRelayQueryUrl(key);
         console.log('found key', key, relayQueryUrl);
-        const agent = getAgent(relayQueryUrl);
         try {
-            const relay = await fetch(relayQueryUrl, { agent });
+            const relay = await fetchAgent.fetch(relayQueryUrl);
             if (relay.ok) {
                 const relayAddr = await relay.text();
                 console.log('found relay addr for key', key, relayAddr);

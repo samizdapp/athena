@@ -1,22 +1,24 @@
 import crawler from './crawler';
 import { NodeInfo } from './rpc';
 import config from './config';
-import getAgent from '../fetch-agent';
-import fetch from 'node-fetch';
+import fetchAgent from '../fetch-agent';
 import { environment } from '../environments/environment';
 import upnp from '../upnp';
 import { writeFile } from 'fs/promises';
-
+import { Debug } from '../logging';
 class YggdrasilManager {
+    private readonly log = new Debug('yggdrasil-manager');
+
     constructor() {
         crawler.on('found', this.handleFound.bind(this));
         this.start();
     }
 
     async start() {
-        console.log('starting yggdrasil crawler');
+        this.log.info('starting yggdrasil crawler');
         crawler.start();
         await this.writeYggdrasilPeerFile();
+        this.log.info('started yggdrasil crawler');
     }
 
     private getPeerQueryUrl(key: string) {
@@ -26,20 +28,19 @@ class YggdrasilManager {
     }
 
     private async handleFound(key: string, _nodeInfo: NodeInfo) {
-        // console.log('found key, add to allowed keys', key)
+        this.log.debug('found key, add to allowed keys', key);
         const peerQueryUrl = this.getPeerQueryUrl(key);
-        // console.log('querying peer url', peerQueryUrl)
+        this.log.trace('query peer url', key, peerQueryUrl);
         const peer = environment.production
-            ? await fetch(peerQueryUrl, {
-                  agent: getAgent(peerQueryUrl),
-              })
+            ? await fetchAgent
+                  .fetch(peerQueryUrl)
                   .then(res => res.text())
                   .catch(_e => null)
             : null;
-        // console.log('got peer response?', peerQueryUrl, peer)
+        this.log.trace('got peer response?', peerQueryUrl, peer);
         await config.allowPublicKey(key);
         if (peer) {
-            // console.log('found peer addr for key',  key, peer)
+            this.log.debug('found peer addr for key', key, peer);
             await config.addPeer(peer);
         }
         config.save();
@@ -47,6 +48,7 @@ class YggdrasilManager {
 
     private async writeYggdrasilPeerFile() {
         const peerString = await this.getSelfPeerString();
+        this.log.debug('writing yggdrasil peer file', peerString);
         if (peerString) {
             writeFile(environment.yggdrasil_peer_file, peerString, {
                 encoding: 'utf8',
@@ -58,10 +60,12 @@ class YggdrasilManager {
         const upnpInfo = await upnp.info();
         const externalHost = upnpInfo.yggdrasil.publicHost;
         const externalPort = upnpInfo.yggdrasil.publicPort;
+        let res = null;
         if (externalHost && externalPort) {
-            return `tcp://${externalHost}:${externalPort}`;
+            res = `tcp://${externalHost}:${externalPort}`;
         }
-        return null;
+        this.log.debug('got self peer string', res);
+        return res;
     }
 }
 

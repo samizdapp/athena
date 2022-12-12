@@ -1,8 +1,13 @@
 import natMapping, { Mapping } from 'node-portmapping';
 import { environment } from './environments/environment';
 import { internalIpV4 } from '@athena/shared/libp2p';
+import { Debug } from './logging';
+
+const log = new Debug('upnp');
 
 class UPNPPortMapper {
+    private log = log;
+
     private port: number;
     private mapping?: Mapping;
     public publicPort?: number;
@@ -14,15 +19,15 @@ class UPNPPortMapper {
 
     async start() {
         try {
+            this.log.debug('creating mapping', this.port);
             this.mapping = await new Promise<Mapping>((resolve, reject) => {
-                console.log('creating mapping', this.port);
                 const mapping = natMapping.createMapping(
                     {
                         internalPort: this.port,
                         protocol: 'TCP',
                     },
                     info => {
-                        console.log(info);
+                        this.log.trace('mapping created internal', info);
                         if (info.state === 'Success') {
                             this.publicPort = info.externalPort;
                             this.publicHost = info.externalHost;
@@ -37,9 +42,9 @@ class UPNPPortMapper {
             });
             this.publicPort = this.port;
         } catch (e) {
-            console.error(e);
+            this.log.error((e as Error).message || (e as string));
         }
-        console.log(
+        this.log.debug(
             'created mapping',
             this.port,
             this.publicPort,
@@ -48,26 +53,37 @@ class UPNPPortMapper {
     }
 
     async stop() {
+        this.log.debug('destroying mapping', this.port);
         this.mapping?.destroy();
     }
 }
 
 export class UPNPService {
+    private readonly log = log;
+
     readonly libp2p = new UPNPPortMapper(environment.libp2p_listen_port);
     readonly yggdrasil = new UPNPPortMapper(environment.yggdrasil_listen_port);
     ready: Promise<void[]>;
 
     constructor() {
         natMapping.init();
+        this.log.info('UPNP service started');
         this.ready = Promise.all([this.libp2p.start(), this.yggdrasil.start()]);
+        this.info().then(res => {
+            this.log.info('UPNP service ready', res);
+        });
     }
 
     async stop() {
+        this.log.info('UPNP service stopping');
+        await this.ready;
         await this.libp2p.stop();
         await this.yggdrasil.stop();
+        this.log.info('UPNP service stopped');
     }
 
     async info() {
+        this.log.trace('UPNP service info called');
         await this.ready;
         return {
             libp2p: {

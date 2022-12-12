@@ -1,6 +1,8 @@
+import { Debug } from './logging';
 import './cleanup';
 import './app';
 import './libp2p';
 import './yggdrasil';
 
-console.log('done loading');
+const log = new Debug('main');
+log.info('done loading');

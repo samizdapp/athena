@@ -11,4 +11,5 @@ export const environment = {
     yggdrasil_config: __dirname + '/assets/yggdrasil.config.json',
     yggdrasil_peer_file: __dirname + '/assets/yggdrasil.peer',
     hostsfile: __dirname + '/assets/hosts',
+    default_log_level: 'trace',
 };

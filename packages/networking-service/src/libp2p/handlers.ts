@@ -1,6 +1,7 @@
 import node from './node';
 import { ProxyStream2 } from './streams/proxy.2';
 import { WebsocketStream } from './streams/websocket';
+import { RelayStream } from './streams/relay';
 import { HeartbeatStream, HeartbeatType } from './streams/heartbeat';
 import { Stream } from '@libp2p/interface-connection';
 
@@ -20,6 +21,8 @@ class Handlers {
             '/samizdapp-heartbeat',
             this.handleHeartbeat.bind(this)
         );
+
+        node.handleProtocol('/samizdapp-relay', this.handleRelay.bind(this));
     }
 
     private async handleProxy2({ stream }: { stream: Stream }) {
@@ -41,6 +44,12 @@ class Handlers {
             HeartbeatType.SENDER
         );
         await heartbeatStream.init();
+    }
+
+    private async handleRelay({ stream }: { stream: Stream }) {
+        console.debug('relay', stream);
+        const relayStream = new RelayStream(stream);
+        await relayStream.init();
     }
 }
 

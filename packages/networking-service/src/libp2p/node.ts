@@ -18,6 +18,8 @@ import {
     StreamHandlerOptions,
 } from '@libp2p/interface-registrar';
 import { Deferred } from './streams/raw';
+import upnp from '../upnp';
+
 class Libp2pNode {
     private ready = new Deferred<void>();
     private node?: Libp2p;
@@ -60,7 +62,7 @@ class Libp2pNode {
                 },
             },
             connectionManager: {
-                autoDial: false, // Auto connect to discovered peers (limited by ConnectionManager minConnections)
+                autoDial: false,
             },
         });
 
@@ -77,6 +79,16 @@ class Libp2pNode {
     public async getSelfPeerString() {
         await this.ready.promise;
         return this.node?.peerId.toString();
+    }
+
+    public async getSelfMultiaddr() {
+        const peerString = await this.getSelfPeerString();
+        const upnpInfo = await upnp.info();
+        const publicPort = upnpInfo.libp2p.internalPort;
+        const publicHost = upnpInfo.libp2p.publicHost;
+        if (!(publicPort && publicHost)) return null;
+
+        return `/ip4/${publicHost}/tcp/${publicPort}/ws/p2p/${peerString}`;
     }
 
     public async handleProtocol(

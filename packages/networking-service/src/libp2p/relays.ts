@@ -4,13 +4,16 @@ import { Libp2p } from '@athena/shared/libp2p';
 import upnp from '../upnp';
 import fetch from 'node-fetch';
 import { HeartbeatStream, HeartbeatType } from './streams/heartbeat';
+import { Deferred } from './streams/raw';
 import node from './node';
 import { environment } from '../environments/environment';
+import { EventEmitter } from 'stream';
 const waitFor = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 class ActiveRelay {
     private readonly pollInterval = 10000;
     private node?: Libp2p;
+    private _isAlive = new Deferred<boolean>();
     private _keepAlive = true;
     constructor(private readonly relayAddr: string) {
         this.start().catch(e => {
@@ -36,6 +39,7 @@ class ActiveRelay {
 
     private async keepAlive() {
         const heartbeatStream = await this.getHeartbeatStream();
+        this._isAlive.resolve(true);
         await heartbeatStream.waitForClose();
     }
 
@@ -52,13 +56,18 @@ class ActiveRelay {
 
         return new HeartbeatStream(conn, HeartbeatType.RECEIVER);
     }
+
+    public isAlive() {
+        return this._isAlive.promise;
+    }
 }
 
-class Libp2pRelays {
+class Libp2pRelays extends EventEmitter {
     private readonly potentialRelays = new Set<string>();
     private readonly activeRelays = new Map<string, ActiveRelay>();
 
     constructor() {
+        super();
         crawler.on('found', this.handleFound.bind(this));
     }
 
@@ -90,8 +99,27 @@ class Libp2pRelays {
         this.potentialRelays.add(relayAddr);
         const upnpInfo = await upnp.info();
         if (!upnpInfo.libp2p.publicPort || environment.force_relay_open) {
+            console.log('opening relay', relayAddr);
+            await this.activateRelay(relayAddr);
             this.activeRelays.set(relayAddr, new ActiveRelay(relayAddr));
         }
+    }
+
+    private async activateRelay(relayAddr: string) {
+        const relay = new ActiveRelay(relayAddr);
+        const alive = await relay.isAlive();
+        if (alive) {
+            this.potentialRelays.delete(relayAddr);
+            this.activeRelays.set(relayAddr, relay);
+            this.emit('activate', relayAddr);
+        }
+    }
+
+    public async getRelays() {
+        const selfPeerString = await node.getSelfPeerString();
+        return Array.from(this.activeRelays.keys()).map(
+            addr => `${addr}/p2p-circuit/p2p/${selfPeerString}`
+        );
     }
 }
 

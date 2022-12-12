@@ -12,7 +12,8 @@
         "main": "packages/shared/libp2p/src/index.ts",
         "tsConfig": "packages/shared/libp2p/tsconfig.json",
         "verbose": true,
-        "externalDependencies": ["bufferutil","utf-8-validate"]
+        "externalDependencies": ["bufferutil","utf-8-validate"],
+        "webpackConfig": "packages/shared/libp2p/webpack.config.js"
      }
     },
     "lint": {

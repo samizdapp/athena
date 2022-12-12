@@ -27,4 +27,4 @@ RUN apk add --update linux-headers
 RUN cd dist/packages/networking-service && npm install
 
 ENV NODE_TLS_REJECT_UNAUTHORIZED=0
-CMD [ "sleep", "infinity"  ]
+CMD [ "/usr/local/bin/node", "dist/packages/networking-service/main.js" ]

@@ -1,6 +1,6 @@
 export const environment = {
     production: true,
-    force_relay_open: false,
+    force_relay_open: true,
     libp2p_id_file: __dirname + '/assets/libp2p.id',
     libp2p_listen_port: 9002,
     libp2p_bootstrap_file: '/next/assets/libp2p.bootstrap',

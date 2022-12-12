@@ -42,7 +42,7 @@ const loadPersistedLevel = (name: string, logger: Logger) => {
 const originalFactory = logger.methodFactory;
 logger.methodFactory = function (methodName, logLevel, loggerName) {
     const originalMethodName = methodName;
-    // don't use console.trace()
+    // don't use console.log()
     if (originalMethodName === 'trace') {
         methodName = 'debug';
     }

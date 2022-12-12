@@ -47,7 +47,7 @@ export class HeartbeatStream extends RawStream {
     }
 
     private handleTimeout() {
-        console.trace('heartbeat', 'timeout');
+        console.log('heartbeat', 'timeout');
         this.close();
         this.closeDeferred.resolve();
     }

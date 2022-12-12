@@ -44,13 +44,13 @@ export class LobStream extends RawStream {
             totalLength = 0;
 
         while (this.isOpen && (chunk = await this.read()) !== null) {
-            console.trace('inbox', chunk);
+            console.log('inbox', chunk);
             chunks.push(chunk);
 
             // first 2 bytes of the first chunk are the length of the packet json portion
             if (headLength === 0) {
                 headLength = chunk.readUInt16BE(0) + 2;
-                console.trace('headLength', headLength);
+                console.log('headLength', headLength);
             }
 
             // add the length of the current chunk to the total length
@@ -63,7 +63,7 @@ export class LobStream extends RawStream {
                 packet = decode(Buffer.concat(chunks));
                 totalLength =
                     ((packet?.json?.bodyLength as number) ?? 0) + headLength;
-                console.trace('totalLength', totalLength);
+                console.log('totalLength', totalLength);
             }
 
             // if we've read the packet json and we've got the total length
@@ -75,7 +75,7 @@ export class LobStream extends RawStream {
                 currentLength = headLength = totalLength = 0;
                 chunks = [];
                 // resolve the inbox
-                console.trace('inbox resolved', packet);
+                console.log('inbox resolved', packet);
                 this._receive(packet as Packet);
             }
 

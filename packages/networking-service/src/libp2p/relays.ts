@@ -1,6 +1,5 @@
 import crawler from '../yggdrasil/crawler';
 import getAgent from '../fetch-agent';
-import { Libp2p } from '@athena/shared/libp2p';
 import upnp from '../upnp';
 import fetch from 'node-fetch';
 import { HeartbeatStream, HeartbeatType } from './streams/heartbeat';
@@ -12,7 +11,6 @@ const waitFor = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 class ActiveRelay {
     private readonly pollInterval = 10000;
-    private node?: Libp2p;
     private _isAlive = new Deferred<boolean>();
     private _keepAlive = true;
     constructor(private readonly relayAddr: string) {
@@ -27,9 +25,6 @@ class ActiveRelay {
     }
 
     private async start() {
-        if (!this.node) {
-            throw new Error('node not ready');
-        }
         while (this._keepAlive) {
             console.log('keep alive', this.relayAddr);
             await this.keepAlive();
@@ -106,9 +101,11 @@ class Libp2pRelays extends EventEmitter {
     }
 
     private async activateRelay(relayAddr: string) {
+        console.log('activating relay', relayAddr);
         const relay = new ActiveRelay(relayAddr);
         const alive = await relay.isAlive();
         if (alive) {
+            console.log('relay activated', relayAddr);
             this.potentialRelays.delete(relayAddr);
             this.activeRelays.set(relayAddr, relay);
             this.emit('activate', relayAddr);

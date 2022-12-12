@@ -49,7 +49,7 @@ export class RawStream {
         while (this.isOpen) {
             let next;
             while ((next = this.writeBuffer.shift())) {
-                console.trace('sink', next);
+                // console.log('sink', next);
                 yield next;
             }
             await this.writeDeferred.promise;
@@ -58,7 +58,7 @@ export class RawStream {
     }
 
     private _write(data: Buffer | null) {
-        console.trace('_write', data);
+        // console.log('_write', data);
         if (data) {
             this.writeBuffer.push(data);
         }
@@ -68,11 +68,11 @@ export class RawStream {
     private async *_source() {
         try {
             for await (const data of this.libp2pStream.source) {
-                console.trace('source', data);
+                console.log('source', data);
                 yield Buffer.from(data.subarray());
             }
 
-            console.trace('source', 'end');
+            console.log('source', 'end');
         } catch (e) {
             console.warn('source error', e);
         } finally {

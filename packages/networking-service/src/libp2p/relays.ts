@@ -5,6 +5,7 @@ import upnp from '../upnp';
 import fetch from 'node-fetch';
 import { HeartbeatStream } from './streams/heartbeat';
 import node from './node';
+import { environment } from '../environments/environment';
 const waitFor = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 class ActiveRelay {
@@ -63,6 +64,7 @@ class Libp2pRelays {
 
     async handleFound(key: string) {
         const relayQueryUrl = this.getRelayQueryUrl(key);
+        console.log('found key', key, relayQueryUrl);
         const agent = getAgent(relayQueryUrl);
         try {
             const relay = await fetch(relayQueryUrl, { agent });
@@ -87,7 +89,7 @@ class Libp2pRelays {
     private async addRelay(relayAddr: string) {
         this.potentialRelays.add(relayAddr);
         const upnpInfo = await upnp.info();
-        if (!upnpInfo.libp2p.publicPort) {
+        if (!upnpInfo.libp2p.publicPort || environment.force_relay_open) {
             this.activeRelays.set(relayAddr, new ActiveRelay(relayAddr));
         }
     }

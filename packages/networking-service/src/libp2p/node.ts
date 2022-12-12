@@ -9,13 +9,17 @@ import {
     createEd25519PeerId,
     exportToProtobuf,
     Libp2p,
+    multiaddr,
 } from '@athena/shared/libp2p';
 import { readFile, writeFile } from 'fs/promises';
 import { environment } from '../environments/environment';
 import { ConnectionEncrypter } from '@libp2p/interface-connection-encrypter';
 import { StreamMuxerFactory } from '@libp2p/interface-stream-muxer';
+import {
+    StreamHandler,
+    StreamHandlerOptions,
+} from '@libp2p/interface-registrar';
 import { Deferred } from './streams/raw';
-import { multiaddr } from '@multiformats/multiaddr';
 class Libp2pNode {
     private ready = new Deferred<void>();
     private node?: Libp2p;
@@ -38,7 +42,9 @@ class Libp2pNode {
         const node = await createLibp2p({
             peerId,
             addresses: {
-                listen: ['/ip4/0.0.0.0/tcp/9000/ws'],
+                listen: [
+                    `/ip4/0.0.0.0/tcp/${environment.libp2p_listen_port}/ws`,
+                ],
             },
             transports: [new WebSockets()],
             connectionEncryption: [
@@ -73,6 +79,15 @@ class Libp2pNode {
     public async getSelfPeerString() {
         await this.ready.promise;
         return this.node?.peerId.toString();
+    }
+
+    public async handleProtocol(
+        protocol: string,
+        handler: StreamHandler,
+        options?: StreamHandlerOptions
+    ) {
+        await this.ready.promise;
+        return this.node?.handle(protocol, handler, options);
     }
 }
 

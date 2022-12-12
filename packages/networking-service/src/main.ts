@@ -1,7 +1,7 @@
 // import manager from './yggdrasil/manager'
 import upnp from './upnp';
 import app from './app';
-import './libp2p/manager';
+import './libp2p';
 import manager from './yggdrasil/manager';
 
 console.log('starting yggdrasil manager');

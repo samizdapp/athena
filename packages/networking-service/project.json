@@ -30,6 +30,10 @@
             {
               "replace": "packages/networking-service/src/environments/environment.ts",
               "with": "packages/networking-service/src/environments/environment.prod.ts"
+            },
+            {
+              "replace": "packages/shared/libp2p/src/index.ts",
+              "with": "dist/packages/shared/libp2p/main.js"
             }
           ]
         }

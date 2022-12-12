@@ -9,7 +9,12 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
 class App {
-    async start(){
+    constructor() {
+        this.start().catch(err => {
+            console.log('Error starting app', err);
+        });
+    }
+    async start() {
         const app = await NestFactory.create(AppModule);
         const globalPrefix = '/smz/api/networking';
         app.setGlobalPrefix(globalPrefix);
@@ -21,4 +26,4 @@ class App {
     }
 }
 
-export default new App()
+export default new App();

@@ -8,10 +8,9 @@ import upnp from '../upnp';
 import { writeFile } from 'fs/promises';
 
 class YggdrasilManager {
-    private saveDelay = 60000;
-    private saveTimeout?: NodeJS.Timeout;
     constructor() {
         crawler.on('found', this.handleFound.bind(this));
+        this.start();
     }
 
     async start() {

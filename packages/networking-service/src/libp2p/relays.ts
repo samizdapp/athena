@@ -3,7 +3,7 @@ import getAgent from '../fetch-agent';
 import { Libp2p } from '@athena/shared/libp2p';
 import upnp from '../upnp';
 import fetch from 'node-fetch';
-import { HeartbeatStream } from './streams/heartbeat';
+import { HeartbeatStream, HeartbeatType } from './streams/heartbeat';
 import node from './node';
 import { environment } from '../environments/environment';
 const waitFor = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -50,7 +50,7 @@ class ActiveRelay {
             await waitFor(this.pollInterval);
         }
 
-        return new HeartbeatStream(conn);
+        return new HeartbeatStream(conn, HeartbeatType.RECEIVER);
     }
 }
 

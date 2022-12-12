@@ -1,5 +1,3 @@
-// eslint-disable-next-line
-// @ts-ignore
 import {
     Mplex,
     WebSockets,

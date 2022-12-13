@@ -90,10 +90,11 @@ type RPCResponse = {
 class RPCWorker {
     static readonly log = new Debug('yggdrasil-rpc-worker');
     static readonly poolSize = 10;
+    static readonly watchdogTimeout = 20000;
     static readonly available = new Set();
     static readonly in_use = new Set();
     static errorCount = 0;
-    static watchdogTimeout?: NodeJS.Timeout;
+    static lastWatchdog = 0;
 
     private readonly log = RPCWorker.log;
     private socket = new Socket();
@@ -112,18 +113,20 @@ class RPCWorker {
             // 20 seconds of errors, trigger manual restart of yggdrasil
             this.watchdog();
         }
-        await waitFor(30000);
+        await waitFor(this.watchdogTimeout);
         this.errorCount--;
         this.log.debug('yggdrasil rpc error count', this.errorCount);
     }
 
     static async watchdog() {
-        this.log.warn('yggdrasil watchdog called, entering debounce');
-        clearTimeout(this.watchdogTimeout);
-        this.watchdogTimeout = setTimeout(() => {
-            this.log.error('yggdrasil watchdog triggered, forcing reboot');
-            config.save(true);
-        }, 10000);
+        this.log.debug('yggdrasil watchdog called, entering debounce');
+        if (Date.now() - this.lastWatchdog < this.watchdogTimeout) {
+            return this.log.debug('yggdrasil watchdog debounce');
+        }
+
+        this.lastWatchdog = Date.now();
+        this.log.debug('yggdrasil watchdog triggered, forcing reboot');
+        config.save(true);
     }
 
     initialize() {

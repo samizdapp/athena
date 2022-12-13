@@ -7,7 +7,7 @@ import node from './node';
 import { environment } from '../environments/environment';
 import { EventEmitter } from 'stream';
 import { Debug } from '../logging';
-import { multiaddr } from '@multiformats/multiaddr';
+import { multiaddr } from '@athena/shared/libp2p';
 const waitFor = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 class ActiveRelay {

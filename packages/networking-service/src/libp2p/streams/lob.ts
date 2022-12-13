@@ -1,8 +1,9 @@
 import { RawStream, Deferred } from './raw';
 import { Packet, decode } from './lob/lob-enc';
 import { Stream } from '@libp2p/interface-connection';
-
+import { Debug } from '../../logging';
 export class LobStream extends RawStream {
+    protected override readonly log = new Debug('libp2p-lob-stream');
     private chunkSize = 64 * 1024;
     private outbox = new Deferred<Packet>();
     private inbox = new Deferred<Packet | null>();
@@ -33,7 +34,7 @@ export class LobStream extends RawStream {
                 await this.write(chunk);
             }
         }
-        console.debug('outbox done');
+        this.log.debug('outbox done');
     }
 
     private async initInbox() {
@@ -44,13 +45,13 @@ export class LobStream extends RawStream {
             totalLength = 0;
 
         while (this.isOpen && (chunk = await this.read()) !== null) {
-            console.log('inbox', chunk);
+            this.log.trace('inbox', chunk);
             chunks.push(chunk);
 
             // first 2 bytes of the first chunk are the length of the packet json portion
             if (headLength === 0) {
                 headLength = chunk.readUInt16BE(0) + 2;
-                console.log('headLength', headLength);
+                this.log.trace('headLength', headLength);
             }
 
             // add the length of the current chunk to the total length
@@ -63,7 +64,7 @@ export class LobStream extends RawStream {
                 packet = decode(Buffer.concat(chunks));
                 totalLength =
                     ((packet?.json?.bodyLength as number) ?? 0) + headLength;
-                console.log('totalLength', totalLength);
+                this.log.trace('totalLength', totalLength);
             }
 
             // if we've read the packet json and we've got the total length
@@ -75,14 +76,14 @@ export class LobStream extends RawStream {
                 currentLength = headLength = totalLength = 0;
                 chunks = [];
                 // resolve the inbox
-                console.log('inbox resolved', packet);
+                this.log.debug('inbox resolved', packet);
                 this._receive(packet as Packet);
             }
 
             this.eventTarget.emit('chunk', { detail: chunk });
         }
 
-        console.debug('stream stopped receiving data');
+        this.log.debug('stream stopped receiving data');
     }
 
     protected send(packet: Packet): void {

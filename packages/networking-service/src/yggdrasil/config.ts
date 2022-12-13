@@ -1,6 +1,7 @@
 import { environment } from '../environments/environment';
 import { readFileSync, writeFile } from 'fs';
 import { Debug } from '../logging';
+import upnp from '../upnp';
 
 const waitFor = (ms: number) =>
     new Promise(resolve => setTimeout(() => resolve(null), ms));
@@ -22,7 +23,8 @@ export class YggdrasilConfig {
         this.log.debug('save called, force:', force);
         if (force) return this._save();
         clearTimeout(this.saveTimeout);
-        this.saveTimeout = setTimeout(() => {
+        this.saveTimeout = setTimeout(async () => {
+            await this.sanitizeConfig();
             const json = JSON.stringify(this.json);
             const oldContent = JSON.stringify(
                 JSON.parse(
@@ -51,6 +53,20 @@ export class YggdrasilConfig {
                 else this.log.debug('saved yggdrasil config');
             }
         );
+    }
+
+    private async sanitizeConfig() {
+        const selfPeer = await this.getSelfPeerString();
+        this.json.Peers = this.json.Peers.filter(
+            (peer: string) => peer !== selfPeer
+        );
+    }
+
+    private async getSelfPeerString() {
+        const upnpInfo = await upnp.info();
+        if (!(upnpInfo.yggdrasil.publicHost && upnpInfo.yggdrasil.publicPort))
+            return null;
+        return `tcp://[${upnpInfo.yggdrasil.publicHost}]:${upnpInfo.yggdrasil.publicPort}`;
     }
 
     get AllowedPublicKeys(): Set<string> {

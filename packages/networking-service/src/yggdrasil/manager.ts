@@ -56,7 +56,7 @@ class YggdrasilManager {
         }
     }
 
-    private async getSelfPeerString() {
+    public async getSelfPeerString() {
         const upnpInfo = await upnp.info();
         const externalHost = upnpInfo.yggdrasil.publicHost;
         const externalPort = upnpInfo.yggdrasil.publicPort;

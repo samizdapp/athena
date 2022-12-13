@@ -11,5 +11,5 @@ export const environment = {
     yggdrasil_config: '/etc/yggdrasil-network/config.conf',
     yggdrasil_peer_file: '/yggdrasil/peer',
     hostsfile: '/shared_etc/hosts',
-    default_log_level: 'trace',
+    default_log_level: 'DEBUG',
 };

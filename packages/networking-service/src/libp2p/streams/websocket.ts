@@ -1,6 +1,7 @@
 import { Packet, encode } from './lob/lob-enc';
 import { LobStream } from './lob';
 import { WebSocket } from 'ws';
+import { Debug } from '../../logging';
 
 export enum WebsocketStreamMessageType {
     COMMAND = 'COMMAND',
@@ -15,6 +16,8 @@ export enum WebsocketStreamStatus {
 }
 
 export class WebsocketStream extends LobStream {
+    protected override readonly log = new Debug('libp2p-websocket-stream');
+
     private ws: WebSocket | null = null;
 
     private readonly streamMessageHandlers = {
@@ -25,6 +28,7 @@ export class WebsocketStream extends LobStream {
 
     async handleCommand({ body }: { body: Buffer }) {
         try {
+            this.log.debug('handle command', body.toString(), this.peer);
             const { method, detail } = JSON.parse(body.toString());
             console.log('handle command', method, detail);
             switch (method) {
@@ -35,10 +39,10 @@ export class WebsocketStream extends LobStream {
                     this.closeWebsocket();
                     break;
                 default:
-                    console.log('unknown method', method);
+                    this.log.error('unknown method', method);
             }
         } catch (error) {
-            console.log(body.toString());
+            this.log.error('handleCommand error', error);
         }
     }
 
@@ -53,15 +57,17 @@ export class WebsocketStream extends LobStream {
         url: string;
         protocols: string[];
     }) {
-        console.log('open websocket', url);
+        this.log.info('open websocket', url, this.peer);
         const ws = new WebSocket(url, protocols);
         ws.onopen = event => {
+            this.log.debug('websocket opened');
             this.sendStatus({
                 status: WebsocketStreamStatus.OPENED,
                 detail: event,
             });
         };
         ws.onclose = () => {
+            this.log.debug('websocket closed', this.peer);
             this.sendStatus({
                 status: WebsocketStreamStatus.CLOSED,
                 detail: {
@@ -72,13 +78,14 @@ export class WebsocketStream extends LobStream {
             });
         };
         ws.onerror = error => {
+            this.log.debug('websocket error', this.peer);
             this.sendStatus({
                 status: WebsocketStreamStatus.ERROR,
                 detail: error,
             });
         };
         ws.onmessage = evt => {
-            // console.log("upstream message", evt.data, JSON.parse(evt.data));
+            this.log.trace('websocket message', evt.data);
             const body =
                 evt.data instanceof Buffer
                     ? evt.data
@@ -99,7 +106,7 @@ export class WebsocketStream extends LobStream {
         status: WebsocketStreamStatus;
         detail: object;
     }) {
-        console.log('send status', status, detail);
+        this.log.debug('send status', status, detail, this.peer);
         const packet = this.encodeMessageToPacket(
             WebsocketStreamMessageType.STATUS,
             Buffer.from(
@@ -113,26 +120,30 @@ export class WebsocketStream extends LobStream {
     }
 
     async closeWebsocket() {
+        this.log.info('close websocket');
         this.ws?.close();
     }
 
     handleMessage({ body }: { body: Buffer }) {
         try {
-            console.log('handle message', body);
+            this.log.trace('handle message', body);
             this.ws?.send(body);
         } catch (error) {
-            console.log('handleMessage error', error);
+            this.log.debug('handleMessage error', error);
         }
     }
 
     handleStatus({ body }: { body: Buffer }) {
-        console.log('handle status', body);
+        this.log.error(
+            'websocket handle status should not be called on server',
+            body
+        );
     }
 
     async dispatch(packet: Packet) {
         const type = packet.json.type as WebsocketStreamMessageType;
         if (!this.streamMessageHandlers[type]) {
-            console.log('unknown type', type);
+            this.log.error('websocket message unknown type', type);
             return;
         }
 
@@ -140,6 +151,7 @@ export class WebsocketStream extends LobStream {
     }
 
     async init() {
+        this.log.info('init websocket');
         while (this.isOpen) {
             const packet = await this.receive();
             if (packet) {
@@ -149,5 +161,6 @@ export class WebsocketStream extends LobStream {
                 this.close();
             }
         }
+        this.log.info('websocket closed');
     }
 }

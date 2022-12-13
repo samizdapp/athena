@@ -1,5 +1,6 @@
 import { Stream } from '@libp2p/interface-connection';
 import { EventEmitter } from 'stream';
+import { Debug } from '../../logging';
 
 export class Deferred<T> {
     promise: Promise<T>;
@@ -15,6 +16,8 @@ export class Deferred<T> {
 }
 
 export class RawStream {
+    protected readonly log = new Debug('libp2p-raw-stream');
+
     protected eventTarget = new EventEmitter();
     private writeBuffer: Buffer[] = [];
     private writeDeferred = new Deferred<null>();
@@ -22,10 +25,14 @@ export class RawStream {
 
     constructor(private readonly libp2pStream: Stream) {
         this.libp2pStream.sink(this.sink()).catch(e => {
-            console.warn('sink error', e);
+            this.log.error('sink error', e);
             this.close();
         });
         this.source = this._source();
+    }
+
+    get peer(): string {
+        return this.libp2pStream.metadata.peer;
     }
 
     get isOpen(): boolean {
@@ -81,6 +88,7 @@ export class RawStream {
     }
 
     public close() {
+        this.log.info('close stream', this.protocol);
         this.libp2pStream.close();
         this.writeDeferred.resolve(null);
     }

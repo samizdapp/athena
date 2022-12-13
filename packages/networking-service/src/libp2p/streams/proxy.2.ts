@@ -12,25 +12,37 @@ export class ProxyStream2 extends LobStream {
             if (!reqPacket) {
                 continue;
             }
+            this.log.debug('fetch request', reqPacket, this.peer);
+
             const { url, init } = this.processRequest(reqPacket);
             const response = await this.fetch(url, init);
             if (response instanceof Error) {
+                this.log.debug('fetch error', response);
                 await this.writeError(response);
                 continue;
             }
-
             const resPacket = await this.processResponse(response);
+
+            this.log.debug('fetch response', resPacket, this.peer);
+
             await this.send(resPacket);
         }
     }
 
     private async processResponse(response: Response) {
+        this.log.debug('processResponse', response.url, this.peer);
         const resb = await response.arrayBuffer();
         const res = this.getResponseJSON(response);
         const body = Buffer.from(resb);
         const responsePacket = encode(
             { res, bodyLength: body.byteLength },
             body
+        );
+        this.log.debug(
+            'processResponse result',
+            response.url,
+            responsePacket,
+            this.peer
         );
         return responsePacket;
     }
@@ -60,10 +72,11 @@ export class ProxyStream2 extends LobStream {
         init: RequestInit
     ): Promise<Response | Error> {
         try {
+            this.log.debug('fetch', url, init, this.peer);
             const res = await fetchAgent.fetch(url, init);
             return res;
         } catch (e) {
-            console.log('fetch error', e);
+            this.log.warn('fetch error', e);
             return Promise.resolve<Error>(e as Error);
         }
     }
@@ -76,6 +89,7 @@ export class ProxyStream2 extends LobStream {
     }
 
     processRequest(packet: Packet): { url: string; init: RequestInit } {
+        this.log.debug('processRequest', packet, this.peer);
         let url, init;
         const reqObj = packet.json.reqObj as
             | { method?: string; url?: string; body?: Buffer }
@@ -107,9 +121,13 @@ export class ProxyStream2 extends LobStream {
             init = reqObj;
         }
 
-        return { url, init } as {
+        const res = { url, init } as {
             url: string;
             init: RequestInit;
         };
+
+        this.log.debug('processRequest result', res, this.peer);
+
+        return res;
     }
 }

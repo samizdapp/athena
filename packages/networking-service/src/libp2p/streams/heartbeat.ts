@@ -1,5 +1,6 @@
 import { Stream } from '@libp2p/interface-connection';
 import { RawStream, Deferred } from './raw';
+import { Debug } from '../../logging';
 
 export enum HeartbeatType {
     SENDER = 'SENDER',
@@ -7,6 +8,8 @@ export enum HeartbeatType {
     DUPLEX = 'DUPLEX',
 }
 export class HeartbeatStream extends RawStream {
+    protected override readonly log = new Debug('libp2p-heartbeat-stream');
+
     private closeDeferred = new Deferred<void>();
 
     private initializers = {
@@ -47,7 +50,7 @@ export class HeartbeatStream extends RawStream {
     }
 
     private handleTimeout() {
-        console.log('heartbeat', 'timeout');
+        this.log.info('heartbeat timeout', this.peer);
         this.close();
         this.closeDeferred.resolve();
     }

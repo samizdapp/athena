@@ -3,9 +3,12 @@ import { ProxyStream2 } from './streams/proxy.2';
 import { WebsocketStream } from './streams/websocket';
 import { RelayStream } from './streams/relay';
 import { HeartbeatStream, HeartbeatType } from './streams/heartbeat';
-import { Stream } from '@libp2p/interface-connection';
+import { Stream, Connection } from '@libp2p/interface-connection';
+import { Debug } from '../logging';
 
 class Handlers {
+    private readonly log = new Debug('libp2p-handlers');
+
     constructor() {
         node.handleProtocol(
             '/samizdapp-proxy/2.0.0',
@@ -25,20 +28,48 @@ class Handlers {
         node.handleProtocol('/samizdapp-relay', this.handleRelay.bind(this));
     }
 
-    private async handleProxy2({ stream }: { stream: Stream }) {
-        console.debug('proxy2', stream);
+    private async handleProxy2({
+        stream,
+        connection,
+    }: {
+        stream: Stream;
+        connection: Connection;
+    }) {
+        stream.metadata = {
+            peer: connection.remotePeer,
+        };
+        this.log.debug('handle proxy2', stream);
         const proxyStream = new ProxyStream2(stream);
         await proxyStream.init();
     }
 
-    private async handleWebsocket({ stream }: { stream: Stream }) {
-        console.debug('websocket', stream);
+    private async handleWebsocket({
+        stream,
+        connection,
+    }: {
+        stream: Stream;
+        connection: Connection;
+    }) {
+        stream.metadata = {
+            peer: connection.remotePeer,
+        };
+        this.log.debug('handle websocket', stream);
         const websocketStream = new WebsocketStream(stream);
         await websocketStream.init();
     }
 
-    private async handleHeartbeat({ stream }: { stream: Stream }) {
-        console.debug('heartbeat', stream);
+    private async handleHeartbeat({
+        stream,
+        connection,
+    }: {
+        stream: Stream;
+        connection: Connection;
+    }) {
+        stream.metadata = {
+            peer: connection.remotePeer,
+            type: HeartbeatType.SENDER,
+        };
+        this.log.debug('handle heartbeat', stream);
         const heartbeatStream = new HeartbeatStream(
             stream,
             HeartbeatType.SENDER
@@ -46,8 +77,17 @@ class Handlers {
         await heartbeatStream.init();
     }
 
-    private async handleRelay({ stream }: { stream: Stream }) {
-        console.debug('relay', stream);
+    private async handleRelay({
+        stream,
+        connection,
+    }: {
+        stream: Stream;
+        connection: Connection;
+    }) {
+        stream.metadata = {
+            peer: connection.remotePeer,
+        };
+        this.log.debug('handle relay', stream);
         const relayStream = new RelayStream(stream);
         await relayStream.init();
     }

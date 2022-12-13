@@ -19,15 +19,36 @@ import {
 } from '@libp2p/interface-registrar';
 import { Deferred } from './streams/raw';
 import upnp from '../upnp';
+import { Debug } from '../logging';
 
 class Libp2pNode {
+    private log = new Debug('libp2p-node');
     private ready = new Deferred<void>();
     private node?: Libp2p;
     constructor() {
-        this.init();
+        this.init()
+            .then(async () => {
+                this.log.info('libp2p node ready: ');
+                this.log.info(
+                    'self peer string:',
+                    await this.getSelfPeerString()
+                );
+                this.log.info(
+                    'local multiaddr:',
+                    await this.getLocalMultiaddr()
+                );
+                this.log.info(
+                    'public multiaddr:',
+                    await this.getPublicMultiaddr()
+                );
+            })
+            .catch(e => {
+                this.log.error('libp2p node failed', e);
+            });
     }
 
     private async init() {
+        this.log.debug('init');
         const peerId = await readFile(environment.libp2p_id_file)
             .then(createFromProtobuf)
             .catch(async _ => {
@@ -39,6 +60,7 @@ class Libp2pNode {
                 return _id;
             });
 
+        this.log;
         const node = await createLibp2p({
             peerId,
             addresses: {
@@ -72,8 +94,13 @@ class Libp2pNode {
     }
 
     public async dialProtocol(ma: string, protocol: string) {
+        this.log.debug('dialProtocol', ma, protocol);
         await this.ready.promise;
-        return this.node?.dialProtocol(multiaddr(ma), protocol);
+        const s = await this.node?.dialProtocol(multiaddr(ma), protocol);
+        if (!s) return null;
+        s.metadata = { peer: ma };
+        this.log.debug('dialProtocol result', ma, protocol, !!s);
+        return s;
     }
 
     public async getSelfPeerString() {
@@ -81,7 +108,7 @@ class Libp2pNode {
         return this.node?.peerId.toString();
     }
 
-    public async getSelfMultiaddr() {
+    public async getPublicMultiaddr() {
         const peerString = await this.getSelfPeerString();
         const upnpInfo = await upnp.info();
         const publicPort = upnpInfo.libp2p.internalPort;
@@ -89,6 +116,14 @@ class Libp2pNode {
         if (!(publicPort && publicHost)) return null;
 
         return `/ip4/${publicHost}/tcp/${publicPort}/ws/p2p/${peerString}`;
+    }
+
+    public async getLocalMultiaddr() {
+        const localIP = await upnp.getLocalIP();
+        const upnpInfo = await upnp.info();
+        const privatePort = upnpInfo.libp2p.internalPort;
+        const selfPeerString = await this.getSelfPeerString();
+        return `/ip4/${localIP}/tcp/${privatePort}/ws/p2p/${selfPeerString}`;
     }
 
     public async handleProtocol(

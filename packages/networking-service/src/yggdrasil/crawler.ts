@@ -3,18 +3,29 @@ import dns from './dns';
 import { EventEmitter } from 'stream';
 import { ScalableBloomFilter } from 'bloom-filters';
 import { Debug } from '../logging';
+import { StatusUpdater, Statuses } from '../status';
 
 const waitFor = async (ms: number) => new Promise(r => setTimeout(r, ms));
 
 class YggdrassilCrawler extends EventEmitter {
-    private readonly log = new Debug('yggdrasil-crawler');
-
+    private readonly service = 'yggdrasil-crawler';
+    private readonly log = new Debug(this.service);
+    private readonly status = new StatusUpdater(this.service);
     private isStarted = false;
     private dudResetCount = 0;
     private duds = new ScalableBloomFilter();
     private currentCrawl: Promise<void> = Promise.resolve();
     private touched = new Set();
     private found = new Set();
+
+    constructor() {
+        super();
+        this.status.sendStatus(Statuses.ONLINE);
+        this.start().catch(e => {
+            this.log.error('crawler error', e);
+            this.status.sendStatus(Statuses.ERROR, e.message);
+        });
+    }
 
     private getWaitTime() {
         if (this.dudResetCount > 0) {
@@ -24,23 +35,21 @@ class YggdrassilCrawler extends EventEmitter {
     }
 
     async start() {
-        if (this.isStarted) return;
-        this.isStarted = true;
         while (this.isStarted) {
             this.log.info('scanning...');
             this.currentCrawl = this.scan();
             await this.currentCrawl;
             this.log.info('scanning complete, trigger dns save');
             await dns.save();
-            const waitTime = this.getWaitTime();
-            this.log.info(`waiting ${waitTime}ms`);
-            await waitFor(this.getWaitTime());
+            await this.idle();
         }
     }
 
-    async stop() {
-        this.isStarted = false;
-        await this.currentCrawl;
+    async idle() {
+        const waitTime = this.getWaitTime();
+        this.log.info(`waiting ${waitTime}ms`);
+        this.status.sendStatus(Statuses.IDLE);
+        await waitFor(waitTime);
     }
 
     private async getInitialCrawl() {

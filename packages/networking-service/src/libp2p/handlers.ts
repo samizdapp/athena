@@ -12,20 +12,31 @@ class Handlers {
     constructor() {
         node.handleProtocol(
             '/samizdapp-proxy/2.0.0',
-            this.handleProxy2.bind(this)
+            this.handleProxy2.bind(this),
+            {
+                maxInboundStreams: 100,
+            }
         );
 
         node.handleProtocol(
             '/samizdapp-websocket',
-            this.handleWebsocket.bind(this)
+            this.handleWebsocket.bind(this),
+            {
+                maxInboundStreams: 100,
+            }
         );
 
         node.handleProtocol(
             '/samizdapp-heartbeat',
-            this.handleHeartbeat.bind(this)
+            this.handleHeartbeat.bind(this),
+            {
+                maxInboundStreams: 100,
+            }
         );
 
-        node.handleProtocol('/samizdapp-relay', this.handleRelay.bind(this));
+        node.handleProtocol('/samizdapp-relay', this.handleRelay.bind(this), {
+            maxInboundStreams: 100,
+        });
     }
 
     private async handleProxy2({
@@ -69,7 +80,7 @@ class Handlers {
             peer: connection.remotePeer,
             type: HeartbeatType.SENDER,
         };
-        this.log.debug('handle heartbeat', stream);
+        this.log.debug('handle heartbeat', stream.metadata.peer.toString());
         const heartbeatStream = new HeartbeatStream(
             stream,
             HeartbeatType.SENDER

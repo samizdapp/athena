@@ -90,7 +90,7 @@ type RPCResponse = {
 class RPCWorker {
     static readonly log = new Debug('yggdrasil-rpc-worker');
     static readonly poolSize = 10;
-    static readonly watchdogTimeout = 20000;
+    static readonly watchdogTimeout = 30000;
     static readonly available = new Set();
     static readonly in_use = new Set();
     static errorCount = 0;

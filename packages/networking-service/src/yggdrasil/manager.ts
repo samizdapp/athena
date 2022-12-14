@@ -16,7 +16,6 @@ class YggdrasilManager {
 
     async start() {
         this.log.info('starting yggdrasil crawler');
-        crawler.start();
         await this.writeYggdrasilPeerFile();
         this.log.info('started yggdrasil crawler');
     }

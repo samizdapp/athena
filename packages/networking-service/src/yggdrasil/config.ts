@@ -21,30 +21,32 @@ export class YggdrasilConfig {
 
     save(force = false) {
         this.log.debug('save called, force:', force);
-        if (force) return this._save();
-        clearTimeout(this.saveTimeout);
-        this.saveTimeout = setTimeout(async () => {
-            await this.sanitizeConfig();
-            const json = JSON.stringify(this.json);
-            const oldContent = JSON.stringify(
-                JSON.parse(
-                    readFileSync(environment.yggdrasil_config, 'utf8').trim()
-                )
-            );
-            if (oldContent === json) {
-                this.log.info('yggdrasil config unchanged, not saving');
-                return;
-            }
-            this.log.info(
-                'yggdrasil config changed, saving (set debug level to see changes)'
-            );
-            this.log.debug('old', oldContent);
-            this.log.debug('new', json);
+        if (force) {
             this._save();
-        }, this.saveDebounce);
+            return;
+        }
+        clearTimeout(this.saveTimeout);
+        this.saveTimeout = setTimeout(this._save.bind(this), this.saveDebounce);
     }
 
-    private _save() {
+    private async _save() {
+        await this.sanitizeConfig();
+        const json = JSON.stringify(this.json);
+        const oldContent = JSON.stringify(
+            JSON.parse(
+                readFileSync(environment.yggdrasil_config, 'utf8').trim()
+            )
+        );
+        if (oldContent === json) {
+            this.log.info('yggdrasil config unchanged, not saving');
+            return;
+        }
+        this.log.info(
+            'yggdrasil config changed, saving (set debug level to see changes)'
+        );
+        this.log.debug('old', oldContent);
+        this.log.debug('new', json);
+
         writeFile(
             environment.yggdrasil_config,
             JSON.stringify(this.json, null, 4),

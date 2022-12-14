@@ -51,7 +51,8 @@ class Libp2pNode {
         this.log.debug('init');
         const peerId = await readFile(environment.libp2p_id_file)
             .then(createFromProtobuf)
-            .catch(async _ => {
+            .catch(async e => {
+                this.log.error('failed to read peer id', e);
                 const _id = await createEd25519PeerId();
                 await writeFile(
                     environment.libp2p_id_file,

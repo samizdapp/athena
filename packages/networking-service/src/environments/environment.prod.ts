@@ -1,7 +1,7 @@
 export const environment = {
     production: true,
     force_relay_open: true,
-    libp2p_id_file: __dirname + '/assets/libp2p.id',
+    libp2p_id_file: '/shared_etc/libp2p.id',
     libp2p_listen_port: 9000,
     libp2p_bootstrap_file: '/next/assets/libp2p.bootstrap',
     libp2p_relay_file: '/yggdrasil/libp2p.relay',
@@ -11,5 +11,5 @@ export const environment = {
     yggdrasil_config: '/etc/yggdrasil-network/config.conf',
     yggdrasil_peer_file: '/yggdrasil/peer',
     hostsfile: '/shared_etc/hosts',
-    default_log_level: 'DEBUG',
+    default_log_level: 'TRACE',
 };

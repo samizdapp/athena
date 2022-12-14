@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import debug from 'debug';
+import { environment } from './environments/environment';
 
 enum LogLevels {
     TRACE = 'TRACE',
@@ -70,7 +71,8 @@ export class Debug {
 }
 
 function init() {
-    const envLogLevels = process.env.DEBUG || `*:${LogLevels.INFO}}`;
+    const envLogLevels =
+        process.env.DEBUG || `*:${environment.default_log_level}`;
     const config = envLogLevels.split(',').reduce((acc, cur) => {
         const [namespace, level] = cur.split(':');
         acc[namespace] = level;

@@ -37,6 +37,7 @@
     "class-validator": "^0.13.2",
     "core-js": "^3.6.5",
     "datastore-level": "^9.0.1",
+    "dbus-native": "^0.4.0",
     "esbuild": "^0.15.18",
     "internal-ip": "^7.0.0",
     "it-pipe": "^2.0.4",

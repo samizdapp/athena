@@ -32,7 +32,11 @@ export class StreamFactory {
         this.dialTimeout = maxDialTimeout;
     }
 
-    private async makeStream(protocol: string) {
+    private async makeStream(
+        protocol: string,
+        Constructor: StreamConstructor,
+        ports: MessagePort[]
+    ) {
         this.log.trace('Get stream for protocol: ', protocol);
 
         // we need to be connected
@@ -41,8 +45,20 @@ export class StreamFactory {
         }
 
         // start with no stream
-        let stream: Stream | null = null;
+        let stream: RawStream | null = null;
         while (!stream) {
+            // if our constructor is a subclass of PooledLobStream, try to get it
+            // from the pool
+            if (Constructor.prototype instanceof PooledLobStream) {
+                stream = PooledLobStream.getFromPool(
+                    protocol,
+                    Constructor as unknown as typeof PooledLobStream
+                );
+                if (stream) {
+                    return stream;
+                }
+            }
+
             // if we're currently in timeout, wait until we're not
             while (this.inTimeout) {
                 this.log.trace('Waiting for timeout to end...');
@@ -64,6 +80,9 @@ export class StreamFactory {
                         ),
                     this.dialTimeout
                 )
+                .then(rawStream => {
+                    return new Constructor(rawStream, ports);
+                })
                 .catch(e => {
                     const log = ['dialProtocol error: ', e];
                     if (['ERR_UNSUPPORTED_PROTOCOL'].includes(e.code)) {
@@ -126,7 +145,7 @@ export class StreamFactory {
             }
 
             // wait awhile before retrying the stream again
-            this.log.info('Dial timeout, waiting to retry...', {
+            this.log.info(`Dial timeout, waiting to retry... (${protocol})`, {
                 dialTimeout: this.dialTimeout,
                 retryTimeout: this.retryTimeout,
             });
@@ -159,22 +178,14 @@ export class StreamFactory {
         ports: MessagePort[] = []
     ): Promise<SamizdappStream> {
         let stream = null;
-        // if our constructor is a subclass of PooledLobStream, try to get it
-        // from the pool
-        if (Constructor.prototype instanceof PooledLobStream) {
-            stream = PooledLobStream.getFromPool(
-                protocol,
-                Constructor as unknown as typeof PooledLobStream
-            );
-            if (stream) {
-                return stream;
-            }
-        }
 
-        // either it's not a pooled stream, or the pool didn't have one
-        // so we need to make a new one
-        const rawStream = await this.makeStream(protocol);
-        stream = new Constructor(rawStream, ports);
+        // make stream returns
+        const rawStream = await this.makeStream(protocol, Constructor, ports);
+        if (rawStream instanceof Constructor) {
+            stream = rawStream;
+        } else {
+            stream = new Constructor(rawStream as Stream, ports);
+        }
         return stream;
     }
 

@@ -119,6 +119,9 @@ export class BootstrapList extends Bootstrap {
         const start = Date.now();
         let socket;
         try {
+            this.log.trace(
+                `Collecting stats for ${address} with timeout: ${timeout}...`
+            );
             socket = await new WebSockets().dial(
                 address.isRelay
                     ? address.multiaddr.decapsulate('p2p-circuit')

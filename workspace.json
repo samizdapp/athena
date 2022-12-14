@@ -6,8 +6,8 @@
     "gateway-client": "packages/gateway-client",
     "networking-service": "packages/networking-service",
     "shared-api": "packages/shared/api",
+    "shared-libp2p": "packages/shared/libp2p",
     "shared-service-worker": "packages/shared/service-worker",
-    "status-service": "packages/status-service",
-    "shared-libp2p": "packages/shared/libp2p"
+    "status-service": "packages/status-service"
   }
 }

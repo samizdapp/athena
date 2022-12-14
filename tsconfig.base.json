@@ -15,8 +15,8 @@
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@athena/shared/libp2p": ["packages/shared/libp2p/src/index.ts"],
       "@athena/shared/api": ["packages/shared/api/src/index.ts"],
+      "@athena/shared/libp2p": ["packages/shared/libp2p/src/index.ts"],
       "@athena/shared/service-worker": [
         "packages/shared/service-worker/src/index.ts"
       ]

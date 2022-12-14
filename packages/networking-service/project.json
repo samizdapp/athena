@@ -11,9 +11,7 @@
         "outputPath": "dist/packages/networking-service",
         "main": "packages/networking-service/src/main.ts",
         "tsConfig": "packages/networking-service/tsconfig.app.json",
-        "assets": [
-          "packages/networking-service/src/assets"
-        ],
+        "assets": ["packages/networking-service/src/assets"],
         "fileReplacements": [
           {
             "replace": "packages/shared/libp2p/src/index.ts",

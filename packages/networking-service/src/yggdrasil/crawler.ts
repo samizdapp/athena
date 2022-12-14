@@ -11,7 +11,7 @@ class YggdrassilCrawler extends EventEmitter {
     private readonly service = 'yggdrasil-crawler';
     private readonly log = new Debug(this.service);
     private readonly status = new StatusUpdater(this.service);
-    private isStarted = false;
+    private isStarted = true;
     private dudResetCount = 0;
     private duds = new ScalableBloomFilter();
     private currentCrawl: Promise<void> = Promise.resolve();

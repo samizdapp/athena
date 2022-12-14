@@ -4,6 +4,26 @@
   "projectType": "application",
   "targets": {
     "build": {
+      "executor": "@nrwl/workspace:run-commands",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "commands": [
+          {
+            "command": "npm run build shared-libp2p && npm run nx run networking-service:build_after"
+          }
+        ]
+      },
+      "configurations": {
+        "production": {
+          "commands": [
+            {
+              "command": "npm run build shared-libp2p && npm run nx run networking-service:build_after:production"
+            }
+          ]
+        }
+      }
+    },
+    "build_after": {
       "executor": "@nrwl/node:webpack",
       "outputs": ["{options.outputPath}"],
       "options": {
@@ -36,11 +56,11 @@
     "serve": {
       "executor": "@nrwl/node:node",
       "options": {
-        "buildTarget": "networking-service:build"
+        "buildTarget": "networking-service:build_after"
       },
       "configurations": {
         "production": {
-          "buildTarget": "networking-service:build:production"
+          "buildTarget": "networking-service:build_after:production"
         }
       }
     },

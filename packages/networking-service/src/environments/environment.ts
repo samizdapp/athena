@@ -16,6 +16,6 @@ export const environment = {
         process.env.yggdrasil_config || '/etc/yggdrasil-network/config.conf',
     yggdrasil_peer_file: process.env.yggdrasil_peer_file || '/yggdrasil/peer',
     hostsfile: process.env.hostsfile || '/shared_etc/hosts',
-    default_log_level: process.env.default_log_level || 'TRACE',
+    default_log_level: process.env.default_log_level || 'INFO',
     ignore_status: (process.env.ignore_status as unknown as boolean) || false,
 };

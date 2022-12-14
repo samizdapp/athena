@@ -10,7 +10,7 @@ export const environment = {
     yggdrasil_listen_port: parseInt(
         process.env.yggdrasil_listen_port || '5000'
     ),
-    yggdrasil_admin_host: process.env.yggdrasil_admin_host || 'localhost',
+    yggdrasil_admin_host: process.env.yggdrasil_admin_host || '127.0.0.1',
     yggdrasil_admin_port: parseInt(process.env.yggdrasil_admin_port || '9001'),
     yggdrasil_config:
         process.env.yggdrasil_config || '/etc/yggdrasil-network/config.conf',

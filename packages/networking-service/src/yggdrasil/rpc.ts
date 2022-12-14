@@ -113,7 +113,7 @@ class RPCWorker {
             // 20 seconds of errors, trigger manual restart of yggdrasil
             this.watchdog();
         }
-        await waitFor(this.watchdogTimeout);
+        await waitFor(this.watchdogTimeout * 3);
         this.errorCount--;
         this.log.debug('yggdrasil rpc error count', this.errorCount);
     }

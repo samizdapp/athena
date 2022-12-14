@@ -1,0 +1,36 @@
+{
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/shared/libp2p/src",
+  "projectType": "library",
+  "targets": {
+    "build": {
+      "executor": "@nrwl/node:webpack",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "generatePackageJson": true,
+        "outputPath": "dist/packages/shared/libp2p",
+        "main": "packages/shared/libp2p/src/index.ts",
+        "tsConfig": "packages/shared/libp2p/tsconfig.json",
+        "verbose": true,
+        "externalDependencies": ["bufferutil", "utf-8-validate"],
+        "webpackConfig": "packages/shared/libp2p/webpack.config.js"
+      }
+    },
+    "lint": {
+      "executor": "@nrwl/linter:eslint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["packages/shared/libp2p/**/*.ts"]
+      }
+    },
+    "test": {
+      "executor": "@nrwl/jest:jest",
+      "outputs": ["coverage/packages/shared/libp2p"],
+      "options": {
+        "jestConfig": "packages/shared/libp2p/jest.config.ts",
+        "passWithNoTests": true
+      }
+    }
+  },
+  "tags": []
+}

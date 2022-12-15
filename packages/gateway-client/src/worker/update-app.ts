@@ -8,8 +8,8 @@ declare const self: ServiceWorkerGlobalScope;
 
 const log = logger.getLogger('worker/update-app');
 
-// abort attempt to fetch updated script after 5 minutes
-const updateFetchTimeout = 5 * 60 * 1000;
+// abort attempt to fetch updated script after 1 minute
+const updateFetchTimeout = 1 * 60 * 1000;
 const rootWorkerCache = '/smz/worker/root';
 const appWorkerUrl =
     `${new URL('.', self.location.href).pathname.slice(0, -1)}` +

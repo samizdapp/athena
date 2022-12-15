@@ -1,4 +1,4 @@
-import { Mapping } from 'node-portmapping';
+import type { Mapping } from 'node-portmapping';
 import { environment } from './environments/environment';
 import { internalIpV4 } from '@athena/shared/libp2p';
 import { Debug } from './logging';

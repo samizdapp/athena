@@ -33,7 +33,11 @@ export class StreamFactory {
         this.dialTimeout = maxDialTimeout;
     }
 
-    private async makeStream(protocol: string) {
+    async getStream(
+        protocol: string,
+        Constructor: StreamConstructor = RawStream,
+        ports: MessagePort[] = []
+    ) {
         this.log.trace('Get stream for protocol: ', protocol);
 
         // we need to be connected
@@ -42,8 +46,13 @@ export class StreamFactory {
         }
 
         // start with no stream
-        let stream: Stream | null = null;
+        let stream: SamizdappStream | null = null;
         while (!stream) {
+            stream = StreamPool.getFromPool(protocol, Constructor);
+            if (stream) {
+                this.log.trace('Got stream from pool');
+                return stream;
+            }
             // if we're currently in timeout, wait until we're not
             while (this.inTimeout) {
                 this.log.trace('Waiting for timeout to end...');
@@ -65,6 +74,9 @@ export class StreamFactory {
                         ),
                     this.dialTimeout
                 )
+                .then((stream: Stream) => {
+                    return new Constructor(stream, ports);
+                })
                 .catch(e => {
                     const log = ['dialProtocol error: ', e];
                     if (['ERR_UNSUPPORTED_PROTOCOL'].includes(e.code)) {
@@ -154,24 +166,6 @@ export class StreamFactory {
         return stream;
     }
 
-    public async getStream(
-        protocol = '/samizdapp-proxy',
-        Constructor: StreamConstructor = RawStream,
-        ports: MessagePort[] = []
-    ): Promise<SamizdappStream> {
-        let stream = null;
-        stream = StreamPool.getFromPool(protocol, Constructor);
-        if (stream) {
-            return stream;
-        }
-
-        // either it's not a pooled stream, or the pool didn't have one
-        // so we need to make a new one
-        const rawStream = await this.makeStream(protocol);
-        stream = new Constructor(rawStream, ports);
-        return stream;
-    }
-
     public async getRequestStream(
         protocol = '/samizdapp-proxy/2.0.0'
     ): Promise<RequestStream> {
@@ -183,7 +177,7 @@ export class StreamFactory {
     }
 
     public async getNativeRequestStream(
-        protocol = '/samizdapp-proxy/2.0.0'
+        protocol = '/samizdapp-proxy/3.0.0'
     ): Promise<NativeRequestStream> {
         this.log.debug('get request stream');
         return this.getStream(

@@ -5,3 +5,5 @@ export * from '@libp2p/websockets';
 export * from '@chainsafe/libp2p-noise';
 export * from 'internal-ip';
 export * from '@multiformats/multiaddr';
+
+export * as nfetch from 'node-fetch';

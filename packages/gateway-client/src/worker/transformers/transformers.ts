@@ -49,31 +49,23 @@ abstract class AbstractTransformer {
 
     private transform(
         r: Request | Response,
-        type: ChunkType
-    ): ReadableStream<Uint8Array> {
-        return new ReadableStream({
-            start: async controller => {
-                const chunks = await this.readableStreamToAsyncIterator(
-                    r.body!
-                );
-                for await (const chunk of chunks) {
-                    controller.enqueue(
-                        this.chunkTransformers[type](
-                            r as unknown as Request & Response,
-                            chunk
-                        )
-                    );
-                }
-            },
-        });
+        _type: ChunkType
+    ): ReadableStream<Uint8Array> | undefined {
+        return r.body || undefined;
     }
 
     transformRequest(req: Request): Request {
+        //console.log('transformRequest', req);
         // check if the request is correct type
         if (this.shouldTransformRequest(req)) {
             const head = this.transformRequestHead(req);
+            console.log(
+                'transformRequest',
+                head,
+                Array.from(head.headers.entries())
+            );
             const body = this.transform(req, ChunkType.REQUEST);
-            return new Request(head, { body });
+            return this.newRequest(head, body as ReadableStream<Uint8Array>);
         }
         return req;
     }
@@ -90,13 +82,116 @@ abstract class AbstractTransformer {
     ): Uint8Array;
 
     transformResponse(res: Response): Response {
+        //console.log('transformResponse', res);
         // check if the response is correct type
         if (this.shouldTransformResponse(res)) {
             const head = this.transformResponseHead(res);
             const body = this.transform(res, ChunkType.RESPONSE);
-            return new Response(body, head);
+            return this.newResponse(head, body as ReadableStream<Uint8Array>);
         }
         return res;
+    }
+
+    protected newResponse(res: Response, body: ReadableStream<Uint8Array>) {
+        return Object.defineProperties(new Response(body, res), {
+            url: {
+                get: () => res.url,
+            },
+            redirected: {
+                get: () => res.redirected,
+            },
+            type: {
+                get: () => res.type,
+            },
+        });
+    }
+
+    protected newRequest(req: Request, body: ReadableStream<Uint8Array>) {
+        //console.log('newRequest', req, body, Array.from(req.headers.entries()));
+
+        return Object.defineProperties(
+            new Request(req.url, {
+                headers: req.headers,
+                method: req.method,
+                mode: req.mode !== 'navigate' ? req.mode : 'same-origin',
+                credentials: req.credentials,
+                cache: req.cache,
+                redirect: req.redirect,
+                referrer: req.referrer,
+                integrity: req.integrity,
+            }),
+            {
+                headers: {
+                    get: () => req.headers,
+                    configurable: true,
+                },
+                body: {
+                    get: () => body,
+                },
+                destination: {
+                    get: () => req.destination,
+                },
+            }
+        );
+    }
+
+    protected newUrlRequest(url: string, req: Request) {
+        const request = new Request(url, {
+            headers: req.headers,
+            method: req.method,
+            mode: req.mode,
+            credentials: req.credentials,
+            cache: req.cache,
+            redirect: req.redirect,
+            referrer: req.referrer,
+            integrity: req.integrity,
+        });
+        Object.defineProperty(request, 'body', {
+            get: () => req.body,
+        });
+        //console.log('newRequest', url, req, request);
+        return request;
+    }
+
+    protected replaceRequestHeaders(req: Request, headers: Headers) {
+        // create a new request with the modified headers, omitting the body if GET/HEAD
+
+        const request = this.newRequest(
+            req,
+            req.body as ReadableStream<Uint8Array>
+        );
+
+        Object.defineProperty(request, 'headers', {
+            get: () => headers,
+        });
+
+        //console.log(
+        //     'replaceRequestHeaders',
+        //     Array.from(req.headers.entries()),
+        //     Array.from(headers.entries()),
+        //     Array.from(request.headers.entries())
+        // );
+
+        return request;
+    }
+
+    protected replaceResponseHeaders(res: Response, headers: Headers) {
+        // create a new response with the modified headers, omitting the body if HEAD
+        const response = this.newResponse(
+            {
+                status: res.status,
+                statusText: res.statusText,
+                headers,
+                url: res.url,
+                redirected: res.redirected,
+                type: res.type,
+            } as Response,
+            res.body as ReadableStream<Uint8Array>
+        );
+
+        //console.log('replaceResponseHeaders', res, headers, response);
+
+        return response;
     }
 
     private async *readableStreamToAsyncIterator(
@@ -170,6 +265,16 @@ export class CompiledTransformer extends BaseTransformer {
             res.headers.get('content-type')?.startsWith(this.content_type) ||
             false
         );
+    }
+
+    override transformResponseHead(res: Response): Response {
+        const headers = new Headers(res.headers);
+        const prevLen = headers.get('content-length') || '0';
+        headers.set(
+            'content-length',
+            `${parseInt(prevLen) + this.snippet.length}`
+        );
+        return this.replaceResponseHeaders(res, headers);
     }
 }
 

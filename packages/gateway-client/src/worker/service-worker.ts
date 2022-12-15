@@ -14,6 +14,7 @@ import injectors, {
     proxyWebSocketTransformer,
     pingServiceWorkerTransformer,
     basePathTransformer,
+    SamizdappFlagTransformer,
 } from './transformers';
 import { logger } from './logging';
 
@@ -48,7 +49,9 @@ fetchHandlers
 injectors
     .use(proxyWebSocketTransformer)
     .use(pingServiceWorkerTransformer)
-    .use(basePathTransformer);
+    .use(basePathTransformer)
+    .use(new SamizdappFlagTransformer('/smz', 'samizdapp'))
+    .use(new SamizdappFlagTransformer('/manifest.json', 'pleroma', true));
 
 bootstrap();
 

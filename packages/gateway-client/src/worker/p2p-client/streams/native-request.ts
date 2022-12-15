@@ -9,7 +9,7 @@ export class NativeRequestStream extends RawStream {
     private inbox = new Deferred<Response>();
     private done = new Deferred<null>();
     private responseHeadBuffer = Buffer.alloc(0);
-    private responseHead: ResponseInit | null = null;
+    private responseHead: Response | null = null;
     private response: Response | null = null;
     private responseBodyStream: ReadableStream | null = null;
     private responseBodyController: ReadableStreamDefaultController | null =
@@ -25,13 +25,20 @@ export class NativeRequestStream extends RawStream {
 
     async fetch(request: Request) {
         const transformedRequest = transformers.transformRequest(request);
-        this.outbox.resolve(transformedRequest);
+        ////console.log(
+        //     'transformedRequest',
+        //     Array.from(transformedRequest.headers.entries())
+        // );
+        const outbox = this.outbox;
+        this.outbox = new Deferred<Request>();
+        outbox.resolve(transformedRequest);
         const response = await this.inbox.promise;
         const transformedResponse = transformers.transformResponse(response);
         return transformedResponse;
     }
 
     private getRequestHead(request: Request) {
+        ////console.log('getRequestHead', Array.from(request.headers.entries()));
         return {
             method: request.method,
             url: request.url,
@@ -48,8 +55,14 @@ export class NativeRequestStream extends RawStream {
 
     private chunkify(chunkType: number, buffer: Buffer) {
         const chunks = [];
+
         for (let i = 0; i < buffer.byteLength; i += this.chunkSize) {
-            const chunk = Buffer.alloc(this.chunkSize + 1);
+            const chunk =
+                i > 0
+                    ? buffer.slice(i - 1, i + this.chunkSize)
+                    : Buffer.alloc(
+                          Math.min(buffer.byteLength - i, this.chunkSize) + 1
+                      );
             chunk.writeUInt8(chunkType, 0);
             buffer.copy(chunk, 1, i, i + this.chunkSize);
             chunks.push(chunk);
@@ -69,9 +82,9 @@ export class NativeRequestStream extends RawStream {
     private async writeRequestBody(request: Request) {
         if (request.body instanceof ArrayBuffer) return;
         if (!request.body) return;
-        const rawChunks = this.readableStreamToAsyncIterator(request.body);
+        const rawChunks = await this.readableStreamToChunks(request.body);
 
-        for await (const chunk of rawChunks) {
+        for (const chunk of rawChunks) {
             const chunks = this.chunkify(0x01, chunk);
             for (const chunk of chunks) {
                 await this.write(chunk);
@@ -79,15 +92,47 @@ export class NativeRequestStream extends RawStream {
         }
     }
 
+    private async readableStreamToChunks(body: ReadableStream) {
+        const reader = (body as ReadableStream).getReader();
+        // loop our reader and store the stream into a new buffer
+        const chunks = [];
+        let finished = false;
+        let length = 0;
+        do {
+            const { done, value } = await reader.read();
+            finished = done;
+            if (!done) {
+                const chunk = Buffer.from(value);
+                length += chunk.byteLength;
+                chunks.push(chunk);
+            }
+        } while (!finished);
+
+        console.log('readableStreamToChunks', length);
+        return chunks;
+    }
+
     private async *readableStreamToAsyncIterator(stream: ReadableStream) {
+        console.log('readableStreamToAsyncIterator', stream);
         const reader = stream.getReader();
+        let length = 0;
         try {
-            while (true) {
+            let finished = false;
+            const chunks = [];
+            do {
                 const { value, done } = await reader.read();
+                // ////console.log('readableStreamToAsyncIterator', value, done);
                 if (done) {
-                    return;
+                    finished = true;
+                } else {
+                    length += value.byteLength;
+                    chunks.push(Buffer.from(value));
                 }
-                yield value;
+            } while (!finished);
+            console.log('readableStreamToAsyncIterator', 'done', length);
+
+            for (const chunk of chunks) {
+                yield chunk;
             }
         } finally {
             reader.releaseLock();
@@ -149,14 +194,55 @@ export class NativeRequestStream extends RawStream {
                 this.responseBodyController = controller;
             },
         });
-        this.response = new Response(
-            this.responseBodyStream,
-            this.responseHead as unknown as ResponseInit
+        this.response = this.makeResponse();
+
+        this.log.debug('receiveResponseHead', this.responseHead, this.response);
+        const inbox = this.inbox;
+        this.inbox = new Deferred<Response>();
+        inbox.resolve(this.response);
+    }
+
+    private makeResponse() {
+        const headers = this.makeHeaders(
+            (this.responseHead?.headers as unknown as [string, string][]) || []
         );
-        this.inbox.resolve(this.response);
+        const status = this.responseHead?.status;
+        const statusText = this.responseHead?.statusText;
+        const response = new Response(this.responseBodyStream, {
+            status,
+            statusText,
+            headers,
+        });
+
+        const url = this.responseHead?.url;
+        const redirected = this.responseHead?.redirected;
+        const type = this.responseHead?.type;
+
+        Object.defineProperties(response, {
+            url: {
+                get: () => url,
+            },
+            redirected: {
+                get: () => redirected,
+            },
+            type: {
+                get: () => type,
+            },
+        });
+
+        return response;
+    }
+
+    private makeHeaders(headers: [string, string][]) {
+        const result = new Headers();
+        for (const [key, value] of headers) {
+            result.append(key, value);
+        }
+        return result;
     }
 
     private receiveResponseBody(chunk: Buffer): Response {
+        this.log.debug('receiveResponseBody', chunk);
         if (!this.responseBodyController) {
             throw new Error('responseBodyController is null');
         }
@@ -165,15 +251,15 @@ export class NativeRequestStream extends RawStream {
     }
 
     private receiveResponseEnd() {
+        this.log.debug('receiveResponseEnd');
         if (!this.responseBodyController) {
             throw new Error('responseBodyController is null');
         }
         this.responseBodyController.close();
-        this.done.resolve(null);
+        this.release();
     }
 
-    public async release() {
-        await this.done.promise;
+    private async release() {
         StreamPool.release(this as unknown as RawStream);
     }
 }

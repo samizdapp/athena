@@ -62,7 +62,7 @@ export class P2pClient {
             .catch(_ => _);
     }
 
-    public getStream(protocol?: string) {
+    public getStream(protocol = '/samizdapp-proxy/3.0.0') {
         if (!this.streamFactory) {
             throw new Error('No connection established!');
         }
@@ -408,7 +408,7 @@ export class P2pClient {
         if (!this.streamFactory) {
             throw new Error('Stream factory not initialized');
         }
-        return this.streamFactory.getRequestStream();
+        return this.streamFactory.getNativeRequestStream();
     }
 
     public async getNativeRequestStream() {

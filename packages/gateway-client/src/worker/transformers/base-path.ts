@@ -88,7 +88,7 @@ class BasePathTransformer extends BaseTransformer {
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore
             req.duplex = 'half';
-            return new Request(newUrl.toString(), req);
+            return this.newUrlRequest(newUrl.toString(), req);
         } catch (e) {
             this.log.error('error constructing new request: ', e);
             this.log.error('original request: ', req.clone());
@@ -134,6 +134,22 @@ class BasePathTransformer extends BaseTransformer {
             res,
             new TextEncoder().encode(newBody)
         );
+    }
+
+    override transformResponseHead(res: Response): Response {
+        const targetHeaderRaw = res.headers.get(this.header);
+        const [targetHeader] = targetHeaderRaw?.split(',') || [];
+        console.log('RESPONSE', res);
+        const _url = new URL(res.url);
+        _url.search = '';
+        _url.hash = '';
+        const url = _url.toString();
+        const injector = new CompiledTransformer(
+            this.content_type,
+            '<head>',
+            makeSnippet(targetHeader, url)
+        );
+        return injector.transformResponseHead(res);
     }
 }
 

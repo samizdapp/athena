@@ -18,4 +18,7 @@ export const environment = {
     hostsfile: process.env.hostsfile || '/shared_etc/hosts',
     default_log_level: process.env.default_log_level || 'INFO',
     ignore_status: (process.env.ignore_status as unknown as boolean) || false,
+    yggdrasil_alias_localhost: process.env.yggdrasil_local_alias || '',
+    fetch_localhost_ip: process.env.fetch_localhost_ip || '127.0.0.1',
+    fetch_localhost_port: parseInt(process.env.fetch_localhost_port || '80'),
 };

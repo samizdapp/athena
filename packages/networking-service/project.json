@@ -1,0 +1,84 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/networking-service/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "@nrwl/workspace:run-commands",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "commands": [
+          {
+            "command": "npm run build shared-libp2p && npm run nx run networking-service:build_after"
+          }
+        ]
+      },
+      "configurations": {
+        "production": {
+          "commands": [
+            {
+              "command": "npm run build shared-libp2p && npm run nx run networking-service:build_after:production"
+            }
+          ]
+        }
+      }
+    },
+    "build_after": {
+      "executor": "@nrwl/node:webpack",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "generatePackageJson": true,
+        "outputPath": "dist/packages/networking-service",
+        "main": "packages/networking-service/src/main.ts",
+        "tsConfig": "packages/networking-service/tsconfig.app.json",
+        "assets": ["packages/networking-service/src/assets"],
+        "fileReplacements": [
+          {
+            "replace": "packages/shared/libp2p/src/index.ts",
+            "with": "dist/packages/shared/libp2p/main.js"
+          }
+        ]
+      },
+      "configurations": {
+        "production": {
+          "optimization": true,
+          "extractLicenses": true,
+          "inspect": false,
+          "fileReplacements": [
+            {
+              "replace": "packages/shared/libp2p/src/index.ts",
+              "with": "dist/packages/shared/libp2p/main.js"
+            }
+          ]
+        }
+      }
+    },
+    "serve": {
+      "executor": "@nrwl/node:node",
+      "options": {
+        "buildTarget": "networking-service:build_after"
+      },
+      "configurations": {
+        "production": {
+          "buildTarget": "networking-service:build_after:production"
+        }
+      }
+    },
+    "lint": {
+      "executor": "@nrwl/linter:eslint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["packages/networking-service/**/*.ts"]
+      }
+    },
+    "test": {
+      "executor": "@nrwl/jest:jest",
+      "outputs": ["coverage/packages/networking-service"],
+      "options": {
+        "jestConfig": "packages/networking-service/jest.config.ts",
+        "passWithNoTests": true
+      }
+    }
+  },
+  "tags": []
+}

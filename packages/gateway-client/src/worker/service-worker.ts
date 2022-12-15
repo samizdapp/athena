@@ -261,6 +261,8 @@ const appExecuted = (async () => {
         }
         // if we've already activated and we do NOT have a pending activate dispatch
         if (
+            !self.registration.waiting &&
+            !self.registration.installing &&
             self.registration.active &&
             !pendingDispatches.find(it => it.type === 'activate')
         ) {

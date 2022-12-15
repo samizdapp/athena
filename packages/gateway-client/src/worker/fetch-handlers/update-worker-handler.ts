@@ -1,4 +1,4 @@
-import updateAppWorker from '../update-app';
+import { updateAppWorker } from '../update-app';
 import { Handler } from './fetch-handlers';
 
 export const updateWorkerHandler: Handler = request => {

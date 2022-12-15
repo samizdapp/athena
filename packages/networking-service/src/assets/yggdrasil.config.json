@@ -1,0 +1,18 @@
+{
+  "Peers": ["tls://51.38.64.12:28395"],
+  "InterfacePeers": {},
+  "Listen": ["tcp://0.0.0.0:5000"],
+  "AdminListen": "tcp://localhost:9001",
+  "MulticastInterfaces": [],
+  "AllowedPublicKeys": [],
+  "PublicKey": "MOCK",
+  "PrivateKey": "MOCK",
+  "IfName": "auto",
+  "IfMTU": 65535,
+  "NodeInfoPrivacy": false,
+  "NodeInfo": {
+    "samizdapp": {
+      "groups": ["caddy", "pleroma", "yggdrasil"]
+    }
+  }
+}

@@ -60,30 +60,51 @@ class UPNPPortMapper {
 
 export class UPNPService {
     private readonly log = log;
-
+    private readonly error: boolean = false;
     readonly libp2p = new UPNPPortMapper(environment.libp2p_listen_port);
     readonly yggdrasil = new UPNPPortMapper(environment.yggdrasil_listen_port);
     ready: Promise<void[]>;
 
     constructor() {
-        natMapping.init();
-        this.log.info('UPNP service started');
-        this.ready = Promise.all([this.libp2p.start(), this.yggdrasil.start()]);
-        this.info().then(res => {
-            this.log.info('UPNP service ready', res);
-        });
+        try {
+            natMapping.init();
+            this.log.info('UPNP service started');
+        } catch (e) {
+            this.error = true;
+            this.log.error((e as Error).message || (e as string));
+        } finally {
+            this.ready = Promise.all([
+                this.libp2p.start(),
+                this.yggdrasil.start(),
+            ]);
+            this.info().then(res => {
+                this.log.info('UPNP service ready', res);
+            });
+        }
     }
 
     async stop() {
         this.log.info('UPNP service stopping');
-        await this.ready;
-        await this.libp2p.stop();
-        await this.yggdrasil.stop();
+        if (!this.error) {
+            await this.ready;
+            await this.libp2p.stop();
+            await this.yggdrasil.stop();
+        }
         this.log.info('UPNP service stopped');
     }
 
     async info() {
         this.log.trace('UPNP service info called');
+        if (this.error) {
+            return {
+                libp2p: {
+                    internalPort: environment.libp2p_listen_port,
+                },
+                yggdrasil: {
+                    internalPort: environment.yggdrasil_listen_port,
+                },
+            };
+        }
         await this.ready;
         return {
             libp2p: {

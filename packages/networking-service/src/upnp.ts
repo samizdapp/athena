@@ -1,8 +1,9 @@
-import natMapping, { Mapping } from 'node-portmapping';
+import { Mapping } from 'node-portmapping';
 import { environment } from './environments/environment';
 import { internalIpV4 } from '@athena/shared/libp2p';
 import { Debug } from './logging';
 
+let natMapping: typeof import('node-portmapping') | null = null;
 const log = new Debug('upnp');
 
 class UPNPPortMapper {
@@ -20,26 +21,28 @@ class UPNPPortMapper {
     async start() {
         try {
             this.log.debug('creating mapping', this.port);
-            this.mapping = await new Promise<Mapping>((resolve, reject) => {
-                const mapping = natMapping.createMapping(
-                    {
-                        internalPort: this.port,
-                        protocol: 'TCP',
-                    },
-                    info => {
-                        this.log.trace('mapping created internal', info);
-                        if (info.state === 'Success') {
-                            this.publicPort = info.externalPort;
-                            this.publicHost = info.externalHost;
-                            this.internalPort = info.internalPort;
-                            resolve(mapping);
-                        } else {
-                            reject(new Error('Failed to create mapping'));
+            this.mapping = await new Promise<Mapping | undefined>(
+                (resolve, reject) => {
+                    const mapping = natMapping?.createMapping(
+                        {
+                            internalPort: this.port,
+                            protocol: 'TCP',
+                        },
+                        info => {
+                            this.log.trace('mapping created internal', info);
+                            if (info.state === 'Success') {
+                                this.publicPort = info.externalPort;
+                                this.publicHost = info.externalHost;
+                                this.internalPort = info.internalPort;
+                                resolve(mapping);
+                            } else {
+                                reject(new Error('Failed to create mapping'));
+                            }
+                            return {};
                         }
-                        return {};
-                    }
-                );
-            });
+                    );
+                }
+            );
             this.publicPort = this.port;
         } catch (e) {
             this.log.error((e as Error).message || (e as string));
@@ -60,27 +63,31 @@ class UPNPPortMapper {
 
 export class UPNPService {
     private readonly log = log;
-    private readonly error: boolean = false;
+    // eslint-disable-next-line @typescript-eslint/no-inferrable-types
+    private error: boolean = false;
     readonly libp2p = new UPNPPortMapper(environment.libp2p_listen_port);
     readonly yggdrasil = new UPNPPortMapper(environment.yggdrasil_listen_port);
-    ready: Promise<void[]>;
+    ready: Promise<void[]> | undefined;
 
     constructor() {
-        try {
-            natMapping.init();
-            this.log.info('UPNP service started');
-        } catch (e) {
-            this.error = true;
-            this.log.error((e as Error).message || (e as string));
-        } finally {
-            this.ready = Promise.all([
-                this.libp2p.start(),
-                this.yggdrasil.start(),
-            ]);
-            this.info().then(res => {
-                this.log.info('UPNP service ready', res);
+        import('node-portmapping')
+            .then(_natMapping => {
+                natMapping = _natMapping;
+                natMapping.init();
+
+                this.log.info('UPNP service started');
+                this.ready = Promise.all([
+                    this.libp2p.start(),
+                    this.yggdrasil.start(),
+                ]);
+                this.info().then(res => {
+                    this.log.info('UPNP service ready', res);
+                });
+            })
+            .catch(e => {
+                this.error = true;
+                this.log.error((e as Error).message || (e as string));
             });
-        }
     }
 
     async stop() {

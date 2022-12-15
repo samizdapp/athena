@@ -17,3 +17,5 @@ self.version.app = {
     branch: process.env.NX_BUILD_BRANCH,
     commit: process.env.NX_BUILD_COMMIT,
 };
+
+export const getVersion = () => self.version;

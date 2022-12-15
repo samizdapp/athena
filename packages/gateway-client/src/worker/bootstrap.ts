@@ -8,7 +8,7 @@ import { runMigrations } from './migrations';
 import { P2pClient } from './p2p-client';
 import { overrideFetch } from './p2p-fetch';
 import status from './status';
-import updateAppWorker from './update-app';
+import { initUpdates } from './update-app';
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -47,12 +47,11 @@ export default async () => {
         localforage.setItem('started', { started: true });
     });
 
-    messenger.addListener(ClientMessageType.UPDATE_WORKER, () => {
-        updateAppWorker();
-    });
-
     // init messenger
     messenger.init();
+
+    // init updates
+    await initUpdates();
 
     // run migrations before any other async work
     await runMigrations();

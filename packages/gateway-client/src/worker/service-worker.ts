@@ -275,6 +275,6 @@ const appExecuted = (async () => {
     }
 
     return fetchedScript;
-})();
+})().catch(e => logger.error('Error executing app: ', e));
 
 logger.info('Root worker executed.');

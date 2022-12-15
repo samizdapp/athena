@@ -1,5 +1,5 @@
 import { RawStream, Deferred } from './raw';
-import { Request, Response, RequestInfo } from 'node-fetch';
+import type { Request, Response, RequestInfo } from 'node-fetch';
 import fetchAgent from '../../fetch-agent';
 import { Stream } from '@libp2p/interface-connection';
 import { Readable } from 'stream';
@@ -33,7 +33,7 @@ export class NativeRequestStream extends RawStream {
         this.log.debug('fetch', request.url, request);
         return fetchAgent.fetch(request).catch(e => {
             this.log.warn('fetch error', e);
-            return new Response(e.message, { status: 500 });
+            return fetchAgent.Response(e.message, { status: 500 });
         });
     }
 
@@ -146,13 +146,13 @@ export class NativeRequestStream extends RawStream {
         this.log.debug('proxy done');
     }
 
-    private receiveChunk(chunk: Buffer) {
+    private async receiveChunk(chunk: Buffer) {
         const type = chunk.readUInt8(0);
         const data = chunk.subarray(1);
         switch (type) {
             case 0x00:
                 this.log.trace('receiveChunk', 'requestHead');
-                this.receiveRequestHead(data);
+                await this.receiveRequestHead(data);
                 break;
             case 0x01:
                 this.log.trace('receiveChunk', 'requestBody');
@@ -167,7 +167,7 @@ export class NativeRequestStream extends RawStream {
         }
     }
 
-    private receiveRequestHead(chunk: Buffer) {
+    private async receiveRequestHead(chunk: Buffer) {
         this.requestHeadBuffer = Buffer.concat([this.requestHeadBuffer, chunk]);
         this.log.trace(
             'receiveRequestHead',
@@ -182,30 +182,51 @@ export class NativeRequestStream extends RawStream {
         this.log.trace('receiveRequestHead got head', head.toString());
         this.requestHead = JSON.parse(head.toString());
         this.requestHeadBuffer = Buffer.alloc(0);
+        if (this.requestBodyStream) {
+            throw new Error('already have stream');
+        }
         this.requestBodyStream = new Readable({
-            read() {
-                // do nothing
+            read: () => {
+                this.log.trace('requestBodyStream read');
             },
         });
-        this.request = new Request(this.requestHead?.url as RequestInfo, {
-            ...this.requestHead,
-            body: ['GET', 'HEAD', undefined].includes(this.requestHead?.method)
-                ? undefined
-                : this.requestBodyStream,
-        });
+
+        // this.requestBodyStream.on('data', chunk => {
+        //     this.log.trace('requestBodyStream data', chunk.toString());
+        // });
+
+        // this.requestBodyStream.on('end', () => {
+        //     this.log.trace('requestBodyStream end');
+        // });
+        this.request = await fetchAgent.Request(
+            this.requestHead?.url as RequestInfo,
+            {
+                ...this.requestHead,
+                body: ['GET', 'HEAD', undefined].includes(
+                    this.requestHead?.method
+                )
+                    ? undefined
+                    : this.requestBodyStream,
+            }
+        );
         const inbox = this.inbox;
         this.inbox = new Deferred<Request>();
-        inbox.resolve(this.request);
+        if (this.request) {
+            inbox.resolve(this.request);
+        }
     }
 
     private receiveRequestBody(chunk: Buffer): void {
-        this.log.trace('receiveRequestBody', chunk);
+        this.log.trace('receiveRequestBody', chunk, this.requestBodyStream);
         this.requestBodyStream?.push(chunk);
+        this.requestBodyStream?.resume();
     }
 
     private receiveRequestEnd() {
         this.log.trace('receiveRequestEnd');
         this.requestBodyStream?.push(null);
+        console.log('receiveRequestEnd', this.requestBodyStream);
+        this.requestBodyStream = null;
         this.done.resolve(null);
     }
 }

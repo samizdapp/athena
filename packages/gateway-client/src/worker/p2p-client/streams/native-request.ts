@@ -3,6 +3,8 @@ import { Stream } from '@libp2p/interface-connection';
 import transformers from '../../transformers';
 import { StreamPool } from './request';
 
+const waitFor = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export class NativeRequestStream extends RawStream {
     private chunkSize = 64 * 1024;
     private outbox = new Deferred<Request>();
@@ -82,9 +84,11 @@ export class NativeRequestStream extends RawStream {
     private async writeRequestBody(request: Request) {
         if (request.body instanceof ArrayBuffer) return;
         if (!request.body) return;
-        const rawChunks = await this.readableStreamToChunks(request.body);
+        const rawChunks = await this.readableStreamToAsyncIterator(
+            request.body
+        );
 
-        for (const chunk of rawChunks) {
+        for await (const chunk of rawChunks) {
             const chunks = this.chunkify(0x01, chunk);
             for (const chunk of chunks) {
                 await this.write(chunk);
@@ -118,7 +122,6 @@ export class NativeRequestStream extends RawStream {
         let length = 0;
         try {
             let finished = false;
-            const chunks = [];
             do {
                 const { value, done } = await reader.read();
                 // ////console.log('readableStreamToAsyncIterator', value, done);
@@ -126,14 +129,17 @@ export class NativeRequestStream extends RawStream {
                     finished = true;
                 } else {
                     length += value.byteLength;
-                    chunks.push(Buffer.from(value));
+                    yield Buffer.from(
+                        value,
+                        value.byteOffset,
+                        value.byteLength
+                    );
                 }
+                await waitFor(100);
             } while (!finished);
             console.log('readableStreamToAsyncIterator', 'done', length);
-
-            for (const chunk of chunks) {
-                yield chunk;
-            }
+        } catch (e) {
+            console.warn('readableStreamToAsyncIterator', 'releaseLock', e);
         } finally {
             reader.releaseLock();
         }

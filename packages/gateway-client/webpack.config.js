@@ -12,6 +12,7 @@ module.exports = (config, _context) => {
         ...config,
         devServer: {
             ...(config.devServer || {}),
+            host: 'nova.local',
             headers: {
                 ...(config.devServer?.headers || {}),
                 'Service-Worker-Allowed': '/',

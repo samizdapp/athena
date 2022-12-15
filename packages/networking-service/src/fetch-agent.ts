@@ -4,24 +4,52 @@ import https from 'https';
 import dns from 'dns';
 import { LookupFunction } from 'net';
 import { Debug } from './logging';
-import { RequestInit, Request, Response } from 'node-fetch';
+import type { RequestInit, Request, Response } from 'node-fetch';
 import { environment } from './environments/environment';
 
 class FetchAgent {
     private readonly log = new Debug('fetch-agent');
     private _fetch: typeof import('node-fetch').default | null = null;
-    Request: typeof Request | null = null;
-    Response: typeof Response | null = null;
+    _Request: typeof Request | null = null;
+    _Response: typeof Response | null = null;
+    private ready: Promise<void>;
+
+    constructor() {
+        this.log.debug('constructor');
+        this.ready = this.init();
+    }
+
+    private async init() {
+        const _import = new Function('specifier', 'return import(specifier)');
+        const __fetch = await _import('node-fetch');
+        this._fetch = __fetch.default;
+        this._Request = __fetch.Request;
+        this._Response = __fetch.Response;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async Response(...args: any[]) {
+        // await this.ready;
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        return new this._Response!(...args);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async Request(arg1: any, arg2: any) {
+        // await this.ready;
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        return new this._Request!(arg1, arg2);
+    }
 
     public async fetch(url: string | Request, options: RequestInit = {}) {
-        this.log.debug('fetch', url, options);
         options.agent = this.getAgent((url as Request).url || (url as string));
         const _inspect = new URL((url as Request).url || 'http://ignore');
         if (_inspect.port === `${environment.fetch_localhost_port}`) {
             _inspect.port = '80';
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            url = new this.Request!(_inspect.toString(), url as Request);
+            url = await this.Request(_inspect.toString(), url as Request);
         }
+        this.log.debug('fetch', url, options);
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         return this._fetch!(url, options);
     }

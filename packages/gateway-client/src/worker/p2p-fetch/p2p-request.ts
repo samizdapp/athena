@@ -30,6 +30,12 @@ class ResponseTimeoutError extends Error {
     }
 }
 
+class AbortError extends Error {
+    constructor(msg = 'Request aborted') {
+        super(msg);
+    }
+}
+
 class RequestAttempt {
     private log = logger.getLogger('worker/p2p-fetch/attempt');
 
@@ -210,13 +216,20 @@ export class P2pRequest {
     constructor(
         private readonly requestId: string,
         private readonly p2pClient: P2pClient,
-        private readonly packet: Packet
+        private readonly packet: Packet,
+        private readonly signal?: AbortSignal
     ) {}
 
     private async loopAttempts(
         responseTimeout = 60000,
         counter = 1
     ): Promise<void> {
+        // if we've been aborted
+        if (this.signal?.aborted) {
+            this.deferredResponse?.reject(new AbortError());
+            return;
+        }
+
         this.log.debug(
             `Request: ${this.requestId} - Attempt number ${counter}`
         );
@@ -233,7 +246,15 @@ export class P2pRequest {
         );
         try {
             // execute our attempt, wait for a response
-            response = await requestAttempt.execute();
+            response = await Promise.race([
+                requestAttempt.execute(),
+                new Promise((_, reject) => {
+                    this.signal?.addEventListener('abort', () =>
+                        reject(new AbortError())
+                    );
+                }) as Promise<Packet>,
+            ]);
+
             this.log.debug(
                 `Request: ${this.requestId} - Timing: response received in ` +
                     `${Date.now() - startTime}ms`
@@ -243,11 +264,20 @@ export class P2pRequest {
             // we're done looping
             return;
         } catch (e) {
+            // if this was due to an abort signal
+            if (e instanceof AbortError) {
+                // then reject our promise
+                this.deferredResponse?.reject(e);
+                // we're done looping
+                return;
+            }
+
             // if this was due to a response timeout
             if (e instanceof ResponseTimeoutError) {
                 // then increase our response timeout before trying again
                 responseTimeout += responseTimeout;
             }
+
             this.log.debug(
                 `Request: ${this.requestId} - Timing: attempt failed in ` +
                     `${Date.now() - startTime}ms`

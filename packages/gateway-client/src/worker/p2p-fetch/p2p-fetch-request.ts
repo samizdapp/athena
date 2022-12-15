@@ -257,7 +257,8 @@ export class P2pFetchRequest {
         const p2pRequest = new P2pRequest(
             this.requestId,
             this.p2pClient,
-            packet
+            packet,
+            this.reqInit.signal ?? undefined
         );
         // and execute it
         this.log.trace(`Request: ${this.requestId} - Executing p2p request`);

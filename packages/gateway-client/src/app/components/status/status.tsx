@@ -1,403 +1,108 @@
-import { useCallback, useState } from 'react';
-import { ArcherContainer, ArcherElement } from 'react-archer';
+import { forwardRef } from 'react';
+import * as Rgl from 'react-grid-layout';
+import 'react-grid-layout/css/styles.css';
+import 'react-resizable/css/styles.css';
 import styled from 'styled-components';
 
-import { useSelectStatusLogsByService } from '../../redux/status-log/statusLog.api';
-import Service from './service';
-import ServiceDetails from './service-details';
+import BoxStatus from './box-status/box-status';
+import Version from './version/version';
+import WorkerStatus from './worker-status/worker-status';
+
+const ResponsiveGridLayout = Rgl.WidthProvider(Rgl.Responsive);
 
 const StyledStatus = styled.div`
-    display: flex;
-    flex-direction: row;
     overflow: auto;
-    padding: 50px;
     height: 100%;
 
-    .service {
-        cursor: pointer;
-        margin: auto;
-        position: relative;
-        width: 100px;
-        height: 100px;
+    .react-grid-item {
+        border: 3px solid #0a0;
+        border-radius: 5px 5px 0 0;
+        transition: none;
 
-        svg {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-        }
+        header {
+            background-color: #0a0;
+            cursor: move;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            margin: -2px 0 0 -2px;
+            height: 34px;
+            width: calc(100% + 4px);
 
-        .details {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-        }
-
-        h3 {
-            margin: 3px;
-            line-height: 31px;
-            text-align: center;
-        }
-
-        .status {
-            font-weight: bold;
-            margin: 0;
-            text-align: center;
-        }
-
-        &.online {
-            svg path,
-            svg g {
-                fill: #0a0;
-            }
-
-            .status {
-                color: #0a0;
+            h3 {
+                margin: 2px 10px;
             }
         }
 
-        &.waiting {
-            svg path,
-            svg g {
-                fill: #caa500;
-            }
-
-            .status {
-                color: #caa500;
-            }
-        }
-
-        &.offline {
-            svg path,
-            svg g {
-                fill: #a00;
-            }
-
-            .status {
-                color: #a00;
-            }
-        }
-    }
-
-    .critical {
-        flex: 1;
-
-        & > svg {
-            min-width: 400px;
-
-            path {
-                fill: #aaa;
-                stroke: #aaa !important;
-            }
-        }
-
-        & > div {
-            display: grid;
-            grid-gap: 40px;
-            min-width: 400px;
-
-            .yggdrasil {
-                grid-column: 1/2;
-                grid-row: 1;
-            }
-
-            .yggdrasil-crawler {
-                grid-column: 2/3;
-                grid-row: 1;
-            }
-
-            .postgres {
-                grid-column: 4/5;
-                grid-row: 1;
-            }
-
-            .daemon-pleroma {
-                grid-column: 3/4;
-                grid-row: 2;
-            }
-
-            .daemon-caddy {
-                grid-column: 4/5;
-                grid-row: 2;
-            }
-
-            .daemon-proxy {
-                grid-column: 4/5;
-                grid-row: 3;
-            }
-        }
-    }
-
-    .non-critical {
-        align-items: flex-end;
-        display: flex;
-        flex-direction: column;
-        flex: 0 0 140px;
-        overflow: auto;
-        padding-right: 5px;
-
-        .service {
-            margin: 10px 0;
-            min-height: 100px;
-        }
-    }
-
-    .service-details {
-        background: #fff;
-        border: 1px #aaa solid;
-        border-radius: 7px;
-        box-shadow: 0px 0px 5px #aaa;
-        max-height: 195px;
-        position: absolute;
-        bottom: 10px;
-        left: 10px;
-        transition: all 0.4s ease;
-        width: 55%;
-        height: 38%;
-
-        &.closed {
-            height: 0;
-            opacity: 0;
-        }
-
-        & > svg {
-            cursor: pointer;
-            position: absolute;
-            top: 5px;
-            right: 5px;
-        }
-
-        h3 {
-            margin: 10px;
-            text-align: center;
-
-            .status {
-                font-size: 0.8em;
-                font-weight: bold;
-            }
-        }
-
-        pre {
-            background: #ddd;
-            margin: 10px;
+        article {
             overflow: auto;
-            padding: 5px;
-            height: calc(100% - 60px);
-        }
-
-        &.online {
-            h3 .status {
-                color: #0a0;
-            }
-        }
-
-        &.waiting {
-            h3 .status {
-                color: #caa500;
-            }
-        }
-
-        &.offline {
-            h3 .status {
-                color: #a00;
-            }
-        }
-    }
-
-    @media (max-width: 768px) {
-        flex-direction: column;
-        padding: 10px;
-
-        .critical {
-            position: relative;
-            height: 400px;
-            overflow: auto;
-            flex: 0;
-            min-height: 400px;
-
-            & > div {
-                .postgres {
-                    grid-row: 1;
-                    grid-column: 3/4;
-                }
-
-                .daemon-pleroma {
-                    grid-column: 2/4;
-                }
-
-                .daemon-caddy {
-                    grid-column: 1/2;
-                }
-
-                .daemon-proxy {
-                    grid-column: 1/2;
-                }
-            }
-        }
-
-        .non-critical {
-            flex: 1;
-            flex-direction: row;
-            flex-wrap: wrap;
-            justify-content: center;
-            width: 100%;
-
-            .service {
-                margin: 10px;
-                min-width: 100px;
-            }
-        }
-
-        .service-details {
-            width: calc(100% - 20px);
-            height: calc(100% - 430px);
-            max-height: initial;
+            height: calc(100% - 30px);
         }
     }
 `;
 
-/* eslint-disable-next-line */
-export interface StatusProps {}
+type GridItemProps = {
+    className?: string;
+    children: React.ReactNode;
+    title: string;
+};
 
-export function Status(_props: StatusProps) {
-    const { data: allLogs } = useSelectStatusLogsByService({
-        pollingInterval: 10000,
-    });
-    const {
-        daemon_pleroma: daemonPleroma,
-        yggdrasil_crawler: yggdrasilCrawler,
-        yggdrasil,
-        postgres,
-        daemon_proxy: daemonProxy,
-        daemon_caddy: daemonCaddy,
-        ...nonCritical
-    } = allLogs;
-    const [selected, setSelected] = useState<string | undefined>(undefined);
-    const [detailsOpen, setDetailsOpen] = useState(false);
+const GridItem = forwardRef<HTMLElement, GridItemProps>(
+    ({ children, className = '', title, ...props }: GridItemProps, ref) => {
+        return (
+            <section ref={ref} className={className} {...props}>
+                <header>
+                    <h3>{title}</h3>
+                </header>
+                <article>{children}</article>
+            </section>
+        );
+    }
+);
 
-    const createHandleClick = (name: string) => () => {
-        setSelected(name);
-        setDetailsOpen(true);
-    };
-
-    const handleClose = useCallback(() => {
-        /* We don't unselect the service because the unselected state will be
-         * visible in the details box ahead of the animation completing.
-         */
-        //setSelected(undefined);
-        setDetailsOpen(false);
-    }, []);
-
+export const Status = () => {
     return (
         <StyledStatus>
-            <ArcherContainer className="critical">
-                <ArcherElement
-                    id="yggdrasil"
-                    relations={[
+            <ResponsiveGridLayout
+                className="layout"
+                layouts={{
+                    lg: [
                         {
-                            targetId: 'yggdrasil_crawler',
-                            sourceAnchor: 'right',
-                            targetAnchor: 'left',
+                            i: 'box-status',
+                            x: 5,
+                            y: 0,
+                            w: 7,
+                            h: 16,
                         },
-                    ]}
-                >
-                    <Service
-                        name="yggdrasil"
-                        logs={yggdrasil}
-                        onClick={createHandleClick('yggdrasil')}
-                    />
-                </ArcherElement>
-
-                <ArcherElement
-                    id="yggdrasil_crawler"
-                    relations={[
                         {
-                            targetId: 'daemon_pleroma',
-                            sourceAnchor: 'right',
-                            targetAnchor: 'top',
+                            i: 'version',
+                            x: 0,
+                            y: 0,
+                            w: 5,
+                            h: 8,
                         },
-                    ]}
-                >
-                    <Service
-                        name="yggdrasil crawler"
-                        logs={yggdrasilCrawler}
-                        onClick={createHandleClick('yggdrasil_crawler')}
-                    />
-                </ArcherElement>
+                        { i: 'worker-status', x: 0, y: 8, w: 5, h: 8 },
+                    ],
+                }}
+                breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
+                cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
+                rowHeight={30}
+                draggableHandle="header"
+            >
+                <GridItem key="box-status" title="Box Status">
+                    <BoxStatus />
+                </GridItem>
 
-                <ArcherElement
-                    id="postgres"
-                    relations={[
-                        {
-                            targetId: 'daemon_pleroma',
-                            sourceAnchor: 'left',
-                            targetAnchor: 'top',
-                        },
-                    ]}
-                >
-                    <Service
-                        name="postgres"
-                        logs={postgres}
-                        onClick={createHandleClick('postgres')}
-                    />
-                </ArcherElement>
+                <GridItem key="version" title="Version">
+                    <Version />
+                </GridItem>
 
-                <ArcherElement id="daemon_pleroma">
-                    <Service
-                        name="daemon pleroma"
-                        logs={daemonPleroma}
-                        onClick={createHandleClick('daemon_pleroma')}
-                    />
-                </ArcherElement>
-
-                <ArcherElement
-                    id="daemon_caddy"
-                    relations={[
-                        {
-                            targetId: 'daemon_proxy',
-                            sourceAnchor: 'bottom',
-                            targetAnchor: 'top',
-                        },
-                    ]}
-                >
-                    <Service
-                        name="daemon caddy"
-                        logs={daemonCaddy}
-                        onClick={createHandleClick('daemon_caddy')}
-                    />
-                </ArcherElement>
-
-                <ArcherElement id="daemon_proxy">
-                    <Service
-                        name="daemon proxy"
-                        logs={daemonProxy}
-                        onClick={createHandleClick('daemon_proxy')}
-                    />
-                </ArcherElement>
-            </ArcherContainer>
-
-            <div className="non-critical">
-                {Object.entries(nonCritical).map(([name, logs]) => (
-                    <Service
-                        key={name}
-                        name={name.replaceAll('_', ' ')}
-                        logs={logs}
-                        onClick={createHandleClick(name)}
-                    />
-                ))}
-            </div>
-
-            <ServiceDetails
-                name={selected}
-                logs={allLogs[selected ?? '']}
-                open={detailsOpen}
-                onClose={handleClose}
-            />
+                <GridItem key="worker-status" title="Worker Status">
+                    <WorkerStatus />
+                </GridItem>
+            </ResponsiveGridLayout>
         </StyledStatus>
     );
-}
+};
 
 export default Status;

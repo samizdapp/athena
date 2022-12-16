@@ -44,7 +44,7 @@
     "libp2p": "^0.39.5",
     "localforage": "^1.10.0",
     "loglevel": "^1.8.1",
-    "node-fetch": "^2.6.7",
+    "node-fetch": "^3.3.0",
     "node-portmapping": "^0.3.0",
     "platform": "^1.3.6",
     "react": "18.2.0",

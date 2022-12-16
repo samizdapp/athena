@@ -1,7 +1,7 @@
 import { Deferred } from './raw';
 import { RawStream } from '../streams';
 import { Stream } from '@libp2p/interface-connection';
-import { decode, Packet } from '../../p2p-fetch/lob-enc';
+import { decode, Packet } from './lob-enc';
 
 export class LobStream extends RawStream {
     private chunkSize = 1024 * 64;

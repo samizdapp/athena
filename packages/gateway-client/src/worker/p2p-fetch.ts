@@ -1,13 +1,12 @@
-import { isBootstrapAppUrl } from '../client';
-import { logger } from '../logging';
-import { P2pClient } from '../p2p-client';
-import { P2pFetchRequest } from './p2p-fetch-request';
+import { isBootstrapAppUrl } from './client';
+import { logger } from './logging';
+import { P2pClient } from './p2p-client';
 
 const log = logger.getLogger('worker/p2p-fetch/override');
 
 const p2pFetch = async (
     p2pClient: P2pClient,
-    request: URL | Request,
+    request: URL | RequestInfo,
     givenReqInit: RequestInit | undefined = {}
 ): Promise<Response> => {
     if (typeof request === 'string') {

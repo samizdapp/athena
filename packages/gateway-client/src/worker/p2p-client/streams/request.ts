@@ -1,6 +1,6 @@
 import { RawStream } from './raw';
 import { LobStream } from './lob';
-import { Packet } from '../../p2p-fetch/lob-enc';
+import { Packet } from './lob-enc';
 
 export class StreamPool {
     private static pool: Set<RawStream> = new Set();

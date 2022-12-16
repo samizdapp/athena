@@ -16,7 +16,7 @@ export class Deferred<T> {
 
 export class RawStream {
     protected eventTarget = new EventTarget();
-    protected log = logger.getLogger('worker/p2p-client/streams');
+    protected log = logger.getLogger('worker/p2p/streams');
     private writeBuffer: Buffer[] = [];
     private writeDeferred = new Deferred<null>();
     private source: AsyncIterator<Buffer> | null = null;

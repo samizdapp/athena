@@ -1,6 +1,6 @@
-import { BaseTransformer } from './transformers';
+import { AbstractTransformer } from './transformers';
 
-export class SamizdappFlagTransformer extends BaseTransformer {
+export class SamizdappFlagTransformer extends AbstractTransformer {
     constructor(
         protected readonly prefix: string,
         protected readonly inject: string,

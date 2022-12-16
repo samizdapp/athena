@@ -1,8 +1,8 @@
-import { BaseTransformer, CompiledTransformer } from './transformers';
+import { AbstractTransformer, CompiledTransformer } from './transformers';
 import { logger } from '../logging';
 
-class BasePathTransformer extends BaseTransformer {
-    protected log = logger.getLogger('worker/transjectors/base-path');
+class BasePathTransformer extends AbstractTransformer {
+    protected log = logger.getLogger('worker/tranformer/base-path');
     private readonly contentType = 'text/html';
     private readonly header = 'x-samizdapp-base-path';
 

@@ -42,7 +42,7 @@ enum ChunkType {
     REQUEST = 'Request',
     RESPONSE = 'Response',
 }
-abstract class AbstractTransformer {
+export class AbstractTransformer {
     private chunkTransformers = {
         [ChunkType.REQUEST]: this.transformRequestChunk.bind(this),
         [ChunkType.RESPONSE]: this.transformResponseChunk.bind(this),
@@ -64,7 +64,12 @@ abstract class AbstractTransformer {
                             controller.close();
                             return;
                         }
-                        controller.enqueue(chunkTransformer(r, value));
+                        controller.enqueue(
+                            chunkTransformer(
+                                r as unknown as Request & Response,
+                                value
+                            )
+                        );
                         pump();
                     });
                 }
@@ -89,20 +94,6 @@ abstract class AbstractTransformer {
         }
         return req;
     }
-
-    abstract shouldTransformRequest(req: Request): boolean;
-    abstract transformRequestHead(res: Request): Request;
-    abstract transformRequestChunk(
-        res: Request | Response,
-        chunk: Uint8Array
-    ): Uint8Array;
-
-    abstract shouldTransformResponse(req: Response): boolean;
-    abstract transformResponseHead(req: Response): Response;
-    abstract transformResponseChunk(
-        req: Response | Request,
-        chunk: Uint8Array
-    ): Uint8Array;
 
     transformResponse(res: Response): Response {
         //console.log('transformResponse', res);
@@ -217,21 +208,6 @@ abstract class AbstractTransformer {
         return response;
     }
 
-    private async *readableStreamToAsyncIterator(
-        readableStream: ReadableStream<Uint8Array>
-    ) {
-        const reader = readableStream?.getReader();
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-                return;
-            }
-            yield value;
-        }
-    }
-}
-
-export class BaseTransformer extends AbstractTransformer {
     shouldTransformRequest(_req: Request): boolean {
         return false;
     }
@@ -257,7 +233,7 @@ export class BaseTransformer extends AbstractTransformer {
     }
 }
 
-export class CompiledTransformer extends BaseTransformer {
+export class CompiledTransformer extends AbstractTransformer {
     protected log = logger.getLogger('worker/transformer/compiled');
 
     constructor(
@@ -266,6 +242,18 @@ export class CompiledTransformer extends BaseTransformer {
         protected readonly snippet: string
     ) {
         super();
+    }
+
+    override shouldTransformResponse(res: Response): boolean {
+        this.log.trace(
+            'shouldTransformResponse?',
+            res.headers.get('content-type'),
+            this.contentType
+        );
+        return (
+            res.headers.get('content-type')?.startsWith(this.contentType) ||
+            false
+        );
     }
 
     override transformResponseChunk(
@@ -280,18 +268,6 @@ export class CompiledTransformer extends BaseTransformer {
             return Buffer.from(parts.join(''));
         }
         return chunk;
-    }
-
-    override shouldTransformResponse(res: Response): boolean {
-        this.log.trace(
-            'shouldTransformResponse?',
-            res.headers.get('content-type'),
-            this.contentType
-        );
-        return (
-            res.headers.get('content-type')?.startsWith(this.contentType) ||
-            false
-        );
     }
 
     override transformResponseHead(res: Response): Response {

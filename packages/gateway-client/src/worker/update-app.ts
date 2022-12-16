@@ -1,5 +1,6 @@
 import { levels } from 'loglevel';
 import { ClientMessageType } from '../worker-messaging';
+import { CACHE_NAME, openCache } from './cache';
 import { logger } from './logging';
 import messenger from './messenger';
 import { getVersion } from './version';
@@ -10,7 +11,6 @@ const log = logger.getLogger('worker/update-app');
 
 // abort attempt to fetch updated script after 1 minute
 const updateFetchTimeout = 1 * 60 * 1000;
-const rootWorkerCache = '/smz/worker/root';
 const appWorkerUrl =
     `${new URL('.', self.location.href).pathname.slice(0, -1)}` +
     `/worker-app.js`;
@@ -91,7 +91,7 @@ const listVersions = async ({
 }: { channel?: Channel } & CacheOptions = {}) => {
     const { regex, createPostFilter } = channelHandlers[channel];
     // open root worker cache
-    const cache = rootCache ?? (await caches.open(rootWorkerCache));
+    const cache = rootCache ?? (await openCache(CACHE_NAME.ROOT));
     const postFilter = await createPostFilter({ rootCache: cache });
     // return our keys sorted by version
     return (await getFilteredCacheKeys(cache, regex))
@@ -104,7 +104,7 @@ const getCachedScript = async (
     { rootCache }: CacheOptions = {}
 ) => {
     // open root worker cache
-    const cache = rootCache ?? (await caches.open(rootWorkerCache));
+    const cache = rootCache ?? (await openCache(CACHE_NAME.ROOT));
     // get cached response
     const response = await cache.match(cacheKey);
     // parse script from response
@@ -140,7 +140,7 @@ const rollbackAppWorker = async ({ rootCache }: CacheOptions = {}) => {
     }
     log.info('Rolling back app worker...');
     // open root worker cache
-    const cache = rootCache ?? (await caches.open(rootWorkerCache));
+    const cache = rootCache ?? (await openCache(CACHE_NAME.ROOT));
 
     // if we've already rolled back our current version
     const existingRollback = await cache.match(rollbackKey);
@@ -217,7 +217,7 @@ export const updateAppWorker = async ({
     }
     log.debug('Checking for app worker updates...');
     // open root worker cache
-    const cache = rootCache ?? (await caches.open(rootWorkerCache));
+    const cache = rootCache ?? (await openCache(CACHE_NAME.ROOT));
 
     // fetch the following cached scripts
     // (the script that we fetch will be compared against them)
@@ -398,7 +398,7 @@ export const updateAppWorker = async ({
 
 export const initUpdates = async ({ rootCache }: CacheOptions = {}) => {
     // open root worker cache
-    const cache = rootCache ?? (await caches.open(rootWorkerCache));
+    const cache = rootCache ?? (await openCache(CACHE_NAME.ROOT));
 
     // get our current version
     const currentCache = await cache.match(currentAppKey);

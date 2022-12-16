@@ -252,7 +252,7 @@ export class RPCWorker extends EventEmitter {
         ]);
         this.log.debug(
             'rpc response (use trace to see content)',
-            response.status
+            response?.status
         );
         this.log.trace(response);
         return response;

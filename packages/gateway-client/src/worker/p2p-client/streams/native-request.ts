@@ -3,13 +3,10 @@ import { Stream } from '@libp2p/interface-connection';
 import transformers from '../../transformers';
 import { StreamPool } from './request';
 
-const waitFor = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
 export class NativeRequestStream extends RawStream {
     private chunkSize = 64 * 1024;
     private outbox = new Deferred<Request>();
     private inbox = new Deferred<Response>();
-    private done = new Deferred<null>();
     private responseHeadBuffer = Buffer.alloc(0);
     private responseHead: Response | null = null;
     private response: Response | null = null;
@@ -96,30 +93,10 @@ export class NativeRequestStream extends RawStream {
         }
     }
 
-    private async readableStreamToChunks(body: ReadableStream) {
-        const reader = (body as ReadableStream).getReader();
-        // loop our reader and store the stream into a new buffer
-        const chunks = [];
-        let finished = false;
-        let length = 0;
-        do {
-            const { done, value } = await reader.read();
-            finished = done;
-            if (!done) {
-                const chunk = Buffer.from(value);
-                length += chunk.byteLength;
-                chunks.push(chunk);
-            }
-        } while (!finished);
-
-        console.log('readableStreamToChunks', length);
-        return chunks;
-    }
-
     private async *readableStreamToAsyncIterator(stream: ReadableStream) {
-        console.log('readableStreamToAsyncIterator', stream);
+        // console.log('readableStreamToAsyncIterator', stream);
         const reader = stream.getReader();
-        let length = 0;
+        // let length = 0;
         try {
             let finished = false;
             do {
@@ -128,18 +105,18 @@ export class NativeRequestStream extends RawStream {
                 if (done) {
                     finished = true;
                 } else {
-                    length += value.byteLength;
+                    // length += value.byteLength;
                     yield Buffer.from(
                         value,
                         value.byteOffset,
                         value.byteLength
                     );
                 }
-                await waitFor(100);
+                // await waitFor(1);
             } while (!finished);
-            console.log('readableStreamToAsyncIterator', 'done', length);
+            // console.log('readableStreamToAsyncIterator', 'done', length);
         } catch (e) {
-            console.warn('readableStreamToAsyncIterator', 'releaseLock', e);
+            // console.warn('readableStreamToAsyncIterator', 'releaseLock', e);
         } finally {
             reader.releaseLock();
         }

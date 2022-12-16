@@ -1,3 +1,5 @@
+import { logger } from '../logging';
+
 class Transformer {
     private transformers = new Set<AbstractTransformer>();
 
@@ -51,7 +53,27 @@ abstract class AbstractTransformer {
         r: Request | Response,
         _type: ChunkType
     ): ReadableStream<Uint8Array> | undefined {
-        return r.body || undefined;
+        if (!r.body) return undefined;
+
+        const chunkTransformer = this.chunkTransformers[_type];
+        const reader = r.body.getReader();
+        const newbody = new ReadableStream({
+            start(controller) {
+                return pump();
+                function pump() {
+                    return reader.read().then(({ done, value }) => {
+                        if (done) {
+                            controller.close();
+                            return;
+                        }
+                        controller.enqueue(chunkTransformer(r, value));
+                        pump();
+                    });
+                }
+            },
+        });
+
+        return newbody;
     }
 
     transformRequest(req: Request): Request {
@@ -59,11 +81,11 @@ abstract class AbstractTransformer {
         // check if the request is correct type
         if (this.shouldTransformRequest(req)) {
             const head = this.transformRequestHead(req);
-            console.log(
-                'transformRequest',
-                head,
-                Array.from(head.headers.entries())
-            );
+            // console.log(
+            //     'transformRequest',
+            //     head,
+            //     Array.from(head.headers.entries())
+            // );
             const body = this.transform(req, ChunkType.REQUEST);
             return this.newRequest(head, body as ReadableStream<Uint8Array>);
         }
@@ -72,12 +94,15 @@ abstract class AbstractTransformer {
 
     abstract shouldTransformRequest(req: Request): boolean;
     abstract transformRequestHead(res: Request): Request;
-    abstract transformRequestChunk(res: Request, chunk: Uint8Array): Uint8Array;
+    abstract transformRequestChunk(
+        res: Request | Response,
+        chunk: Uint8Array
+    ): Uint8Array;
 
     abstract shouldTransformResponse(req: Response): boolean;
     abstract transformResponseHead(req: Response): Response;
     abstract transformResponseChunk(
-        req: Response,
+        req: Response | Request,
         chunk: Uint8Array
     ): Uint8Array;
 
@@ -239,6 +264,8 @@ export class BaseTransformer extends AbstractTransformer {
 }
 
 export class CompiledTransformer extends BaseTransformer {
+    protected log = logger.getLogger('worker/transformer/compiled');
+
     constructor(
         protected readonly content_type: string,
         protected readonly split: string,
@@ -253,6 +280,7 @@ export class CompiledTransformer extends BaseTransformer {
     ): Uint8Array {
         const [start, end] = chunk.toString().split(this.split);
         // check if the response contains the split tag
+        this.log.trace('has start && end?', start && end, this.split);
         if (start && end) {
             const parts = [start, this.split, this.snippet, end];
             return Buffer.from(parts.join(''));
@@ -261,6 +289,11 @@ export class CompiledTransformer extends BaseTransformer {
     }
 
     override shouldTransformResponse(res: Response): boolean {
+        this.log.trace(
+            'shouldTransformResponse?',
+            res.headers.get('content-type'),
+            this.content_type
+        );
         return (
             res.headers.get('content-type')?.startsWith(this.content_type) ||
             false

@@ -2,6 +2,7 @@ import { Packet, encode } from './lob/lob-enc';
 import { LobStream } from './lob';
 import { WebSocket } from 'ws';
 import { Debug } from '../../logging';
+import fetchAgent from '../../fetch-agent';
 
 export enum WebsocketStreamMessageType {
     COMMAND = 'COMMAND',
@@ -16,7 +17,8 @@ export enum WebsocketStreamStatus {
 }
 
 export class WebsocketStream extends LobStream {
-    protected override readonly log = new Debug('libp2p-websocket-stream');
+    static log = new Debug('libp2p-websocket-stream');
+    protected override readonly log = WebsocketStream.log;
 
     private ws: WebSocket | null = null;
 
@@ -58,7 +60,9 @@ export class WebsocketStream extends LobStream {
         protocols: string[];
     }) {
         this.log.info('open websocket', url, this.peer);
-        const ws = new WebSocket(url, protocols);
+        const ws = new WebSocket(url, protocols, {
+            agent: fetchAgent.getAgent(url),
+        });
         ws.onopen = event => {
             this.log.debug('websocket opened');
             this.sendStatus({
@@ -67,7 +71,7 @@ export class WebsocketStream extends LobStream {
             });
         };
         ws.onclose = () => {
-            this.log.debug('websocket closed', this.peer);
+            this.log.debug('websocket closed', this.peer.toString());
             this.sendStatus({
                 status: WebsocketStreamStatus.CLOSED,
                 detail: {
@@ -78,7 +82,7 @@ export class WebsocketStream extends LobStream {
             });
         };
         ws.onerror = error => {
-            this.log.debug('websocket error', this.peer);
+            this.log.debug('websocket error', this.peer.toString());
             this.sendStatus({
                 status: WebsocketStreamStatus.ERROR,
                 detail: error,
@@ -91,7 +95,7 @@ export class WebsocketStream extends LobStream {
                     ? evt.data
                     : Buffer.from(evt.data as unknown as string, 'ascii');
             const packet = this.encodeMessageToPacket(
-                WebsocketStreamMessageType.STATUS,
+                WebsocketStreamMessageType.MESSAGE,
                 body
             );
             this.send(packet);

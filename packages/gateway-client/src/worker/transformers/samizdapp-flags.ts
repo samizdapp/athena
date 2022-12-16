@@ -18,12 +18,12 @@ export class SamizdappFlagTransformer extends BaseTransformer {
     override transformRequestHead(req: Request): Request {
         const headers = new Headers(req.headers);
         headers.set('x-intercepted-subdomain', this.inject);
-        console.log(
-            'transformRequestHead',
-            req,
-            Array.from(headers.entries()),
-            Array.from(req.headers.entries())
-        );
+        // console.log(
+        //     'transformRequestHead',
+        //     req,
+        //     Array.from(headers.entries()),
+        //     Array.from(req.headers.entries())
+        // );
         return this.replaceRequestHeaders(req, headers);
     }
 }

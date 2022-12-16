@@ -139,7 +139,7 @@ class BasePathTransformer extends BaseTransformer {
     override transformResponseHead(res: Response): Response {
         const targetHeaderRaw = res.headers.get(this.header);
         const [targetHeader] = targetHeaderRaw?.split(',') || [];
-        console.log('RESPONSE', res);
+        // console.log('RESPONSE', res);
         const _url = new URL(res.url);
         _url.search = '';
         _url.hash = '';

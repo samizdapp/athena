@@ -1,4 +1,5 @@
 import { Stream } from '@libp2p/interface-connection';
+import { logger } from '../../logging';
 import { encode, Packet } from '../../p2p-fetch/lob-enc';
 import { LobStream } from './lob';
 
@@ -15,6 +16,10 @@ export enum WebsocketStreamStatus {
 }
 
 export class WebsocketStream extends LobStream {
+    protected override readonly log = logger.getLogger(
+        'worker/p2p-client/streams/websocket'
+    );
+
     private portMap: Record<WebsocketStreamMessageType, MessagePort>;
 
     constructor(libp2pStream: Stream, ports: MessagePort[]) {

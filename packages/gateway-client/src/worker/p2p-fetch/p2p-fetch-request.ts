@@ -1,4 +1,3 @@
-import { logger } from '../logging';
 import { P2pClient } from '../p2p-client';
 
 export class P2pFetchRequest {

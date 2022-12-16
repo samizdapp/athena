@@ -397,6 +397,7 @@ export class P2pClient {
         messenger.addNativeHandler(event => {
             this.log.debug('Received websocket message:', event);
             if (event.data.type === ClientMessageType.WEBSOCKET) {
+                this.log.info('creating websocket stream...');
                 this.streamFactory?.getWebsocketStream(
                     event.ports as MessagePort[]
                 );

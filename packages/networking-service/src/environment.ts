@@ -13,9 +13,9 @@ export const environment = {
     yggdrasil_admin_host: process.env.YGGDRASIL_ADMIN_HOST || '127.0.0.1',
     yggdrasil_admin_port: parseInt(process.env.YGGDRASIL_ADMIN_PORT || '9001'),
     yggdrasil_config:
-        process.env.yggdrasil_config || '/etc/yggdrasil-network/config.conf',
+        process.env.YGGDRASIL_CONFIG || '/etc/yggdrasil-network/config.conf',
     yggdrasil_peer_file: process.env.YGGDRASIL_PEER_FILE || '/yggdrasil/peer',
-    hostsfile: process.env.hostsfile || '/shared_etc/hosts',
+    hostsfile: process.env.HOSTSFILE || '/shared_etc/hosts',
     default_log_level: process.env.DEFAULT_LOG_LEVEL || 'INFO',
     ignore_status: (process.env.IGNORE_STATUS as unknown as boolean) || false,
     yggdrasil_alias_localhost: process.env.YGGDRASIL_LOCAL_ALIAS || '',

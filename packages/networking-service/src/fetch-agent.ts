@@ -58,11 +58,10 @@ class FetchAgent {
                 },
             });
         }
+        this.log.info('fetch', url);
         this.log.debug(
-            'fetch',
-            url,
-            Array.from((url as Request).headers?.entries() || []),
-            options
+            '',
+            Array.from((url as Request).headers?.entries() || [])
         );
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         return this._fetch!(url, options);

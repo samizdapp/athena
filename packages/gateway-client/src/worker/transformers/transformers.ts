@@ -80,15 +80,8 @@ export class AbstractTransformer {
     }
 
     transformRequest(req: Request): Request {
-        //console.log('transformRequest', req);
-        // check if the request is correct type
         if (this.shouldTransformRequest(req)) {
             const head = this.transformRequestHead(req);
-            // console.log(
-            //     'transformRequest',
-            //     head,
-            //     Array.from(head.headers.entries())
-            // );
             const body = this.transformBody(req, ChunkType.REQUEST);
             return this.newRequest(head, body as ReadableStream<Uint8Array>);
         }
@@ -96,8 +89,6 @@ export class AbstractTransformer {
     }
 
     transformResponse(res: Response): Response {
-        //console.log('transformResponse', res);
-        // check if the response is correct type
         if (this.shouldTransformResponse(res)) {
             const head = this.transformResponseHead(res);
             const body = this.transformBody(res, ChunkType.RESPONSE);
@@ -127,14 +118,17 @@ export class AbstractTransformer {
             new Request(req.url, {
                 headers: req.headers,
                 method: req.method,
-                mode: req.mode !== 'navigate' ? req.mode : 'same-origin',
                 credentials: req.credentials,
                 cache: req.cache,
                 redirect: req.redirect,
                 referrer: req.referrer,
                 integrity: req.integrity,
+                signal: req.signal,
             }),
             {
+                mode: {
+                    get: () => req.mode,
+                },
                 headers: {
                     get: () => req.headers,
                     configurable: true,
@@ -160,8 +154,20 @@ export class AbstractTransformer {
             referrer: req.referrer,
             integrity: req.integrity,
         });
-        Object.defineProperty(request, 'body', {
-            get: () => req.body,
+        Object.defineProperties(request, {
+            headers: {
+                get: () => req.headers,
+                configurable: true,
+            },
+            body: {
+                get: () => req.body,
+            },
+            destination: {
+                get: () => req.destination,
+            },
+            signal: {
+                get: () => req.signal,
+            },
         });
         //console.log('newRequest', url, req, request);
         return request;

@@ -8,6 +8,7 @@ enum ChunkType {
     HEAD = 0x00,
     BODY = 0x01,
     END = 0x02,
+    ABORT_SIGNAL = 0x03,
 }
 
 export class NativeRequestStream extends RawStream {
@@ -33,6 +34,7 @@ export class NativeRequestStream extends RawStream {
 
     async fetch(request: Request) {
         this.log.debug('fetch', request.url, request);
+        this.handleAbortSignal(request.signal);
         const transformedRequest = transformers.transformRequest(request);
         this.log.debug(
             'transformedRequest',
@@ -43,8 +45,24 @@ export class NativeRequestStream extends RawStream {
         this.outbox = new Deferred<Request>();
         outbox.resolve(transformedRequest);
         const response = await this.inbox.promise;
+        this.log.debug('response received', response);
         const transformedResponse = transformers.transformResponse(response);
         return transformedResponse;
+    }
+
+    private handleAbortSignal(signal: AbortSignal | null) {
+        if (!signal) return;
+        signal.addEventListener('abort', () => {
+            this.log.debug('abort signal received');
+            this.abort();
+        });
+    }
+
+    private async abort() {
+        this.log.debug('abort');
+        await this.write(Buffer.from([ChunkType.ABORT_SIGNAL]));
+        this.log.debug('abort ack received, release stream');
+        this.release();
     }
 
     private getRequestHead(request: Request) {
@@ -249,14 +267,18 @@ export class NativeRequestStream extends RawStream {
 
     private receiveResponseEnd() {
         this.log.debug('receiveResponseEnd');
-        if (!this.responseBodyController) {
-            throw new Error('responseBodyController is null');
-        }
-        this.responseBodyController.close();
         this.release();
     }
 
-    private async release() {
+    private release() {
+        this.log.debug('release');
+        this.responseHeadBuffer = Buffer.alloc(0);
+        this.responseHead = null;
+        this.response = null;
+        this.responseBodyStream = null;
+        this.responseBodyController?.close();
+        this.responseBodyController = null;
+
         StreamPool.release(this as unknown as RawStream);
     }
 }

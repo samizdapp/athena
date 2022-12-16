@@ -18,6 +18,7 @@ const p2pFetch = async (
 
     const url = new URL((request as Request).url);
     if (process.env.NX_LOCAL === 'true' && isBootstrapAppUrl(url)) {
+        log.trace('Using native fetch for bootstrap app: ', url);
         return nativeFetch(request, givenReqInit);
     }
 

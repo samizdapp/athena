@@ -95,7 +95,7 @@ function init() {
             i++;
         }
     }
-    console.log(toEnable);
+    // console.log(toEnable);
 }
 
 const log = new Debug('logger');

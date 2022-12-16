@@ -4,11 +4,14 @@ import fetchAgent from '../../fetch-agent';
 import { Stream } from '@libp2p/interface-connection';
 import { Readable } from 'stream';
 import { Debug } from '../../logging';
+import type { FetchError, RequestInit } from 'node-fetch';
+import { AbortSignal } from 'node-fetch/externals';
 
 enum ChunkType {
     HEAD = 0x00,
     BODY = 0x01,
     END = 0x02,
+    ABORT = 0x03,
 }
 
 export class NativeRequestStream extends RawStream {
@@ -17,11 +20,11 @@ export class NativeRequestStream extends RawStream {
     private readonly chunkSize = 64 * 1024;
     private outbox = new Deferred<Response>();
     private inbox = new Deferred<Request>();
-    private done = new Deferred<null>();
     private requestHeadBuffer = Buffer.alloc(0);
     private requestHead: Request | null = null;
     private request: Request | null = null;
     private requestBodyStream: Readable | null = null;
+    private abortController: AbortController = new AbortController();
 
     constructor(libp2pStream: Stream) {
         super(libp2pStream);
@@ -35,11 +38,13 @@ export class NativeRequestStream extends RawStream {
         this.initProxy();
     }
 
-    private async fetch(request: Request) {
-        this.log.debug('fetch', request.url, request);
-        return fetchAgent.fetch(request).catch(e => {
+    private async fetch(request: Request, init: RequestInit = {}) {
+        this.log.debug('fetch', request.url);
+        return fetchAgent.fetch(request, init).catch(e => {
             this.log.warn('fetch error', e);
-            return fetchAgent.Response(e.message, { status: 500 });
+            return fetchAgent.Response(`${e.code} ${e.message}`, {
+                status: 500,
+            });
         });
     }
 
@@ -135,7 +140,7 @@ export class NativeRequestStream extends RawStream {
     private async initInbox() {
         let chunk = null;
         while (this.isOpen && (chunk = await this.read()) != null) {
-            await this.receiveChunk(chunk);
+            this.receiveChunk(chunk);
         }
         this.log.debug('inbox done');
     }
@@ -143,7 +148,11 @@ export class NativeRequestStream extends RawStream {
     private async initProxy() {
         let request = null;
         while (this.isOpen && (request = await this.inbox.promise) != null) {
-            const response = await this.fetch(request);
+            const response = await this.fetch(request, {
+                signal: this.abortController.signal as AbortSignal,
+            })
+                .catch(this.catchAbortError.bind(this))
+                .catch(this.catchTimeoutError.bind(this));
             this.log.debug(
                 'proxy got response',
                 response.status,
@@ -154,6 +163,23 @@ export class NativeRequestStream extends RawStream {
         }
         this.log.debug('proxy done');
     }
+
+    private catchAbortError = (e: FetchError) => {
+        if (e.type === 'aborted') {
+            this.log.debug('fetch aborted');
+            return fetchAgent.Response('aborted', { status: 499 });
+        }
+        throw e;
+    };
+
+    private catchTimeoutError = (e: FetchError) => {
+        // if error is a fetch timeout, return a 408 response
+        if (e.code === 'ETIMEDOUT') {
+            this.log.debug('fetch timeout');
+            return fetchAgent.Response('', { status: 408 });
+        }
+        throw e;
+    };
 
     private async receiveChunk(chunk: Buffer) {
         const type = chunk.readUInt8(0);
@@ -171,9 +197,20 @@ export class NativeRequestStream extends RawStream {
                 this.log.trace('receiveChunk', 'requestEnd');
                 this.receiveRequestEnd();
                 break;
+            case ChunkType.ABORT:
+                this.log.trace('receiveChunk', 'requestAbort');
+                await this.receiveRequestAbort();
+                break;
             default:
                 this.log.warn('receiveChunk', 'unknown chunk type', type);
         }
+    }
+
+    private async receiveRequestAbort() {
+        this.requestBodyStream?.destroy();
+
+        this.abortController?.abort();
+        this.reset();
     }
 
     private async receiveRequestHead(chunk: Buffer) {
@@ -200,13 +237,7 @@ export class NativeRequestStream extends RawStream {
             },
         });
 
-        // this.requestBodyStream.on('data', chunk => {
-        //     this.log.trace('requestBodyStream data', chunk.toString());
-        // });
-
-        // this.requestBodyStream.on('end', () => {
-        //     this.log.trace('requestBodyStream end');
-        // });
+        this.abortController = new AbortController();
         this.request = await fetchAgent.Request(
             this.requestHead?.url as RequestInfo,
             {
@@ -218,6 +249,7 @@ export class NativeRequestStream extends RawStream {
                     : this.requestBodyStream,
             }
         );
+
         const inbox = this.inbox;
         this.inbox = new Deferred<Request>();
         if (this.request) {
@@ -234,8 +266,12 @@ export class NativeRequestStream extends RawStream {
     private receiveRequestEnd() {
         this.log.trace('receiveRequestEnd');
         this.requestBodyStream?.push(null);
-        console.log('receiveRequestEnd', this.requestBodyStream);
+        this.reset();
+    }
+
+    reset() {
+        this.requestHead = null;
+        this.requestHeadBuffer = Buffer.alloc(0);
         this.requestBodyStream = null;
-        this.done.resolve(null);
     }
 }

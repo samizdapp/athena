@@ -5,7 +5,9 @@ import { StreamPool } from './request';
 import { logger } from '../../logging';
 
 export class NativeRequestStream extends RawStream {
-    static readonly log = logger.getLogger('worker/p2p/native-request-stream');
+    static readonly log = logger.getLogger(
+        'worker/p2p-client/streams/native-request'
+    );
     protected override readonly log = NativeRequestStream.log;
     private chunkSize = 64 * 1024;
     private outbox = new Deferred<Request>();

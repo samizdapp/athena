@@ -1,11 +1,11 @@
 import 'whatwg-fetch';
 
 import { renderWithProviders } from '../../redux/testing';
-import Status from './status';
+import StatusDashboard from './status-dashboard';
 
 describe('Status', () => {
     it('should render successfully', () => {
-        const { baseElement } = renderWithProviders(<Status />);
+        const { baseElement } = renderWithProviders(<StatusDashboard />);
         expect(baseElement).toBeTruthy();
     });
 });

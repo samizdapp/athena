@@ -66,6 +66,10 @@ module.exports = (config, _context) => {
                 swSrc: 'packages/gateway-client/src/worker/service-worker.ts',
                 swDest: 'service-worker.js',
             }),
+            new InjectManifest({
+                swSrc: 'packages/gateway-client/src/worker/app.ts',
+                swDest: 'worker-app.js',
+            }),
         ],
     };
 };

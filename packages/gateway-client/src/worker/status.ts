@@ -4,6 +4,7 @@ import {
     WorkerMessageType,
 } from '../worker-messaging';
 import messenger from './messenger';
+import { getVersion } from './version';
 
 class Status {
     _serverPeer: ServerPeerStatus | null = null;
@@ -46,6 +47,10 @@ class Status {
         messenger.postMessage({
             type: WorkerMessageType.SERVER_PEER_STATUS,
             status: this.serverPeer,
+        });
+        messenger.postMessage({
+            type: WorkerMessageType.VERSION,
+            version: getVersion(),
         });
     }
 }

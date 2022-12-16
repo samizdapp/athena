@@ -1,4 +1,4 @@
-import { environment } from '../environments/environment';
+import { environment } from '../environment';
 import { readFileSync, writeFile } from 'fs';
 import { Debug } from '../logging';
 import upnp from '../upnp';
@@ -59,6 +59,7 @@ export class YggdrasilConfig {
 
     private async sanitizeConfig() {
         const selfPeer = await this.getSelfPeerString();
+        this.json.AdminListen = `tcp://${environment.yggdrasil_admin_host}:${environment.yggdrasil_admin_port}`;
         this.json.Peers = this.json.Peers.filter(
             (peer: string) => peer !== selfPeer
         );

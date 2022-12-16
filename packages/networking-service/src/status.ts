@@ -1,6 +1,6 @@
 import { Debug } from './logging';
 import fetchAgent from './fetch-agent';
-import { environment } from './environments/environment';
+import { environment } from './environment';
 
 export enum Statuses {
     ONLINE = 'online',

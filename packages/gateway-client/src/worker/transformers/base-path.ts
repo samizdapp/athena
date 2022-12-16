@@ -106,7 +106,7 @@ class BasePathTransformer extends BaseTransformer {
         );
         return (
             (contentType?.startsWith(this.content_type) &&
-                res.headers.get(this.header) !== undefined) ||
+                res.headers.get(this.header) !== null) ||
             false
         );
     }

@@ -49,7 +49,7 @@ fetchHandlers
 transformers
     .use(proxyWebSocketTransformer)
     .use(pingServiceWorkerTransformer)
-    .use(basePathTransformer)
+    // .use(basePathTransformer)
     .use(new SamizdappFlagTransformer('/manifest.json', 'pleroma', true))
     .use(new SamizdappFlagTransformer('/smz', 'samizdapp'));
 

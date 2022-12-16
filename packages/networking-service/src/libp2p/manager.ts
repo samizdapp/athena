@@ -1,6 +1,6 @@
 import node from './node';
 import { writeFile } from 'fs/promises';
-import { environment } from '../environments/environment';
+import { environment } from '../environment';
 import { Debug } from '../logging';
 
 class Libp2pManager {

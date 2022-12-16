@@ -2,7 +2,7 @@ import crawler from './crawler';
 import { NodeInfo } from './rpc';
 import config from './config';
 import fetchAgent from '../fetch-agent';
-import { environment } from '../environments/environment';
+import { environment } from '../environment';
 import upnp from '../upnp';
 import { writeFile } from 'fs/promises';
 import { Debug } from '../logging';

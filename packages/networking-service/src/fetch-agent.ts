@@ -5,7 +5,7 @@ import dns from 'dns';
 import { LookupFunction } from 'net';
 import { Debug } from './logging';
 import type { RequestInit, Request, Response } from 'node-fetch';
-import { environment } from './environments/environment';
+import { environment } from './environment';
 
 class FetchAgent {
     private readonly log = new Debug('fetch-agent');

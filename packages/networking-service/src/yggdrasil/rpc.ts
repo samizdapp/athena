@@ -1,5 +1,5 @@
 import { Socket } from 'node:net';
-import { environment } from '../environments/environment';
+import { environment } from '../environment';
 import { Debug } from '../logging';
 import { EventEmitter } from 'node:stream';
 

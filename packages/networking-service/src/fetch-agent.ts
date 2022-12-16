@@ -29,14 +29,14 @@ class FetchAgent {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async Response(...args: any[]) {
-        // await this.ready;
+        await this.ready;
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         return new this._Response!(...args);
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async Request(arg1: any, arg2: any) {
-        // await this.ready;
+        await this.ready;
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         return new this._Request!(arg1, arg2);
     }
@@ -44,7 +44,7 @@ class FetchAgent {
     public async fetch(url: string | Request, options: RequestInit = {}) {
         options.agent = this.getAgent((url as Request).url || (url as string));
         const _inspect = new URL((url as Request).url || 'http://ignore');
-        if (_inspect.port === `${environment.fetch_localhost_port}`) {
+        if (_inspect.hostname === `localhost` && environment.nx_local) {
             _inspect.port = '80';
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             const { headers, body } = url as Request;

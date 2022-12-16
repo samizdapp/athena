@@ -43,13 +43,6 @@ export class ServiceWorkerLogic {
         }
         dispatch(setStatus(this.worker.state));
         // check if controlling
-        console.log(
-            'controlling?',
-            this,
-            navigator.serviceWorker.controller,
-            this.worker,
-            navigator.serviceWorker.controller === this.worker
-        );
         dispatch(
             setIsControlling(navigator.serviceWorker.controller === this.worker)
         );

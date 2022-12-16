@@ -7,22 +7,23 @@ const log = logger.getLogger('worker/p2p-fetch/override');
 
 const p2pFetch = async (
     p2pClient: P2pClient,
-    givenReqObj: URL | RequestInfo,
+    request: URL | Request,
     givenReqInit: RequestInit | undefined = {}
 ): Promise<Response> => {
-    const request = new P2pFetchRequest(p2pClient, givenReqObj, givenReqInit);
-
-    // apply filtering to the request
-    try {
-        const url = new URL(givenReqObj as unknown as string);
-        if (process.env.NX_LOCAL === 'true' && isBootstrapAppUrl(url)) {
-            return nativeFetch(givenReqObj, givenReqInit);
-        }
-    } catch (e) {
-        // ignore
+    if (typeof request === 'string') {
+        throw new Error(
+            'Patched service worker `fetch()` method expects a full request object, received string ' +
+                request
+        );
     }
 
-    return request.execute();
+    const url = new URL((request as Request).url);
+    if (process.env.NX_LOCAL === 'true' && isBootstrapAppUrl(url)) {
+        return nativeFetch(request, givenReqInit);
+    }
+
+    const stream = await p2pClient.getNativeRequestStream();
+    return stream.fetch(request as Request);
 };
 
 export const nativeFetch = self.fetch;

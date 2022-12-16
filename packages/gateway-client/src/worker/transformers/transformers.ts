@@ -47,9 +47,7 @@ abstract class AbstractTransformer {
         [ChunkType.REQUEST]: this.transformRequestChunk.bind(this),
         [ChunkType.RESPONSE]: this.transformResponseChunk.bind(this),
     };
-    abstract transformChunk(chunk: Uint8Array): Uint8Array;
-
-    private transform(
+    private transformBody(
         r: Request | Response,
         _type: ChunkType
     ): ReadableStream<Uint8Array> | undefined {
@@ -86,7 +84,7 @@ abstract class AbstractTransformer {
             //     head,
             //     Array.from(head.headers.entries())
             // );
-            const body = this.transform(req, ChunkType.REQUEST);
+            const body = this.transformBody(req, ChunkType.REQUEST);
             return this.newRequest(head, body as ReadableStream<Uint8Array>);
         }
         return req;
@@ -111,7 +109,7 @@ abstract class AbstractTransformer {
         // check if the response is correct type
         if (this.shouldTransformResponse(res)) {
             const head = this.transformResponseHead(res);
-            const body = this.transform(res, ChunkType.RESPONSE);
+            const body = this.transformBody(res, ChunkType.RESPONSE);
             return this.newResponse(head, body as ReadableStream<Uint8Array>);
         }
         return res;
@@ -234,10 +232,6 @@ abstract class AbstractTransformer {
 }
 
 export class BaseTransformer extends AbstractTransformer {
-    transformChunk(chunk: Uint8Array): Uint8Array {
-        return chunk;
-    }
-
     shouldTransformRequest(_req: Request): boolean {
         return false;
     }
@@ -267,7 +261,7 @@ export class CompiledTransformer extends BaseTransformer {
     protected log = logger.getLogger('worker/transformer/compiled');
 
     constructor(
-        protected readonly content_type: string,
+        protected readonly contentType: string,
         protected readonly split: string,
         protected readonly snippet: string
     ) {
@@ -292,10 +286,10 @@ export class CompiledTransformer extends BaseTransformer {
         this.log.trace(
             'shouldTransformResponse?',
             res.headers.get('content-type'),
-            this.content_type
+            this.contentType
         );
         return (
-            res.headers.get('content-type')?.startsWith(this.content_type) ||
+            res.headers.get('content-type')?.startsWith(this.contentType) ||
             false
         );
     }

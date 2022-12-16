@@ -3,7 +3,7 @@ import { logger } from '../logging';
 
 class BasePathTransformer extends BaseTransformer {
     protected log = logger.getLogger('worker/transjectors/base-path');
-    private readonly content_type = 'text/html';
+    private readonly contentType = 'text/html';
     private readonly header = 'x-samizdapp-base-path';
 
     constructor() {
@@ -64,7 +64,8 @@ class BasePathTransformer extends BaseTransformer {
         return (hostIsLocal && (hasSeenReferrer || hasSeenPort)) || false;
     }
 
-    override transformRequestHead(req: Request): Request {
+    // have to have a duplex flag when cloning requests, otherwise the body will throw error
+    override transformRequestHead(req: { duplex?: string } & Request): Request {
         this.log.debug(`transforming request: ${req.url}`);
         const basePath = this.hasSeenPort(req.url)
             ? this.getSeenPort(req.url)
@@ -84,9 +85,6 @@ class BasePathTransformer extends BaseTransformer {
 
         // construct a new request with the new url
         try {
-            // have to do this because request constructors with bodies throw if not.
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
             req.duplex = 'half';
             return this.newUrlRequest(newUrl.toString(), req);
         } catch (e) {
@@ -102,10 +100,10 @@ class BasePathTransformer extends BaseTransformer {
         const [targetHeader] = targetHeaderRaw?.split(',') || [];
 
         this.log.trace(
-            `contentType(${this.content_type}): ${contentType}, targetHeader(${this.header}): ${targetHeader} `
+            `contentType(${this.contentType}): ${contentType}, targetHeader(${this.header}): ${targetHeader} `
         );
         return (
-            (contentType?.startsWith(this.content_type) &&
+            (contentType?.startsWith(this.contentType) &&
                 res.headers.get(this.header) !== null) ||
             false
         );
@@ -125,7 +123,7 @@ class BasePathTransformer extends BaseTransformer {
         const newBody = chunk.toString().replace(/<base[^>]*>/, '');
         // make a new compiled injector with the base path
         const injector = new CompiledTransformer(
-            this.content_type,
+            this.contentType,
             '<head>',
             makeSnippet(targetHeader, url)
         );
@@ -145,7 +143,7 @@ class BasePathTransformer extends BaseTransformer {
         _url.hash = '';
         const url = _url.toString();
         const injector = new CompiledTransformer(
-            this.content_type,
+            this.contentType,
             '<head>',
             makeSnippet(targetHeader, url)
         );

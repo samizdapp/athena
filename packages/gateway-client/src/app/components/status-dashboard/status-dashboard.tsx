@@ -3,6 +3,7 @@ import * as Rgl from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 import styled from 'styled-components';
+import OpenWithIcon from '@mui/icons-material/OpenWith';
 
 import BoxStatus from './box-status/box-status';
 import Version from './version/version';
@@ -15,28 +16,85 @@ const StyledStatus = styled.div`
     height: 100%;
 
     .react-grid-item {
-        border: 3px solid #0a0;
-        border-radius: 5px 5px 0 0;
+        background-color: #f1f1f1;
+        border: 2px solid #84c184;
+        border-top: 0;
+        border-radius: 5px;
+        box-shadow: 2px 2px 7px -3px #000;
         transition: none;
 
         header {
-            background-color: #0a0;
+            background-color: #84c184;
+            border-radius: 5px 5px 0 0;
             cursor: move;
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            margin: -2px 0 0 -2px;
-            height: 34px;
+            margin: 0 0 0 -2px;
+            position: relative;
+            height: 30px;
             width: calc(100% + 4px);
 
             h3 {
+                font-size: 1.2em;
+                line-height: 1.4em;
                 margin: 2px 10px;
+            }
+
+            svg {
+                position: absolute;
+                right: 10px;
+                top: 50%;
+                margin-top: -0.5em;
+                opacity: 0.2;
             }
         }
 
         article {
             overflow: auto;
-            height: calc(100% - 30px);
+            margin: 5px;
+            height: calc(100% - 30px - 10px);
+        }
+
+        .react-resizable-handle {
+            background-image: none;
+            background-color: #ccc;
+            border-radius: 10px;
+            opacity: 0;
+            margin: 0;
+            transform: none;
+        }
+
+        .react-resizable-handle:hover {
+            opacity: 0.6;
+        }
+
+        .react-resizable-handle-s,
+        .react-resizable-handle-se {
+            bottom: -8px;
+            height: 10px;
+        }
+
+        .react-resizable-handle-e,
+        .react-resizable-handle-se {
+            right: -8px;
+            width: 10px;
+        }
+
+        .react-resizable-handle-s {
+            left: 0px;
+            width: calc(100% - 12px);
+        }
+
+        .react-resizable-handle-e {
+            top: 30px;
+            height: calc(100% - 30px - 12px);
+        }
+
+        .react-resizable-handle-se {
+            border-radius: 5px;
+            height: 20px;
+            width: 20px;
         }
     }
 `;
@@ -53,6 +111,7 @@ const GridItem = forwardRef<HTMLElement, GridItemProps>(
             <section ref={ref} className={className} {...props}>
                 <header>
                     <h3>{title}</h3>
+                    <OpenWithIcon />
                 </header>
                 <article>{children}</article>
             </section>
@@ -60,7 +119,7 @@ const GridItem = forwardRef<HTMLElement, GridItemProps>(
     }
 );
 
-export const Status = () => {
+export const StatusDashboard = () => {
     return (
         <StyledStatus>
             <ResponsiveGridLayout
@@ -88,6 +147,7 @@ export const Status = () => {
                 cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
                 rowHeight={30}
                 draggableHandle="header"
+                resizeHandles={['s', 'e', 'se']}
             >
                 <GridItem key="box-status" title="Box Status">
                     <BoxStatus />
@@ -105,4 +165,4 @@ export const Status = () => {
     );
 };
 
-export default Status;
+export default StatusDashboard;

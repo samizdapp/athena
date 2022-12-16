@@ -16,7 +16,7 @@ import {
 import ErasablePen from '../loading/erasable-pen';
 import AnimatedCheck from './animated-check';
 import AnimatedConnection from './animated-connection';
-import Status from './status';
+import Status from './worker';
 
 const StyledHome = styled.div`
     overflow: hidden;

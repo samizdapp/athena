@@ -1,6 +1,7 @@
 import localforage from 'localforage';
 
 import { ClientMessageType } from '../worker-messaging';
+import { CACHE_NAME, clearExpiredCaches } from './cache';
 import { SamizdAppDevTools } from './devtools';
 import { logger } from './logging';
 import messenger from './messenger';
@@ -39,6 +40,9 @@ export default async () => {
 
         // send status update to our client
         status.sendCurrent();
+
+        // clear expired caches
+        await clearExpiredCaches(CACHE_NAME.APP);
 
         log.debug('Finish clients claim');
     });

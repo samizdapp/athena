@@ -2,8 +2,11 @@ import { Deferred, RawStream } from './raw';
 import { Stream } from '@libp2p/interface-connection';
 import transformers from '../../transformers';
 import { StreamPool } from './request';
+import { logger } from '../../logging';
 
 export class NativeRequestStream extends RawStream {
+    static readonly log = logger.getLogger('worker/p2p/native-request-stream');
+    protected override readonly log = NativeRequestStream.log;
     private chunkSize = 64 * 1024;
     private outbox = new Deferred<Request>();
     private inbox = new Deferred<Response>();
@@ -23,11 +26,13 @@ export class NativeRequestStream extends RawStream {
     }
 
     async fetch(request: Request) {
+        this.log.debug('fetch', request.url, request);
         const transformedRequest = transformers.transformRequest(request);
-        ////console.log(
-        //     'transformedRequest',
-        //     Array.from(transformedRequest.headers.entries())
-        // );
+        this.log.debug(
+            'transformedRequest',
+            transformedRequest.url,
+            transformedRequest
+        );
         const outbox = this.outbox;
         this.outbox = new Deferred<Request>();
         outbox.resolve(transformedRequest);

@@ -4,4 +4,4 @@ loggers:
   worker/p2p/libp2p: ERROR
   worker/p2p/bootstrap: DEBUG
   worker/p2p/client: DEBUG
-  worker/p2p-client/streams/websocket: DEBUG
+  worker/p2p-client/streams/native-request: TRACE

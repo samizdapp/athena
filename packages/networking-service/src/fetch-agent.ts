@@ -47,9 +47,23 @@ class FetchAgent {
         if (_inspect.port === `${environment.fetch_localhost_port}`) {
             _inspect.port = '80';
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            const { headers, body } = url as Request;
             url = await this.Request(_inspect.toString(), url as Request);
+            Object.defineProperties(url, {
+                headers: {
+                    value: headers,
+                },
+                body: {
+                    value: body,
+                },
+            });
         }
-        this.log.debug('fetch', url, options);
+        this.log.debug(
+            'fetch',
+            url,
+            Array.from((url as Request).headers?.entries() || []),
+            options
+        );
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         return this._fetch!(url, options);
     }
@@ -79,7 +93,11 @@ class FetchAgent {
             }
 
             if (hostname.endsWith('localhost') || hostname.endsWith('local')) {
-                this.log.trace('intercepting localhost', hostname);
+                this.log.trace(
+                    'intercepting localhost',
+                    hostname,
+                    environment.fetch_localhost_ip
+                );
                 return cb(null, environment.fetch_localhost_ip, 4);
             }
 

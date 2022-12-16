@@ -12,7 +12,14 @@ export class SamizdappFlagTransformer extends BaseTransformer {
     override shouldTransformRequest(res: Request): boolean {
         const url = new URL(res.url);
         const match = url.pathname.startsWith(this.prefix);
-        return this.invert ? !match : match;
+        const shouldTransformRequest = this.invert ? !match : match;
+        console.log(
+            'shouldTransformRequest',
+            shouldTransformRequest,
+            res.url,
+            this.prefix
+        );
+        return shouldTransformRequest;
     }
 
     override transformRequestHead(req: Request): Request {

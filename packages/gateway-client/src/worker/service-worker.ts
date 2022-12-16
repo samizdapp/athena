@@ -139,7 +139,13 @@ const rollbackWorker = async () => {
 };
 
 const fetchWorkerUrl = async () => {
-    const originalResponse = await fetch(new Request(appWorkerUrl));
+    const originalResponse = await fetch(
+        new Request(appWorkerUrl, {
+            headers: {
+                'x-intercepted-subdomain': 'samizdapp',
+            },
+        })
+    );
     const headers = new Headers(originalResponse.headers);
     headers.set('X-Smz-Worker-App-Script-Id', self.crypto.randomUUID());
     return new Response(originalResponse.body, {

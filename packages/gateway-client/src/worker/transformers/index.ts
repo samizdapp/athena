@@ -8,9 +8,8 @@ import { SamizdappFlagTransformer } from './samizdapp-flags';
 transformers
     .use(proxyWebSocketTransformer)
     .use(pingServiceWorkerTransformer)
-    .use(basePathTransformer)
-    .use(new SamizdappFlagTransformer('/smz', 'samizdapp'))
-    .use(new SamizdappFlagTransformer('/manifest.json', 'pleroma', true));
+    .use(new SamizdappFlagTransformer('/manifest.json', 'pleroma', true))
+    .use(new SamizdappFlagTransformer('/smz', 'samizdapp'));
 
 export default transformers;
 

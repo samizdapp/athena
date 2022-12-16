@@ -5,6 +5,12 @@ import { Stream } from '@libp2p/interface-connection';
 import { Readable } from 'stream';
 import { Debug } from '../../logging';
 
+enum ChunkType {
+    HEAD = 0x00,
+    BODY = 0x01,
+    END = 0x02,
+}
+
 export class NativeRequestStream extends RawStream {
     static log = new Debug('native-request-stream');
     protected override readonly log = NativeRequestStream.log;
@@ -78,7 +84,10 @@ export class NativeRequestStream extends RawStream {
     private async writeResponseHead(response: Response) {
         const responseHeadPojo = this.getResponseHead(response);
         const responseHeadBuffer = this.encodeHead(responseHeadPojo);
-        const responseHeadChunks = this.chunkify(0x00, responseHeadBuffer);
+        const responseHeadChunks = this.chunkify(
+            ChunkType.HEAD,
+            responseHeadBuffer
+        );
         this.log.trace(
             'writeResponseHead',
             responseHeadPojo,
@@ -97,7 +106,7 @@ export class NativeRequestStream extends RawStream {
         for await (let chunk of response.body) {
             this.log.trace('writeResponseBody chunk', chunk);
             chunk = typeof chunk === 'string' ? Buffer.from(chunk) : chunk;
-            const chunks = this.chunkify(0x01, chunk);
+            const chunks = this.chunkify(ChunkType.BODY, chunk);
             for (const chunk of chunks) {
                 await this.write(chunk);
             }
@@ -114,7 +123,7 @@ export class NativeRequestStream extends RawStream {
             ) {
                 await this.writeResponseHead(response);
                 await this.writeResponseBody(response);
-                await this.write(Buffer.from([0x02]));
+                await this.write(Buffer.from([ChunkType.END]));
             }
         } catch (e) {
             this.log.warn('outbox error', e);
@@ -150,15 +159,15 @@ export class NativeRequestStream extends RawStream {
         const type = chunk.readUInt8(0);
         const data = chunk.subarray(1);
         switch (type) {
-            case 0x00:
+            case ChunkType.HEAD:
                 this.log.trace('receiveChunk', 'requestHead');
                 await this.receiveRequestHead(data);
                 break;
-            case 0x01:
+            case ChunkType.BODY:
                 this.log.trace('receiveChunk', 'requestBody');
                 this.receiveRequestBody(data);
                 break;
-            case 0x02:
+            case ChunkType.END:
                 this.log.trace('receiveChunk', 'requestEnd');
                 this.receiveRequestEnd();
                 break;

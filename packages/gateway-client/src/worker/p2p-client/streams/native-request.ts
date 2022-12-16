@@ -4,6 +4,12 @@ import transformers from '../../transformers';
 import { StreamPool } from './request';
 import { logger } from '../../logging';
 
+enum ChunkType {
+    HEAD = 0x00,
+    BODY = 0x01,
+    END = 0x02,
+}
+
 export class NativeRequestStream extends RawStream {
     static readonly log = logger.getLogger('worker/p2p/streams/native-request');
     protected override readonly log = NativeRequestStream.log;
@@ -77,7 +83,10 @@ export class NativeRequestStream extends RawStream {
     private async writeRequestHead(request: Request) {
         const requestHeadPojo = this.getRequestHead(request);
         const requestHeadBuffer = this.encodeHead(requestHeadPojo);
-        const requestHeadChunks = this.chunkify(0x00, requestHeadBuffer);
+        const requestHeadChunks = this.chunkify(
+            ChunkType.HEAD,
+            requestHeadBuffer
+        );
         for (const chunk of requestHeadChunks) {
             await this.write(chunk);
         }
@@ -91,7 +100,7 @@ export class NativeRequestStream extends RawStream {
         );
 
         for await (const chunk of rawChunks) {
-            const chunks = this.chunkify(0x01, chunk);
+            const chunks = this.chunkify(ChunkType.BODY, chunk);
             for (const chunk of chunks) {
                 await this.write(chunk);
             }
@@ -132,7 +141,7 @@ export class NativeRequestStream extends RawStream {
         while (this.isOpen && (request = await this.outbox.promise) != null) {
             await this.writeRequestHead(request);
             await this.writeRequestBody(request);
-            await this.write(Buffer.from([0x02]));
+            await this.write(Buffer.from([ChunkType.END]));
         }
         this.log.debug('outbox done');
     }
@@ -149,15 +158,15 @@ export class NativeRequestStream extends RawStream {
         const type = chunk.readUInt8(0);
         const data = chunk.subarray(1);
         switch (type) {
-            case 0x00:
+            case ChunkType.HEAD:
                 this.log.trace('receiveChunk', 'responseHead');
                 this.receiveResponseHead(data);
                 break;
-            case 0x01:
+            case ChunkType.BODY:
                 this.log.trace('receiveChunk', 'responseBody');
                 this.receiveResponseBody(data);
                 break;
-            case 0x02:
+            case ChunkType.END:
                 this.log.trace('receiveChunk', 'responseEnd');
                 this.receiveResponseEnd();
                 break;

@@ -1,5 +1,6 @@
-import { ServerPeerStatus } from 'packages/gateway-client/src/worker-messaging';
 import { useSelector } from 'react-redux';
+
+import { ServerPeerStatus } from '../../../worker-messaging';
 import { selectWorkerStatus } from '../../redux/service-worker/serviceWorker.slice';
 import StatusProperty from './property';
 

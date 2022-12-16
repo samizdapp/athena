@@ -1,5 +1,5 @@
 import { RawStream, Deferred } from './raw';
-import { Packet, decode } from './lob/lob-enc';
+import { Packet, decode } from './lob-enc';
 import { Stream } from '@libp2p/interface-connection';
 import { Debug } from '../../logging';
 export class LobStream extends RawStream {

@@ -1,4 +1,4 @@
-import { Packet, encode } from './lob/lob-enc';
+import { Packet, encode } from './lob-enc';
 import { LobStream } from './lob';
 import { WebSocket } from 'ws';
 import { Debug } from '../../logging';

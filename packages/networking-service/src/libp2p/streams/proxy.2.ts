@@ -1,5 +1,5 @@
 import { LobStream } from './lob';
-import { Packet, encode } from './lob/lob-enc';
+import { Packet, encode } from './lob-enc';
 import { RequestInit, Headers, Response } from 'node-fetch';
 import fetchAgent from '../../fetch-agent';
 

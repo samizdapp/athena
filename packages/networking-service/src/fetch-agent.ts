@@ -78,7 +78,7 @@ class FetchAgent {
                 }
             }
 
-            if (hostname.endsWith('localhost')) {
+            if (hostname.endsWith('localhost') || hostname.endsWith('local')) {
                 this.log.trace('intercepting localhost', hostname);
                 return cb(null, environment.fetch_localhost_ip, 4);
             }

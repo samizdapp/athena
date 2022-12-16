@@ -6,6 +6,7 @@ import { environment } from '../environments/environment';
 import upnp from '../upnp';
 import { writeFile } from 'fs/promises';
 import { Debug } from '../logging';
+
 class YggdrasilManager {
     private readonly log = new Debug('yggdrasil-manager');
 

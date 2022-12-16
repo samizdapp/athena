@@ -119,7 +119,7 @@ const GridItem = forwardRef<HTMLElement, GridItemProps>(
     }
 );
 
-export const Status = () => {
+export const StatusDashboard = () => {
     return (
         <StyledStatus>
             <ResponsiveGridLayout
@@ -165,4 +165,4 @@ export const Status = () => {
     );
 };
 
-export default Status;
+export default StatusDashboard;

@@ -2,7 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import styled from 'styled-components';
 
 import Home from './components/home/home';
-import Status from './components/status/status';
+import Status from './components/status-dashboard/status-dashboard';
 import Navbar from './navbar';
 
 const StyledApp = styled.div`

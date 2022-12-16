@@ -1,3 +1,4 @@
+import { CACHE_NAME, openCache } from '../cache';
 import { logger } from '../logging';
 import { Handler } from './fetch-handlers';
 
@@ -36,7 +37,7 @@ export const staticCacheHandler: Handler = (request, respondWith) => {
 
     // respond with asset from either cache or fetch
     respondWith(
-        caches.open('pwa-static-cache').then(cache => {
+        openCache(CACHE_NAME.APP).then(cache => {
             // Go to the cache first
             return cache.match(request.url).then(cachedResponse => {
                 // Return a cached response if we have one

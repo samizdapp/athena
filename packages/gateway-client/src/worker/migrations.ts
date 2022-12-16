@@ -98,3 +98,19 @@ registerMigration('0f8edbd5-6aa0-492e-9c3a-b419752dfdb1', async () => {
     // we won't remove the old bootstrap key
     // in case it is needed after the migration
 });
+
+// Clear obsolete pwa-static-cache
+registerMigration('b0e1c2c0-1b0f-4b1f-9c1f-1c1f1c1f1c1f', async () => {
+    // search for old key
+    const oldKey = 'pwa-static-cache';
+    const foundCache = await caches.has(oldKey);
+
+    // if it wasn't found
+    if (!foundCache) {
+        // nothing more to do
+        return;
+    }
+
+    // else, delete the cache
+    await caches.delete(oldKey);
+});

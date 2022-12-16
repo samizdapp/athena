@@ -3,7 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import 'whatwg-fetch';
 
 import { renderWithProviders } from '../../redux/testing';
-import Status from './status';
+import Status from './worker';
 
 describe('Status', () => {
     const renderWithRouter = (children: React.ReactNode) =>

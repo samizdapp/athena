@@ -1,10 +1,10 @@
-import { ServerPeerStatus } from 'packages/gateway-client/src/worker-messaging';
 import { useSelector } from 'react-redux';
 import styled from 'styled-components';
-import {
-    selectRelayAddresses,
-    selectWorkerStatus,
-} from '../../../redux/service-worker/serviceWorker.slice';
+import { selectRelayAddresses } from '../../../redux/service-worker/serviceWorker.slice';
+import Properties from '../../status-info/properties';
+
+import StatusProperty from '../../status-info/property';
+import WorkerProperties from '../../status-info/worker-properties';
 
 const StyledWorkerStatus = styled.div`
     padding: 10px;
@@ -21,69 +21,6 @@ const StyledWorkerStatus = styled.div`
         margin: 0 5px 10px;
         margin-top: 0;
         text-align: center;
-    }
-
-    .properties {
-        display: flex;
-        flex-wrap: wrap;
-        margin: 0;
-
-        .property {
-            margin-bottom: 10px;
-        }
-
-        dl {
-            flex: 1;
-            margin: 0;
-            min-width: 280px;
-        }
-
-        dt {
-            display: inline-block;
-            font-weight: bold;
-            text-transform: capitalize;
-            width: 125px;
-        }
-
-        dd {
-            display: inline-block;
-            margin: 0;
-            width: 150px;
-        }
-
-        .badge {
-            border-radius: 1em;
-            display: inline-block;
-            margin-left: 0.5em;
-            width: 0.5em;
-            height: 0.5em;
-
-            &.connecting {
-                background-color: #ffd000;
-            }
-
-            &.online {
-                background-color: #00dd00;
-            }
-
-            &.offline {
-                background-color: #cc0000;
-            }
-        }
-
-        .box-address {
-            display: none;
-
-            pre {
-                background: #ddd;
-                padding: 10px;
-                overflow: auto;
-            }
-        }
-
-        .service-status-link {
-            display: none;
-        }
     }
 
     .box-address {
@@ -105,84 +42,20 @@ const StyledWorkerStatus = styled.div`
     }
 `;
 
-interface StatusPropertyProps {
-    className?: string;
-    name: string;
-    value: string;
-    color?: 'online' | 'offline' | 'connecting' | 'none';
-}
-
-const StatusProperty = ({
-    className = '',
-    name,
-    value,
-    color = 'none',
-}: StatusPropertyProps) => {
-    return (
-        <div className={'property ' + className}>
-            <dt>{name}: </dt>
-            <dd>
-                {value}
-                <span className={'badge ' + color}></span>
-            </dd>
-        </div>
-    );
-};
-
 export const WorkerStatus = () => {
-    const {
-        isControlling,
-        status: workerStatus,
-        serverPeerStatus,
-    } = useSelector(selectWorkerStatus);
     const boxAddresses = useSelector(selectRelayAddresses);
-    const secureContext = window.isSecureContext;
 
     return (
         <StyledWorkerStatus className="worker-status">
-            <dl className="properties">
-                <StatusProperty
-                    name="status"
-                    value={workerStatus ?? 'pending'}
-                    color={
-                        workerStatus === 'activated'
-                            ? 'online'
-                            : workerStatus === 'redundant'
-                            ? 'offline'
-                            : 'connecting'
-                    }
-                />
-
-                <StatusProperty
-                    name="controlling"
-                    value={isControlling ? 'yes' : 'no'}
-                    color={isControlling ? 'online' : 'connecting'}
-                />
-
-                <StatusProperty
-                    name="secure context"
-                    value={secureContext ? 'yes' : 'no'}
-                    color={secureContext ? 'online' : 'offline'}
-                />
-
-                <StatusProperty
-                    name="server peer"
-                    value={serverPeerStatus ?? 'PENDING'}
-                    color={
-                        serverPeerStatus === ServerPeerStatus.CONNECTED
-                            ? 'online'
-                            : serverPeerStatus === ServerPeerStatus.OFFLINE
-                            ? 'offline'
-                            : 'connecting'
-                    }
-                />
+            <Properties>
+                <WorkerProperties />
 
                 <StatusProperty
                     className="box-addresses"
                     name="box-addresses"
                     value={boxAddresses.length.toString()}
                 />
-            </dl>
+            </Properties>
 
             <div className="box-address">
                 <h3>Box Addresses ({boxAddresses.length})</h3>

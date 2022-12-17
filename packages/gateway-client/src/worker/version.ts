@@ -19,3 +19,14 @@ self.version.app = {
 };
 
 export const getVersion = () => self.version;
+
+export const setUpdateAvailable = (
+    which: 'root' | 'app',
+    available: boolean
+) => {
+    if (!self.version[which]) {
+        self.version[which] = {};
+    }
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    self.version[which]!.updateAvailable = available;
+};

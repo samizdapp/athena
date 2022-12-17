@@ -3,6 +3,7 @@ import { ClientMessageType } from '../worker-messaging';
 import { CACHE_NAME, openCache } from './cache';
 import { logger } from './logging';
 import messenger from './messenger';
+import status from './status';
 import { getVersion, setUpdateAvailable } from './version';
 
 declare const self: ServiceWorkerGlobalScope;
@@ -412,13 +413,15 @@ export const initUpdates = async ({ rootCache }: CacheOptions = {}) => {
     }
 
     // listen for update command
-    messenger.addListener(ClientMessageType.UPDATE_WORKER, () => {
-        updateAppWorker({ rootCache: cache, ignoreRollback: true });
+    messenger.addListener(ClientMessageType.UPDATE_WORKER, async () => {
+        await updateAppWorker({ rootCache: cache, ignoreRollback: true });
+        status.sendVersion();
     });
 
     // listen for rollback command
-    messenger.addListener(ClientMessageType.ROLLBACK_WORKER, () => {
-        rollbackAppWorker({ rootCache: cache });
+    messenger.addListener(ClientMessageType.ROLLBACK_WORKER, async () => {
+        await rollbackAppWorker({ rootCache: cache });
+        status.sendVersion();
     });
 };
 

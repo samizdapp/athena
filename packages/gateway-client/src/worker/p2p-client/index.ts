@@ -62,7 +62,7 @@ export class P2pClient {
             .catch(_ => _);
     }
 
-    public getStream(protocol?: string) {
+    public getStream(protocol = '/samizdapp-proxy/3.0.0') {
         if (!this.streamFactory) {
             throw new Error('No connection established!');
         }
@@ -397,6 +397,7 @@ export class P2pClient {
         messenger.addNativeHandler(event => {
             this.log.debug('Received websocket message:', event);
             if (event.data.type === ClientMessageType.WEBSOCKET) {
+                this.log.info('creating websocket stream...');
                 this.streamFactory?.getWebsocketStream(
                     event.ports as MessagePort[]
                 );
@@ -408,7 +409,14 @@ export class P2pClient {
         if (!this.streamFactory) {
             throw new Error('Stream factory not initialized');
         }
-        return this.streamFactory.getRequestStream();
+        return this.streamFactory.getNativeRequestStream();
+    }
+
+    public async getNativeRequestStream() {
+        if (!this.streamFactory) {
+            throw new Error('Stream factory not initialized');
+        }
+        return this.streamFactory.getNativeRequestStream();
     }
 
     private dispatchEvent<T>(type: string, detail?: T) {

@@ -10,7 +10,7 @@ import {
     multiaddr,
 } from '@athena/shared/libp2p';
 import { readFile, writeFile } from 'fs/promises';
-import { environment } from '../environments/environment';
+import { environment } from '../environment';
 import { ConnectionEncrypter } from '@libp2p/interface-connection-encrypter';
 import { StreamMuxerFactory } from '@libp2p/interface-stream-muxer';
 import {

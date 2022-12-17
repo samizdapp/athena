@@ -1,4 +1,4 @@
-import { environment } from '../environments/environment';
+import { environment } from '../environment';
 import { readFileSync, writeFile } from 'fs';
 import { Debug } from '../logging';
 import upnp from '../upnp';
@@ -22,14 +22,14 @@ export class YggdrasilConfig {
     save(force = false) {
         this.log.debug('save called, force:', force);
         if (force) {
-            this._save();
+            this._save(force);
             return;
         }
         clearTimeout(this.saveTimeout);
         this.saveTimeout = setTimeout(this._save.bind(this), this.saveDebounce);
     }
 
-    private async _save() {
+    private async _save(force = false) {
         await this.sanitizeConfig();
         const json = JSON.stringify(this.json);
         const oldContent = JSON.stringify(
@@ -37,7 +37,7 @@ export class YggdrasilConfig {
                 readFileSync(environment.yggdrasil_config, 'utf8').trim()
             )
         );
-        if (oldContent === json) {
+        if (!force && oldContent === json) {
             this.log.info('yggdrasil config unchanged, not saving');
             return;
         }
@@ -59,6 +59,7 @@ export class YggdrasilConfig {
 
     private async sanitizeConfig() {
         const selfPeer = await this.getSelfPeerString();
+        this.json.AdminListen = `tcp://${environment.yggdrasil_admin_host}:${environment.yggdrasil_admin_port}`;
         this.json.Peers = this.json.Peers.filter(
             (peer: string) => peer !== selfPeer
         );

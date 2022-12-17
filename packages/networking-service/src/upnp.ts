@@ -1,5 +1,5 @@
 import type { Mapping } from 'node-portmapping';
-import { environment } from './environments/environment';
+import { environment } from './environment';
 import { internalIpV4 } from '@athena/shared/libp2p';
 import { Debug } from './logging';
 
@@ -9,23 +9,22 @@ const log = new Debug('upnp');
 class UPNPPortMapper {
     private log = log;
 
-    private port: number;
     private mapping?: Mapping;
     public publicPort?: number;
     public publicHost?: string;
-    public internalPort?: number;
+    public internalPort: number;
     constructor(port: number) {
-        this.port = port;
+        this.internalPort = port;
     }
 
     async start() {
         try {
-            this.log.debug('creating mapping', this.port);
+            this.log.debug('creating mapping', this.internalPort);
             this.mapping = await new Promise<Mapping | undefined>(
                 (resolve, reject) => {
                     const mapping = natMapping?.createMapping(
                         {
-                            internalPort: this.port,
+                            internalPort: this.internalPort,
                             protocol: 'TCP',
                         },
                         info => {
@@ -43,20 +42,20 @@ class UPNPPortMapper {
                     );
                 }
             );
-            this.publicPort = this.port;
+            this.publicPort = this.publicPort || this.internalPort;
         } catch (e) {
             this.log.error((e as Error).message || (e as string));
         }
         this.log.debug(
             'created mapping',
-            this.port,
+            this.internalPort,
             this.publicPort,
             this.publicHost
         );
     }
 
     async stop() {
-        this.log.debug('destroying mapping', this.port);
+        this.log.debug('destroying mapping', this.internalPort);
         this.mapping?.destroy();
     }
 }

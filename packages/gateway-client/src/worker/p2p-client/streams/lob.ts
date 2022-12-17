@@ -1,10 +1,10 @@
-import { RawStream, Deferred } from './raw';
-import { Packet, decode } from './lob-enc';
+import { Deferred } from './raw';
+import { RawStream } from '../streams';
 import { Stream } from '@libp2p/interface-connection';
-import { Debug } from '../../logging';
+import { decode, Packet } from './lob-enc';
+
 export class LobStream extends RawStream {
-    protected override readonly log = new Debug('libp2p-lob-stream');
-    private chunkSize = 64 * 1024;
+    private chunkSize = 1024 * 64;
     private outbox = new Deferred<Packet>();
     private inbox = new Deferred<Packet | null>();
     public hasInitialized = false;
@@ -13,7 +13,7 @@ export class LobStream extends RawStream {
         super(libp2pStream);
         this.initOutbox();
         this.initInbox().then(() => {
-            console.debug('stream is closed');
+            this.log.debug('stream is closed');
         });
     }
 
@@ -76,22 +76,24 @@ export class LobStream extends RawStream {
                 currentLength = headLength = totalLength = 0;
                 chunks = [];
                 // resolve the inbox
-                this.log.debug('inbox resolved', packet);
+                this.log.trace('inbox resolved', packet);
                 this._receive(packet as Packet);
             }
 
-            this.eventTarget.emit('chunk', { detail: chunk });
+            this.eventTarget.dispatchEvent(
+                new CustomEvent('chunk', { detail: chunk })
+            );
         }
 
         this.log.debug('stream stopped receiving data');
     }
 
-    protected send(packet: Packet): void {
+    public send(packet: Packet): void {
         this.outbox.resolve(packet);
         this.outbox = new Deferred<Packet>();
     }
 
-    protected receive(): Promise<Packet | null> {
+    public receive(): Promise<Packet | null> {
         return this.inbox.promise;
     }
 

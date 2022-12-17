@@ -1,13 +1,9 @@
-import {
-    AbstractTransformer,
-    CompiledTransformer,
-    SamizdappResponse,
-} from './transformers';
+import { AbstractTransformer, CompiledTransformer } from './transformers';
 import { logger } from '../logging';
 
 class BasePathTransformer extends AbstractTransformer {
-    protected log = logger.getLogger('worker/transjectors/base-path');
-    private readonly content_type = 'text/html';
+    protected log = logger.getLogger('worker/tranformer/base-path');
+    private readonly contentType = 'text/html';
     private readonly header = 'x-samizdapp-base-path';
 
     constructor() {
@@ -55,55 +51,7 @@ class BasePathTransformer extends AbstractTransformer {
         ].includes(host);
     }
 
-    override transformResponse({
-        headers,
-        body,
-        url,
-    }: SamizdappResponse): SamizdappResponse {
-        const contentType = headers.get('content-type');
-        const targetHeaderRaw = headers.get(this.header);
-        const [targetHeader, ...ports] = targetHeaderRaw?.split(',') || [];
-
-        this.log.trace(
-            `contentType(${this.content_type}): ${contentType}, targetHeader(${this.header}): ${targetHeader}, url: ${url} `
-        );
-        if (
-            contentType?.startsWith(this.content_type) &&
-            headers.get(this.header)
-        ) {
-            // get url string without query params or hash
-            const _url = new URL(url);
-            _url.search = '';
-            _url.hash = '';
-            url = _url.toString();
-
-            this.log.debug(`injecting base path into: ${url}`);
-            this.referrerMap.set(url, targetHeader);
-            for (const port of ports) {
-                this.portMap.set(parseInt(port), `${targetHeader}/${port}`);
-            }
-
-            // remove the first <base> tag in the body via regex
-            const newBody = body.toString().replace(/<base[^>]*>/, '');
-            // make a new compiled injector with the base path
-            const injector = new CompiledTransformer(
-                this.content_type,
-                '<head>',
-                makeSnippet(targetHeader, url)
-            );
-
-            // inject the new base tag into the body
-            return injector.transformResponse({
-                headers,
-                body: Buffer.from(newBody),
-                url,
-            });
-        }
-        return { url, body, headers };
-    }
-
-    override transformRequest(req: { duplex?: string } & Request): Request {
-        // get the host of the url and of the referrer
+    override shouldTransformRequest(req: Request): boolean {
         const url = new URL(req.url);
         const hasSeenReferrer = this.hasSeenReferrer(req.referrer);
         const hasSeenPort = this.hasSeenPort(req.url);
@@ -113,35 +61,93 @@ class BasePathTransformer extends AbstractTransformer {
             `url: ${url}, hostIsLocal: ${hostIsLocal}, hasSeenReferrer: ${hasSeenReferrer}, hasSeenPort: ${hasSeenPort}`
         );
 
-        if (hostIsLocal && (hasSeenReferrer || hasSeenPort)) {
-            this.log.debug(`transforming request: ${req.url}`);
-            const basePath = hasSeenPort
-                ? this.getSeenPort(req.url)
-                : this.getSeenReferrer(req.referrer);
+        return (hostIsLocal && (hasSeenReferrer || hasSeenPort)) || false;
+    }
 
-            const newUrl = new URL(req.url);
-            if (newUrl.pathname.startsWith(basePath)) {
-                this.log.debug('url already contains basePath, skipping');
-                return req;
-            }
+    // have to have a duplex flag when cloning requests, otherwise the body will throw error
+    override transformRequestHead(req: { duplex?: string } & Request): Request {
+        this.log.debug(`transforming request: ${req.url}`);
+        const basePath = this.hasSeenPort(req.url)
+            ? this.getSeenPort(req.url)
+            : this.getSeenReferrer(req.referrer);
 
-            newUrl.pathname = basePath + newUrl.pathname;
-            newUrl.port = '80';
-            newUrl.protocol = 'http:';
-            newUrl.hostname = 'localhost';
-            this.log.debug('new url: ' + newUrl.toString());
-
-            // construct a new request with the new url
-            try {
-                req.duplex = 'half';
-                return new Request(newUrl.toString(), req);
-            } catch (e) {
-                this.log.error('error constructing new request: ', e);
-                this.log.error('original request: ', req.clone());
-            }
+        const newUrl = new URL(req.url);
+        if (newUrl.pathname.startsWith(basePath)) {
+            this.log.debug('url already contains basePath, skipping');
+            return req;
         }
 
-        return req;
+        newUrl.pathname = basePath + newUrl.pathname;
+        newUrl.port = '80';
+        newUrl.protocol = 'http:';
+        newUrl.hostname = 'localhost';
+        this.log.debug('new url: ' + newUrl.toString());
+
+        // construct a new request with the new url
+        try {
+            req.duplex = 'half';
+            return this.newUrlRequest(newUrl.toString(), req);
+        } catch (e) {
+            this.log.error('error constructing new request: ', e);
+            this.log.error('original request: ', req.clone());
+            return req;
+        }
+    }
+
+    override shouldTransformResponse(res: Response): boolean {
+        const contentType = res.headers.get('content-type');
+        const targetHeaderRaw = res.headers.get(this.header);
+        const [targetHeader] = targetHeaderRaw?.split(',') || [];
+
+        this.log.trace(
+            `contentType(${this.contentType}): ${contentType}, targetHeader(${this.header}): ${targetHeader} `
+        );
+        return (
+            (contentType?.startsWith(this.contentType) &&
+                res.headers.get(this.header) !== null) ||
+            false
+        );
+    }
+
+    override transformResponseChunk(
+        res: Response,
+        chunk: Uint8Array
+    ): Uint8Array {
+        const targetHeaderRaw = res.headers.get(this.header);
+        const [targetHeader] = targetHeaderRaw?.split(',') || [];
+        // remove the first <base> tag in the body via regex
+        const _url = new URL(res.url);
+        _url.search = '';
+        _url.hash = '';
+        const url = _url.toString();
+        const newBody = chunk.toString().replace(/<base[^>]*>/, '');
+        // make a new compiled injector with the base path
+        const injector = new CompiledTransformer(
+            this.contentType,
+            '<head>',
+            makeSnippet(targetHeader, url)
+        );
+
+        return injector.transformResponseChunk(
+            res,
+            new TextEncoder().encode(newBody)
+        );
+    }
+
+    override transformResponseHead(res: Response): Response {
+        const targetHeaderRaw = res.headers.get(this.header);
+        const [targetHeader] = targetHeaderRaw?.split(',') || [];
+        // console.log('RESPONSE', res);
+        const _url = new URL(res.url);
+        _url.search = '';
+        _url.hash = '';
+        const url = _url.toString();
+        const injector = new CompiledTransformer(
+            this.contentType,
+            '<head>',
+            makeSnippet(targetHeader, url)
+        );
+        return injector.transformResponseHead(res);
     }
 }
 

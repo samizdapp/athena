@@ -1,6 +1,7 @@
-import { WorkerVersion } from 'packages/gateway-client/src/worker-messaging';
 import { useSelector } from 'react-redux';
 import styled from 'styled-components';
+
+import { WorkerVersion } from '../../../../../src/worker-messaging';
 import { selectVersions } from '../../../redux/service-worker/serviceWorker.slice';
 
 const StyledVersion = styled.div`

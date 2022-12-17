@@ -8,6 +8,7 @@ export type WorkerVersion = Partial<{
     commit: string;
     build: string;
     branch: string;
+    updateAvailable?: boolean;
 }>;
 
 export enum ServerPeerStatus {

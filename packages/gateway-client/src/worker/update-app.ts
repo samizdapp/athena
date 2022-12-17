@@ -3,7 +3,7 @@ import { ClientMessageType } from '../worker-messaging';
 import { CACHE_NAME, openCache } from './cache';
 import { logger } from './logging';
 import messenger from './messenger';
-import { getVersion } from './version';
+import { getVersion, setUpdateAvailable } from './version';
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -420,4 +420,16 @@ export const initUpdates = async ({ rootCache }: CacheOptions = {}) => {
     messenger.addListener(ClientMessageType.ROLLBACK_WORKER, () => {
         rollbackAppWorker({ rootCache: cache });
     });
+};
+
+export const setVersionUpdateAvailable = async ({
+    rootCache,
+}: CacheOptions = {}) => {
+    // open root worker cache
+    const cache = rootCache ?? (await openCache(CACHE_NAME.ROOT));
+    // get cached response
+    const newScriptResponse = await cache.match(newAppKey);
+    // set flags
+    setUpdateAvailable('root', newWorkerExists() ? true : false);
+    setUpdateAvailable('app', newScriptResponse ? true : false);
 };

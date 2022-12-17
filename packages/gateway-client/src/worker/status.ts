@@ -4,6 +4,7 @@ import {
     WorkerMessageType,
 } from '../worker-messaging';
 import messenger from './messenger';
+import { setVersionUpdateAvailable } from './update-app';
 import { getVersion } from './version';
 
 class Status {

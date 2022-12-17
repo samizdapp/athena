@@ -7,7 +7,7 @@ import {
     openSync,
     closeSync,
 } from 'fs';
-import { environment } from '../environments/environment';
+import { environment } from '../environment';
 import { Debug } from '../logging';
 
 const HOST_HEADER = `

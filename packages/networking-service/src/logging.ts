@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import debug from 'debug';
-import { environment } from './environments/environment';
+import { environment } from './environment';
 
 enum LogLevels {
     TRACE = 'TRACE',
@@ -95,7 +95,7 @@ function init() {
             i++;
         }
     }
-    console.log(toEnable);
+    // console.log(toEnable);
 }
 
 const log = new Debug('logger');

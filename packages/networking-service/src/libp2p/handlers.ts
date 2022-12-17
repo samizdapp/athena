@@ -1,5 +1,6 @@
 import node from './node';
 import { ProxyStream2 } from './streams/proxy.2';
+import { NativeRequestStream as ProxyStream3 } from './streams/proxy.3';
 import { WebsocketStream } from './streams/websocket';
 import { RelayStream } from './streams/relay';
 import { HeartbeatStream, HeartbeatType } from './streams/heartbeat';
@@ -13,6 +14,14 @@ class Handlers {
         node.handleProtocol(
             '/samizdapp-proxy/2.0.0',
             this.handleProxy2.bind(this),
+            {
+                maxInboundStreams: 100,
+            }
+        );
+
+        node.handleProtocol(
+            '/samizdapp-proxy/3.0.0',
+            this.handleProxy3.bind(this),
             {
                 maxInboundStreams: 100,
             }
@@ -51,6 +60,21 @@ class Handlers {
         };
         this.log.debug('handle proxy2', stream);
         const proxyStream = new ProxyStream2(stream);
+        await proxyStream.init();
+    }
+
+    private async handleProxy3({
+        stream,
+        connection,
+    }: {
+        stream: Stream;
+        connection: Connection;
+    }) {
+        stream.metadata = {
+            peer: connection.remotePeer,
+        };
+        this.log.debug('handle proxy2', stream);
+        const proxyStream = new ProxyStream3(stream);
         await proxyStream.init();
     }
 

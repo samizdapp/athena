@@ -1,24 +1,29 @@
-import { isBootstrapAppUrl } from '../client';
-import { logger } from '../logging';
-import { P2pClient } from '../p2p-client';
-import { P2pFetchRequest } from './p2p-fetch-request';
+import { isBootstrapAppUrl } from './client';
+import { logger } from './logging';
+import { P2pClient } from './p2p-client';
 
 const log = logger.getLogger('worker/p2p-fetch/override');
 
 const p2pFetch = async (
     p2pClient: P2pClient,
-    givenReqObj: URL | RequestInfo,
+    request: URL | RequestInfo,
     givenReqInit: RequestInit | undefined = {}
 ): Promise<Response> => {
-    const request = new P2pFetchRequest(p2pClient, givenReqObj, givenReqInit);
-
-    // apply filtering to the request
-    const url = new URL(request.reqObj.url);
-    if (process.env.NX_LOCAL === 'true' && isBootstrapAppUrl(url)) {
-        return nativeFetch(givenReqObj, givenReqInit);
+    if (typeof request === 'string') {
+        throw new Error(
+            'Patched service worker `fetch()` method expects a full request object, received string ' +
+                request
+        );
     }
 
-    return request.execute();
+    const url = new URL((request as Request).url);
+    if (process.env.NX_LOCAL === 'true' && isBootstrapAppUrl(url)) {
+        log.trace('Using native fetch for bootstrap app: ', url);
+        return nativeFetch(request, givenReqInit);
+    }
+
+    const stream = await p2pClient.getNativeRequestStream();
+    return stream.fetch(request as Request);
 };
 
 export const nativeFetch = self.fetch;

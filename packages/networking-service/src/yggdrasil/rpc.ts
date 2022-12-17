@@ -1,7 +1,7 @@
 import { Socket } from 'node:net';
-import config from './config';
-import { environment } from '../environments/environment';
+import { environment } from '../environment';
 import { Debug } from '../logging';
+import { EventEmitter } from 'node:stream';
 
 //eslint-disable-next-line @typescript-eslint/no-explicit-any
 class Deferred {
@@ -87,7 +87,7 @@ type RPCResponse = {
     error?: string;
 };
 
-class RPCWorker {
+export class RPCWorker extends EventEmitter {
     static readonly log = new Debug('yggdrasil-rpc-worker');
     static readonly poolSize = 10;
     static readonly watchdogTimeout = 30000;
@@ -103,30 +103,12 @@ class RPCWorker {
     private _locked = true;
 
     constructor() {
+        super();
         this.initialize();
     }
 
-    static async error() {
-        this.errorCount++;
-        this.log.debug('yggdrasil rpc error count', this.errorCount);
-        if (this.errorCount > 2 * this.poolSize) {
-            // 20 seconds of errors, trigger manual restart of yggdrasil
-            this.watchdog();
-        }
-        await waitFor(this.watchdogTimeout * 3);
-        this.errorCount--;
-        this.log.debug('yggdrasil rpc error count', this.errorCount);
-    }
-
-    static async watchdog() {
-        this.log.debug('yggdrasil watchdog called, entering debounce');
-        if (Date.now() - this.lastWatchdog < this.watchdogTimeout) {
-            return this.log.debug('yggdrasil watchdog debounce');
-        }
-
-        this.lastWatchdog = Date.now();
-        this.log.debug('yggdrasil watchdog triggered, forcing reboot');
-        config.save(true);
+    async watchdog() {
+        this.emit('watchdog', 'yggdrasil rpc error');
     }
 
     initialize() {
@@ -152,7 +134,7 @@ class RPCWorker {
                 }, 100);
             }
 
-            RPCWorker.error();
+            this.watchdog();
         });
         this.socket.on('connect', () => {
             this.log.debug('connected to yggdrasil rpc socket');
@@ -180,7 +162,7 @@ class RPCWorker {
     async recover(msg: string) {
         this.log.warn(msg);
         this.lock();
-        await waitFor(10000);
+        await waitFor(1000);
         this.socket = new Socket();
         this.inboxBuffer = Buffer.alloc(0);
         this.inboxJSON = new Deferred();
@@ -270,7 +252,7 @@ class RPCWorker {
         ]);
         this.log.debug(
             'rpc response (use trace to see content)',
-            response.status
+            response?.status
         );
         this.log.trace(response);
         return response;

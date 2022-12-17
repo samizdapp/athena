@@ -4,7 +4,7 @@ import upnp from '../upnp';
 import { HeartbeatStream, HeartbeatType } from './streams/heartbeat';
 import { Deferred } from './streams/raw';
 import node from './node';
-import { environment } from '../environments/environment';
+import { environment } from '../environment';
 import { EventEmitter } from 'stream';
 import { Debug } from '../logging';
 import { multiaddr } from '@athena/shared/libp2p';

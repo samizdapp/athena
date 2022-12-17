@@ -1,5 +1,5 @@
 import { LobStream } from './lob';
-import { Packet, encode } from './lob/lob-enc';
+import { Packet, encode } from './lob-enc';
 import { RequestInit, Headers, Response } from 'node-fetch';
 import fetchAgent from '../../fetch-agent';
 
@@ -74,7 +74,7 @@ export class ProxyStream2 extends LobStream {
         try {
             this.log.debug('fetch', url, init, this.peer);
             const res = await fetchAgent.fetch(url, init);
-            return res;
+            return res as Response;
         } catch (e) {
             this.log.warn('fetch error', e);
             return Promise.resolve<Error>(e as Error);

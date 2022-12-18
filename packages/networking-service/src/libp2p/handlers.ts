@@ -73,7 +73,7 @@ class Handlers {
         stream.metadata = {
             peer: connection.remotePeer,
         };
-        this.log.debug('handle proxy2', stream);
+        this.log.debug('handle proxy3', stream);
         const proxyStream = new ProxyStream3(stream);
         await proxyStream.init();
     }

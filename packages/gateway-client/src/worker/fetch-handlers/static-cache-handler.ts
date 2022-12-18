@@ -48,7 +48,10 @@ export const staticCacheHandler: Handler = (request, respondWith) => {
                 // Otherwise, hit the network
                 return fetch(request).then(fetchedResponse => {
                     // Add the network response to the cache for later visits
-                    cache.put(request, fetchedResponse.clone());
+                    // but only if the response is OK
+                    if (fetchedResponse.ok) {
+                        cache.put(request, fetchedResponse.clone());
+                    }
 
                     // Return the network response
                     return fetchedResponse;

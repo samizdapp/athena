@@ -18,6 +18,7 @@ class App {
         const app = await NestFactory.create(AppModule);
         const globalPrefix = '/smz/api/networking';
         app.setGlobalPrefix(globalPrefix);
+        app.enableCors({ origin: true });
         const port = process.env.PORT || 3413;
         await app.listen(port);
         Logger.log(

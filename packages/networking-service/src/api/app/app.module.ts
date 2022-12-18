@@ -1,7 +1,7 @@
 import { Global, Module, ValidationPipe } from '@nestjs/common';
 import { APP_PIPE } from '@nestjs/core';
 
-import { InfoModule } from './info/info.module';
+import { InfoModule } from '../info/info.module';
 
 @Global()
 @Module({

@@ -6,13 +6,6 @@ import basePathTransformer from './base-path';
 import { SamizdappFlagTransformer } from './samizdapp-flags';
 import localTransformer from './local';
 
-transformers
-    .use(proxyWebSocketTransformer)
-    .use(pingServiceWorkerTransformer)
-    .use(new SamizdappFlagTransformer('/manifest.json', 'pleroma', true))
-    .use(new SamizdappFlagTransformer('/smz', 'samizdapp'))
-    .use(localTransformer);
-
 export default transformers;
 
 export {
@@ -20,4 +13,5 @@ export {
     pingServiceWorkerTransformer,
     basePathTransformer,
     SamizdappFlagTransformer,
+    localTransformer,
 };

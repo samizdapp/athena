@@ -42,6 +42,7 @@ class FetchAgent {
     }
 
     public async fetch(url: string | Request, options: RequestInit = {}) {
+        await this.ready;
         options.agent = this.getAgent((url as Request).url || (url as string));
         const _inspect = new URL((url as Request).url || 'http://ignore');
         if (_inspect.hostname === `localhost` && environment.nx_local) {

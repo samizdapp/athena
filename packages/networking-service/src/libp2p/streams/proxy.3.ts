@@ -25,6 +25,7 @@ export class NativeRequestStream extends RawStream {
     private request: Request | null = null;
     private requestBodyStream: Readable | null = null;
     private abortController: AbortController = new AbortController();
+    private isReadingBody = false;
 
     constructor(libp2pStream: Stream) {
         super(libp2pStream);
@@ -108,15 +109,25 @@ export class NativeRequestStream extends RawStream {
         this.log.debug('writeResponseBody', response);
         if (response.body instanceof ArrayBuffer) return;
         if (!response.body) return;
-        for await (let chunk of response.body) {
-            this.log.trace('writeResponseBody chunk', chunk);
-            chunk = typeof chunk === 'string' ? Buffer.from(chunk) : chunk;
-            const chunks = this.chunkify(ChunkType.BODY, chunk);
+        if (response.body instanceof Readable) {
+            for await (let chunk of response.body) {
+                this.log.trace('writeResponseBody chunk', chunk, typeof chunk);
+                chunk = typeof chunk === 'string' ? Buffer.from(chunk) : chunk;
+                const chunks = this.chunkify(ChunkType.BODY, chunk);
+                for (const chunk of chunks) {
+                    await this.write(chunk);
+                }
+            }
+            return;
+        }
+        if (response.body instanceof Buffer) {
+            const chunks = this.chunkify(ChunkType.BODY, response.body);
             for (const chunk of chunks) {
                 await this.write(chunk);
             }
+            return;
         }
-        this.log.debug('writeResponseBody done');
+        this.log.error('unhandled response body', typeof response.body);
     }
 
     private async initOutbox() {
@@ -140,7 +151,7 @@ export class NativeRequestStream extends RawStream {
     private async initInbox() {
         let chunk = null;
         while (this.isOpen && (chunk = await this.read()) != null) {
-            this.receiveChunk(chunk);
+            await this.receiveChunk(chunk);
         }
         this.log.debug('inbox done');
     }
@@ -183,26 +194,48 @@ export class NativeRequestStream extends RawStream {
 
     private async receiveChunk(chunk: Buffer) {
         const type = chunk.readUInt8(0);
-        const data = chunk.subarray(1);
+
+        if (chunk.byteLength === 1) {
+            switch (type) {
+                case ChunkType.BODY:
+                    this.log.trace('receiveChunk', 'requestBody');
+                    this.isReadingBody = true;
+                    break;
+                case ChunkType.END:
+                    this.log.trace('receiveChunk', 'requestEnd');
+                    this.isReadingBody = false;
+                    this.receiveRequestEnd();
+                    break;
+                case ChunkType.ABORT:
+                    this.log.trace('receiveChunk', 'requestAbort');
+                    await this.receiveRequestAbort();
+                    break;
+                default:
+                    if (this.isReadingBody) {
+                        this.receiveRequestBody(chunk);
+                        return;
+                    }
+                    this.log.warn('receiveChunk', 'unknown chunk type', type);
+            }
+
+            return;
+        }
+
+        if (this.isReadingBody) {
+            this.log.debug('receiveChunk', 'requestBody (chunked)');
+            await new Promise(resolve => setImmediate(resolve));
+            this.receiveRequestBody(chunk);
+            return;
+        }
+
+        const data = chunk.slice(1);
         switch (type) {
             case ChunkType.HEAD:
                 this.log.trace('receiveChunk', 'requestHead');
                 await this.receiveRequestHead(data);
                 break;
-            case ChunkType.BODY:
-                this.log.trace('receiveChunk', 'requestBody');
-                this.receiveRequestBody(data);
-                break;
-            case ChunkType.END:
-                this.log.trace('receiveChunk', 'requestEnd');
-                this.receiveRequestEnd();
-                break;
-            case ChunkType.ABORT:
-                this.log.trace('receiveChunk', 'requestAbort');
-                await this.receiveRequestAbort();
-                break;
             default:
-                this.log.warn('receiveChunk', 'unknown chunk type', type);
+                throw new Error('unknown chunk type ' + type);
         }
     }
 
@@ -270,6 +303,7 @@ export class NativeRequestStream extends RawStream {
     }
 
     reset() {
+        this.isReadingBody = false;
         this.requestHead = null;
         this.requestHeadBuffer = Buffer.alloc(0);
         this.requestBodyStream = null;

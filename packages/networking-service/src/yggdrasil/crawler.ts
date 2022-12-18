@@ -4,6 +4,7 @@ import { EventEmitter } from 'stream';
 import { ScalableBloomFilter } from 'bloom-filters';
 import { Debug } from '../logging';
 import { StatusUpdater, Statuses } from '../status';
+import { environment } from '../environment';
 
 const waitFor = async (ms: number) => new Promise(r => setTimeout(r, ms));
 
@@ -28,10 +29,7 @@ class YggdrassilCrawler extends EventEmitter {
     }
 
     private getWaitTime() {
-        if (this.dudResetCount > 0) {
-            return 60000 * this.dudResetCount;
-        }
-        return 60000;
+        return parseInt(environment.yggdrasil_scan_interval);
     }
 
     async start() {

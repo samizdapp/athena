@@ -58,13 +58,25 @@ class FetchAgent {
                 },
             });
         }
-        this.log.info('fetch', url);
+        const randomUUID = Math.random().toString(36).substring(2, 15);
+        this.log.info(
+            'fetch',
+            randomUUID,
+            (url as Request).url || (url as string)
+        );
         this.log.debug(
             '',
             Array.from((url as Request).headers?.entries() || [])
         );
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        return this._fetch!(url, options);
+        const response = await this._fetch!(url, options);
+        this.log.info(
+            'fetch',
+            randomUUID,
+            response.status,
+            response.statusText
+        );
+        return response;
     }
 
     public getAgent(url: string) {

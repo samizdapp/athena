@@ -3,14 +3,16 @@ import dns from './dns';
 import { EventEmitter } from 'stream';
 import { ScalableBloomFilter } from 'bloom-filters';
 import { Debug } from '../logging';
-import { StatusUpdater, Statuses } from '../status';
+import { StatusUpdater, Status } from '../status';
 
 const waitFor = async (ms: number) => new Promise(r => setTimeout(r, ms));
 
 class YggdrassilCrawler extends EventEmitter {
     private readonly service = 'yggdrasil-crawler';
     private readonly log = new Debug(this.service);
-    private readonly status = new StatusUpdater(this.service);
+    private readonly status = new StatusUpdater(
+        this.service.replaceAll('-', '_')
+    );
     private isStarted = true;
     private dudResetCount = 0;
     private duds = new ScalableBloomFilter();
@@ -20,10 +22,13 @@ class YggdrassilCrawler extends EventEmitter {
 
     constructor() {
         super();
-        this.status.sendStatus(Statuses.ONLINE);
-        this.start().catch(e => {
+        this.status.sendStatus(Status.IDLE, 'Starting up...');
+        this.start().catch(async e => {
             this.log.error('crawler error', e);
-            this.status.sendStatus(Statuses.ERROR, e.message);
+            while (true) {
+                this.status.sendStatus(Status.ERROR, e.message);
+                await waitFor(4 * 60 * 1000);
+            }
         });
     }
 
@@ -37,6 +42,7 @@ class YggdrassilCrawler extends EventEmitter {
     async start() {
         while (this.isStarted) {
             this.log.info('scanning...');
+            this.status.sendStatus(Status.ONLINE, 'Scanning...');
             this.currentCrawl = this.scan();
             await this.currentCrawl;
             this.log.info('scanning complete, trigger dns save');
@@ -48,7 +54,6 @@ class YggdrassilCrawler extends EventEmitter {
     async idle() {
         const waitTime = this.getWaitTime();
         this.log.info(`waiting ${waitTime}ms`);
-        this.status.sendStatus(Statuses.IDLE);
         await waitFor(waitTime);
     }
 

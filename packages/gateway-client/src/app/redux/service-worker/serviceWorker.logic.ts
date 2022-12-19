@@ -5,6 +5,7 @@ import {
     Message,
     ServerPeerStatus,
     WorkerMessageType,
+    WorkerVersionManifest,
 } from '../../../worker-messaging';
 import { AppDispatch } from '../store';
 import {
@@ -12,6 +13,7 @@ import {
     setRelayAddresses,
     setServerPeerStatus,
     setStatus,
+    setVersions,
 } from './serviceWorker.slice';
 
 export class ServiceWorkerLogic {
@@ -28,6 +30,9 @@ export class ServiceWorkerLogic {
         },
         LOADED_RELAYS: (msg, dispatch) => {
             dispatch(setRelayAddresses(msg.relays as string[]));
+        },
+        VERSION: (msg, dispatch) => {
+            dispatch(setVersions(msg.version as WorkerVersionManifest));
         },
         HEARTBEAT: (_msg, _dispatch) => {
             //noop

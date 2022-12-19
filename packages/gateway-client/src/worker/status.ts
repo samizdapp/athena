@@ -4,6 +4,8 @@ import {
     WorkerMessageType,
 } from '../worker-messaging';
 import messenger from './messenger';
+import { setVersionUpdateAvailable } from './update-app';
+import { getVersion } from './version';
 
 class Status {
     _serverPeer: ServerPeerStatus | null = null;
@@ -38,7 +40,18 @@ class Status {
         });
     }
 
+    async sendVersion() {
+        // set the update available flags on our version info first
+        await setVersionUpdateAvailable();
+        // now, send status
+        messenger.postMessage({
+            type: WorkerMessageType.VERSION,
+            version: getVersion(),
+        });
+    }
+
     async sendCurrent() {
+        await this.sendVersion();
         messenger.postMessage({
             type: WorkerMessageType.LOADED_RELAYS,
             relays: this.relays,

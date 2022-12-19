@@ -1,6 +1,7 @@
 import localforage from 'localforage';
 
 import { ClientMessageType } from '../worker-messaging';
+import { CACHE_NAME, clearExpiredCaches } from './cache';
 import { SamizdAppDevTools } from './devtools';
 import { logger } from './logging';
 import messenger from './messenger';
@@ -8,6 +9,7 @@ import { runMigrations } from './migrations';
 import { P2pClient } from './p2p-client';
 import { overrideFetch } from './p2p-fetch';
 import status from './status';
+import { initUpdates } from './update-app';
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -39,6 +41,9 @@ export default async () => {
         // send status update to our client
         status.sendCurrent();
 
+        // clear expired caches
+        await clearExpiredCaches(CACHE_NAME.APP);
+
         log.debug('Finish clients claim');
     });
 
@@ -48,6 +53,9 @@ export default async () => {
 
     // init messenger
     messenger.init();
+
+    // init updates
+    await initUpdates();
 
     // run migrations before any other async work
     await runMigrations();

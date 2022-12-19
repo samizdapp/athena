@@ -1,3 +1,16 @@
+export type WorkerVersionManifest = Partial<{
+    root: WorkerVersion;
+    app: WorkerVersion;
+}>;
+
+export type WorkerVersion = Partial<{
+    version: string;
+    commit: string;
+    build: string;
+    branch: string;
+    updateAvailable?: boolean;
+}>;
+
 export enum ServerPeerStatus {
     BOOTSTRAPPED = 'BOOTSTRAPPED',
     CONNECTING = 'CONNECTING',
@@ -8,6 +21,7 @@ export enum ServerPeerStatus {
 export enum WorkerMessageType {
     SERVER_PEER_STATUS = 'SERVER_PEER_STATUS',
     LOADED_RELAYS = 'LOADED_RELAYS',
+    VERSION = 'VERSION',
     HEARTBEAT = 'HEARTBEAT',
 }
 
@@ -16,6 +30,8 @@ export enum ClientMessageType {
     OPENED = 'OPENED',
     HEARTBEAT = 'HEARTBEAT',
     WEBSOCKET = 'WEBSOCKET',
+    UPDATE_WORKER = 'UPDATE_WORKER',
+    ROLLBACK_WORKER = 'ROLLBACK_WORKER',
 }
 
 export type Message<T extends WorkerMessageType | ClientMessageType> = {

@@ -15,7 +15,7 @@ FROM node:18-alpine as run
 
 RUN apk add --no-cache bash python3 py3-pip docker-cli docker-cli-compose poetry
 
-RUN ln -s /usr/bin/python3 /usr/bin/python
+RUN ln -fs /usr/bin/python3 /usr/bin/python
 
 WORKDIR /usr/src/athena
 

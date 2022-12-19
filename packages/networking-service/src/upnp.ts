@@ -1,89 +1,116 @@
-import natMapping, { Mapping } from 'node-portmapping';
-import { environment } from './environments/environment';
+import type { Mapping } from 'node-portmapping';
+import { environment } from './environment';
 import { internalIpV4 } from '@athena/shared/libp2p';
 import { Debug } from './logging';
 
+let natMapping: typeof import('node-portmapping') | null = null;
 const log = new Debug('upnp');
 
 class UPNPPortMapper {
     private log = log;
 
-    private port: number;
     private mapping?: Mapping;
     public publicPort?: number;
     public publicHost?: string;
-    public internalPort?: number;
+    public internalPort: number;
     constructor(port: number) {
-        this.port = port;
+        this.internalPort = port;
     }
 
     async start() {
         try {
-            this.log.debug('creating mapping', this.port);
-            this.mapping = await new Promise<Mapping>((resolve, reject) => {
-                const mapping = natMapping.createMapping(
-                    {
-                        internalPort: this.port,
-                        protocol: 'TCP',
-                    },
-                    info => {
-                        this.log.trace('mapping created internal', info);
-                        if (info.state === 'Success') {
-                            this.publicPort = info.externalPort;
-                            this.publicHost = info.externalHost;
-                            this.internalPort = info.internalPort;
-                            resolve(mapping);
-                        } else {
-                            reject(new Error('Failed to create mapping'));
+            this.log.debug('creating mapping', this.internalPort);
+            this.mapping = await new Promise<Mapping | undefined>(
+                (resolve, reject) => {
+                    const mapping = natMapping?.createMapping(
+                        {
+                            internalPort: this.internalPort,
+                            protocol: 'TCP',
+                        },
+                        info => {
+                            this.log.trace('mapping created internal', info);
+                            if (info.state === 'Success') {
+                                this.publicPort = info.externalPort;
+                                this.publicHost = info.externalHost;
+                                this.internalPort = info.internalPort;
+                                resolve(mapping);
+                            } else {
+                                reject(new Error('Failed to create mapping'));
+                            }
+                            return {};
                         }
-                        return {};
-                    }
-                );
-            });
-            this.publicPort = this.port;
+                    );
+                }
+            );
+            this.publicPort = this.publicPort || this.internalPort;
         } catch (e) {
             this.log.error((e as Error).message || (e as string));
         }
         this.log.debug(
             'created mapping',
-            this.port,
+            this.internalPort,
             this.publicPort,
             this.publicHost
         );
     }
 
     async stop() {
-        this.log.debug('destroying mapping', this.port);
+        this.log.debug('destroying mapping', this.internalPort);
         this.mapping?.destroy();
     }
 }
 
 export class UPNPService {
     private readonly log = log;
-
+    // eslint-disable-next-line @typescript-eslint/no-inferrable-types
+    private error: boolean = false;
     readonly libp2p = new UPNPPortMapper(environment.libp2p_listen_port);
     readonly yggdrasil = new UPNPPortMapper(environment.yggdrasil_listen_port);
-    ready: Promise<void[]>;
+    ready: Promise<void[]> | undefined;
 
     constructor() {
-        natMapping.init();
-        this.log.info('UPNP service started');
-        this.ready = Promise.all([this.libp2p.start(), this.yggdrasil.start()]);
-        this.info().then(res => {
-            this.log.info('UPNP service ready', res);
-        });
+        import('node-portmapping')
+            .then(_natMapping => {
+                natMapping = _natMapping;
+                natMapping.init();
+
+                this.log.info('UPNP service started');
+                this.ready = Promise.all([
+                    this.libp2p.start(),
+                    this.yggdrasil.start(),
+                ]);
+                this.info().then(res => {
+                    this.log.info('UPNP service ready', res);
+                });
+            })
+            .catch(e => {
+                this.error = true;
+                this.log.error((e as Error).message || (e as string));
+            });
     }
 
     async stop() {
         this.log.info('UPNP service stopping');
-        await this.ready;
-        await this.libp2p.stop();
-        await this.yggdrasil.stop();
+        if (!this.error) {
+            await this.ready;
+            await this.libp2p.stop();
+            await this.yggdrasil.stop();
+        }
         this.log.info('UPNP service stopped');
     }
 
     async info() {
         this.log.trace('UPNP service info called');
+        if (this.error) {
+            return {
+                libp2p: {
+                    internalPort: environment.libp2p_listen_port,
+                },
+                yggdrasil: {
+                    internalPort: environment.yggdrasil_listen_port,
+                },
+            };
+        }
         await this.ready;
         return {
             libp2p: {

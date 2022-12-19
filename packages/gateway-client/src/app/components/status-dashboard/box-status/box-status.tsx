@@ -1,12 +1,15 @@
 import { useCallback, useState } from 'react';
 import { ArcherContainer, ArcherElement } from 'react-archer';
-import styled from 'styled-components';
+import { css } from 'styled-components';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import styledContainerQuery from 'styled-container-query';
 
-import { useSelectStatusLogsByService } from '../../redux/status-log/statusLog.api';
+import { useSelectStatusLogsByService } from '../../../redux/status-log/statusLog.api';
 import Service from './service';
 import ServiceDetails from './service-details';
 
-const StyledStatus = styled.div`
+const defaultCss = css`
     display: flex;
     flex-direction: row;
     overflow: auto;
@@ -206,63 +209,70 @@ const StyledStatus = styled.div`
             }
         }
     }
+`;
 
-    @media (max-width: 768px) {
-        flex-direction: column;
-        padding: 10px;
+const mobileCss = css`
+    flex-direction: column;
+    padding: 10px;
 
-        .critical {
-            position: relative;
-            height: 400px;
-            overflow: auto;
-            flex: 0;
-            min-height: 400px;
+    .critical {
+        position: relative;
+        height: 400px;
+        overflow: auto;
+        flex: 0;
+        min-height: 400px;
 
-            & > div {
-                .postgres {
-                    grid-row: 1;
-                    grid-column: 3/4;
-                }
+        & > div {
+            .postgres {
+                grid-row: 1;
+                grid-column: 3/4;
+            }
 
-                .daemon-pleroma {
-                    grid-column: 2/4;
-                }
+            .daemon-pleroma {
+                grid-column: 2/4;
+            }
 
-                .daemon-caddy {
-                    grid-column: 1/2;
-                }
+            .daemon-caddy {
+                grid-column: 1/2;
+            }
 
-                .daemon-proxy {
-                    grid-column: 1/2;
-                }
+            .daemon-proxy {
+                grid-column: 1/2;
             }
         }
+    }
 
-        .non-critical {
-            flex: 1;
-            flex-direction: row;
-            flex-wrap: wrap;
-            justify-content: center;
-            width: 100%;
+    .non-critical {
+        flex: 1;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        width: 100%;
 
-            .service {
-                margin: 10px;
-                min-width: 100px;
-            }
+        .service {
+            margin: 10px;
+            min-width: 100px;
         }
+    }
 
-        .service-details {
-            width: calc(100% - 20px);
-            height: calc(100% - 430px);
-            max-height: initial;
-        }
+    .service-details.open {
+        width: calc(100% - 20px);
+        height: calc(100% - 430px);
+        max-height: initial;
+    }
+`;
+
+const StyledStatus = styledContainerQuery.div`
+    ${defaultCss}
+    &:container(max-width: 768px) {
+        ${mobileCss}
     }
 `;
 
 /* eslint-disable-next-line */
 export interface StatusProps {}
 
-export function Status(_props: StatusProps) {
+export const BoxStatus = (_props: StatusProps) => {
     const { data: allLogs } = useSelectStatusLogsByService({
         pollingInterval: 10000,
     });
@@ -398,6 +408,6 @@ export function Status(_props: StatusProps) {
             />
         </StyledStatus>
     );
-}
+};
 
-export default Status;
+export default BoxStatus;

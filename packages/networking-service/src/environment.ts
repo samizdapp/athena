@@ -22,4 +22,8 @@ export const environment = {
     fetch_localhost_ip: process.env.FETCH_LOCALHOST_IP || '127.0.0.1',
     fetch_localhost_port: parseInt(process.env.FETCH_LOCALHOST_PORT || '80'),
     nx_local: (process.env.NX_LOCAL as unknown as boolean) || false,
+    wifi_ssid: process.env.WIFI_SSID || '',
+    wifi_password: process.env.WIFI_PASSWORD || '',
+    ap_ssid: process.env.AP_SSID || 'SamizdApp',
+    ap_password: process.env.AP_PASSWORD || 'samizdapp',
 };

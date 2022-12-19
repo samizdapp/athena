@@ -16,7 +16,6 @@ import transformers, {
     pingServiceWorkerTransformer,
     basePathTransformer,
     SamizdappFlagTransformer,
-    localTransformer,
 } from './transformers';
 import { logger } from './logging';
 import './version';
@@ -52,8 +51,7 @@ transformers
     .use(pingServiceWorkerTransformer)
     .use(basePathTransformer)
     .use(new SamizdappFlagTransformer('/manifest.json', 'pleroma', true))
-    .use(new SamizdappFlagTransformer('/smz', 'samizdapp'))
-    .use(localTransformer);
+    .use(new SamizdappFlagTransformer('/smz', 'samizdapp'));
 
 bootstrap();
 

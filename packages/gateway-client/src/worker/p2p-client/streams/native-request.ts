@@ -14,7 +14,7 @@ enum ChunkType {
 export class NativeRequestStream extends RawStream {
     static readonly log = logger.getLogger('worker/p2p/streams/native-request');
     protected override readonly log = NativeRequestStream.log;
-    private chunkSize = 64 * 1024;
+    private chunkSize = 60 * 1024;
     private outbox = new Deferred<Request>();
     private inbox = new Deferred<Response>();
     private responseHeadBuffer = Buffer.alloc(0);
@@ -33,7 +33,8 @@ export class NativeRequestStream extends RawStream {
     }
 
     async fetch(request: Request) {
-        this.log.debug('fetch', request.url, request);
+        const randomUUID = Math.random().toString(36).substring(2, 15);
+        this.log.info('request', randomUUID, request.url, request);
         this.handleAbortSignal(request.signal);
         const transformedRequest = transformers.transformRequest(request);
         this.log.debug(
@@ -45,7 +46,7 @@ export class NativeRequestStream extends RawStream {
         this.outbox = new Deferred<Request>();
         outbox.resolve(transformedRequest);
         const response = await this.inbox.promise;
-        this.log.debug('response received', response);
+        this.log.info('response', randomUUID, request.url, response);
         const transformedResponse = transformers.transformResponse(response);
         return transformedResponse;
     }
@@ -113,45 +114,30 @@ export class NativeRequestStream extends RawStream {
     private async writeRequestBody(request: Request) {
         if (request.body instanceof ArrayBuffer) return;
         if (!request.body) return;
-        const rawChunks = await this.readableStreamToAsyncIterator(
-            request.body
-        );
-
-        for await (const chunk of rawChunks) {
-            const chunks = this.chunkify(ChunkType.BODY, chunk);
-            for (const chunk of chunks) {
-                await this.write(chunk);
-            }
-        }
+        await this.writeRequestBodyStream(request.body);
     }
 
-    private async *readableStreamToAsyncIterator(stream: ReadableStream) {
-        // console.log('readableStreamToAsyncIterator', stream);
+    private async writeRequestBodyStream(stream: ReadableStream) {
         const reader = stream.getReader();
-        // let length = 0;
-        try {
-            let finished = false;
-            do {
-                const { value, done } = await reader.read();
-                // ////console.log('readableStreamToAsyncIterator', value, done);
-                if (done) {
-                    finished = true;
-                } else {
-                    // length += value.byteLength;
-                    yield Buffer.from(
-                        value,
-                        value.byteOffset,
-                        value.byteLength
-                    );
+        await this.write(Buffer.from([ChunkType.BODY]));
+        let finished = false;
+        do {
+            const { value, done } = await reader.read();
+            if (done) {
+                finished = true;
+            } else {
+                // always wait for 1ms to avoid blocking the event loop
+                let i = 0;
+                while (i < value.byteLength) {
+                    const chunk = value.slice(i, i + this.chunkSize);
+                    await this.write(chunk);
+                    i += this.chunkSize;
+                    await new Promise(resolve => setTimeout(resolve, 10));
                 }
-                // await waitFor(1);
-            } while (!finished);
-            // console.log('readableStreamToAsyncIterator', 'done', length);
-        } catch (e) {
-            // console.warn('readableStreamToAsyncIterator', 'releaseLock', e);
-        } finally {
-            reader.releaseLock();
-        }
+            }
+        } while (!finished);
+
+        reader.releaseLock();
     }
 
     private async initOutbox() {
@@ -261,7 +247,11 @@ export class NativeRequestStream extends RawStream {
         if (!this.responseBodyController) {
             throw new Error('responseBodyController is null');
         }
-        this.responseBodyController.enqueue(chunk);
+        try {
+            this.responseBodyController.enqueue(chunk);
+        } catch (e) {
+            this.log.error('receiveResponseBody', e);
+        }
         return this.response as Response;
     }
 

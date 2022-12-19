@@ -15,6 +15,7 @@ export const environment = {
     yggdrasil_config:
         process.env.YGGDRASIL_CONFIG || '/etc/yggdrasil-network/config.conf',
     yggdrasil_peer_file: process.env.YGGDRASIL_PEER_FILE || '/yggdrasil/peer',
+    yggdrasil_scan_interval: process.env.YGGDRASIL_SCAN_INTERVAL || '60000',
     hostsfile: process.env.HOSTSFILE || '/shared_etc/hosts',
     default_log_level: process.env.DEFAULT_LOG_LEVEL || 'INFO',
     ignore_status: (process.env.IGNORE_STATUS as unknown as boolean) || false,

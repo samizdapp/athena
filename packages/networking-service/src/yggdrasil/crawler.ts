@@ -1,9 +1,11 @@
-import rpc, { NodeInfo } from './rpc';
-import dns from './dns';
-import { EventEmitter } from 'stream';
 import { ScalableBloomFilter } from 'bloom-filters';
+import { EventEmitter } from 'stream';
+
+import { environment } from '../environment';
 import { Debug } from '../logging';
-import { StatusUpdater, Status } from '../status';
+import { Status, StatusUpdater } from '../status';
+import dns from './dns';
+import rpc, { NodeInfo } from './rpc';
 
 const waitFor = async (ms: number) => new Promise(r => setTimeout(r, ms));
 
@@ -33,10 +35,7 @@ class YggdrasilCrawler extends EventEmitter {
     }
 
     private getWaitTime() {
-        if (this.dudResetCount > 0) {
-            return 60000 * this.dudResetCount;
-        }
-        return 60000;
+        return parseInt(environment.yggdrasil_scan_interval);
     }
 
     async start() {

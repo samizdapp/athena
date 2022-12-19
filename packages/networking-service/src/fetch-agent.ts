@@ -59,7 +59,13 @@ class FetchAgent {
                 },
             });
         }
-        this.log.info('fetch', url, options);
+        const randomUUID = Math.random().toString(36).substring(2, 15);
+        this.log.info(
+            'fetch',
+            randomUUID,
+            (url as Request).url ?? url,
+            options
+        );
         this.log.debug(
             '',
             Array.from((url as Request).headers?.entries() || [])
@@ -69,8 +75,9 @@ class FetchAgent {
         fetchPromise.then((response: Response) => {
             this.log.info(
                 'fetch response',
-                (url as Request).url ?? url,
-                response.status
+                randomUUID,
+                response.status,
+                response.statusText
             );
             this.log.debug('', Array.from(response.headers?.entries() || []));
         });

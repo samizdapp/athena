@@ -46,20 +46,18 @@ export class RawStream {
         return this._write(data);
     }
 
-    private async *sink() {
+    protected async *sink() {
         while (this.isOpen) {
             let next;
             while ((next = this.writeBuffer.shift())) {
-                this.log.trace('sink', next);
                 yield next;
             }
-            await this.writeDeferred.promise;
             this.writeDeferred = new Deferred<null>();
+            await this.writeDeferred.promise;
         }
     }
 
-    private _write(data: Buffer | null) {
-        this.log.trace('_write', data);
+    private async _write(data: Buffer | null) {
         if (data) {
             this.writeBuffer.push(data);
         }

@@ -7,7 +7,7 @@ import { StatusUpdater, Status } from '../status';
 
 const waitFor = async (ms: number) => new Promise(r => setTimeout(r, ms));
 
-class YggdrassilCrawler extends EventEmitter {
+class YggdrasilCrawler extends EventEmitter {
     private readonly service = 'yggdrasil-crawler';
     private readonly log = new Debug(this.service);
     private readonly status = new StatusUpdater(
@@ -151,16 +151,16 @@ class YggdrassilCrawler extends EventEmitter {
             await waitFor(1);
         }
 
-        const nexthops = Array.from(
+        const nextHops = Array.from(
             new Set((await Promise.all(peerJobs)).flat())
         );
         this.log.debug(
-            'depth, nexthops',
+            'depth, nextHops',
             depth,
-            JSON.stringify(nexthops, null, 4)
+            JSON.stringify(nextHops, null, 4)
         );
         depth--;
-        await this.scan(nexthops, depth);
+        await this.scan(nextHops, depth);
     }
 
     private emitFoundOnce(key: string, nodeInfo: NodeInfo) {
@@ -172,4 +172,4 @@ class YggdrassilCrawler extends EventEmitter {
     }
 }
 
-export default new YggdrassilCrawler();
+export default new YggdrasilCrawler();

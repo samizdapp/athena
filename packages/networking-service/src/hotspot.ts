@@ -292,7 +292,9 @@ const WIFI_PASSWORD = environment.wifi_password;
     // - accessPoint: Any wireless device capable of creating an AP
     // - bridge: Any wireless device excluding accessPoint device
     // - ethernet: Any wired device that has internet connectivity
-    const accessPoint = wifiDevices.find(device => device.apCapable);
+    const accessPoint = wifiDevices.find(
+        device => device.apCapable && !device.connected
+    );
     const bridge = wifiDevices.find(
         device => device.iface !== accessPoint?.iface
     );

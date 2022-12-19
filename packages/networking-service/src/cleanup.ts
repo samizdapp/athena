@@ -1,8 +1,8 @@
-import upnp from './upnp';
-
 async function cleanup() {
     console.log('cleaning up');
-    await upnp.stop();
+    // TODO: Call upnp.stop() in a way that prevents
+    // a crashed process from hanging
+    // await upnp.stop();
     console.log('done cleaning up');
 }
 

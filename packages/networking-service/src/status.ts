@@ -11,7 +11,7 @@ export enum Status {
 
 export class StatusUpdater {
     private readonly log = new Debug('status-manager');
-    private readonly endpoint = 'http://localhost/smz/api/status/logs';
+    private readonly endpoint = `${environment.statusApiRoot}/logs`;
 
     constructor(private readonly service: string) {
         this.log.debug('init');

@@ -315,6 +315,8 @@ const WIFI_PASSWORD = environment.wifi_password;
         password: AP_PASSWORD,
     });
 
+    return;
+
     // Use secondary wireless device for internet if ethernet doesn't do the job.
     if (!ethernet) {
         console.log(

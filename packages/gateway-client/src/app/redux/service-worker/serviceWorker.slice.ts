@@ -1,47 +1,33 @@
 import { createSelector, createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { ServerPeerStatus } from '../../../worker-messaging';
+import {
+    ServerPeerStatus,
+    WorkerVersion,
+    WorkerVersionManifest,
+} from '../../../worker-messaging';
 
 import { RootState } from '../store';
-
-/**
- * Service worker lifecycle:
- *
- * 1. Executed
- * 2. Get server peer:
- *   a. Fetch bootstrap address
- *   b. Fetch relay list
- *   c. Start libp2p node (w/ autodial effectively disabled)
- *   d. Connect (probably) to peers on peer:discovery event
- *   e. Receive peer:connect event filtered to be our server (self.serverPeer)
- * 3. Get list of relays:
- *   a. Open stream to `/samizdapp-relay`
- *   b. For each received address:
- *     i. Add to stored relay list
- *     ii. Add to libp2p node address book
- *
- */
-
-/**
- * Service worker actions:
- *
- * - Make a fetch request:
- *   - Waits on lifecycle: (2. Get server peer)
- *   - Sends request through p2p stream
- *
- * - Receive a message:
- *   - Set started true
- */
 
 export interface WorkerState {
     status?: ServiceWorkerState;
     isControlling: boolean;
     serverPeerStatus?: ServerPeerStatus;
-    relayAddresses: string[];
+    boxAddresses: string[];
+    versions: {
+        gateway: WorkerVersion;
+    } & WorkerVersionManifest;
 }
 
 const initialState: WorkerState = {
     isControlling: false,
-    relayAddresses: [],
+    boxAddresses: [],
+    versions: {
+        gateway: {
+            build: process.env.NX_BUILD_NUMBER,
+            branch: process.env.NX_BUILD_BRANCH,
+            commit: process.env.NX_BUILD_COMMIT,
+            updateAvailable: false,
+        },
+    },
 };
 
 export const serviceWorkerSlice = createSlice({
@@ -71,7 +57,26 @@ export const serviceWorkerSlice = createSlice({
             state,
             { payload: addresses }: PayloadAction<string[]>
         ) => {
-            state.relayAddresses = addresses;
+            state.boxAddresses = addresses;
+        },
+        setVersions: (
+            state,
+            { payload: versions }: PayloadAction<WorkerVersionManifest>
+        ) => {
+            state.versions = {
+                ...state.versions,
+                ...versions,
+            };
+            // if worker version is newer than gateway version
+            if (
+                (state.versions.root?.build ?? 0) >
+                    (state.versions.gateway.build ?? 0) ||
+                (state.versions.app?.build ?? 0) >
+                    (state.versions.gateway.build ?? 0)
+            ) {
+                // then there is an update available for the gateway
+                state.versions.gateway.updateAvailable = true;
+            }
         },
     },
 });
@@ -81,6 +86,7 @@ export const {
     setStatus,
     setServerPeerStatus,
     setRelayAddresses,
+    setVersions,
 } = serviceWorkerSlice.actions;
 
 // The function below is called a selector and allows us to select a value from
@@ -97,7 +103,11 @@ export const selectWorkerStatus = createSelector(
 );
 export const selectRelayAddresses = createSelector(
     selectServiceWorker,
-    state => state.relayAddresses
+    state => state.boxAddresses
+);
+export const selectVersions = createSelector(
+    selectServiceWorker,
+    state => state.versions
 );
 
 export default serviceWorkerSlice;

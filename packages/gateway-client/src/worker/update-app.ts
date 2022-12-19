@@ -3,7 +3,8 @@ import { ClientMessageType } from '../worker-messaging';
 import { CACHE_NAME, openCache } from './cache';
 import { logger } from './logging';
 import messenger from './messenger';
-import { getVersion } from './version';
+import status from './status';
+import { getVersion, setUpdateAvailable } from './version';
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -412,12 +413,26 @@ export const initUpdates = async ({ rootCache }: CacheOptions = {}) => {
     }
 
     // listen for update command
-    messenger.addListener(ClientMessageType.UPDATE_WORKER, () => {
-        updateAppWorker({ rootCache: cache, ignoreRollback: true });
+    messenger.addListener(ClientMessageType.UPDATE_WORKER, async () => {
+        await updateAppWorker({ rootCache: cache, ignoreRollback: true });
+        status.sendVersion();
     });
 
     // listen for rollback command
-    messenger.addListener(ClientMessageType.ROLLBACK_WORKER, () => {
-        rollbackAppWorker({ rootCache: cache });
+    messenger.addListener(ClientMessageType.ROLLBACK_WORKER, async () => {
+        await rollbackAppWorker({ rootCache: cache });
+        status.sendVersion();
     });
+};
+
+export const setVersionUpdateAvailable = async ({
+    rootCache,
+}: CacheOptions = {}) => {
+    // open root worker cache
+    const cache = rootCache ?? (await openCache(CACHE_NAME.ROOT));
+    // get cached response
+    const newScriptResponse = await cache.match(newAppKey);
+    // set flags
+    setUpdateAvailable('root', newWorkerExists() ? true : false);
+    setUpdateAvailable('app', newScriptResponse ? true : false);
 };

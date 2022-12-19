@@ -138,9 +138,9 @@ export const StatusDashboard = () => {
                             x: 0,
                             y: 0,
                             w: 5,
-                            h: 8,
+                            h: 9,
                         },
-                        { i: 'worker-status', x: 0, y: 8, w: 5, h: 8 },
+                        { i: 'worker-status', x: 0, y: 8, w: 5, h: 7 },
                     ],
                 }}
                 breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}

@@ -59,13 +59,22 @@ class FetchAgent {
                 },
             });
         }
-        this.log.info('fetch', url);
+        this.log.info('fetch', url, options);
         this.log.debug(
             '',
             Array.from((url as Request).headers?.entries() || [])
         );
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        return this._fetch!(url, options);
+        const fetchPromise = this._fetch!(url, options);
+        fetchPromise.then((response: Response) => {
+            this.log.info(
+                'fetch response',
+                (url as Request).url ?? url,
+                response.status
+            );
+            this.log.debug('', Array.from(response.headers?.entries() || []));
+        });
+        return fetchPromise;
     }
 
     public getAgent(url: string) {

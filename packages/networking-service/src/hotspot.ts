@@ -272,8 +272,8 @@ function stringToArrayOfBytes(str: string) {
 // defaults
 const AP_SSID = environment.ap_ssid;
 const AP_PASSWORD = environment.ap_password;
-const WIFI_SSID = environment.wifi_ssid;
-const WIFI_PASSWORD = environment.wifi_password;
+// const WIFI_SSID = environment.wifi_ssid;
+// const WIFI_PASSWORD = environment.wifi_password;
 
 (async () => {
     console.log('-- WiFi repeater: starting...');
@@ -295,10 +295,10 @@ const WIFI_PASSWORD = environment.wifi_password;
     const accessPoint = wifiDevices.find(
         device => device.apCapable && !device.connected
     );
-    const bridge = wifiDevices.find(
-        device => device.iface !== accessPoint?.iface
-    );
-    const ethernet = wiredDevices.find(device => device.connected);
+    // const bridge = wifiDevices.find(
+    //     device => device.iface !== accessPoint?.iface
+    // );
+    // const ethernet = wiredDevices.find(device => device.connected);
 
     // Create Access Point, required for both modes of operation
     if (!accessPoint) {
@@ -317,49 +317,49 @@ const WIFI_PASSWORD = environment.wifi_password;
         password: AP_PASSWORD,
     });
 
-    return;
+    // return;
 
-    // Use secondary wireless device for internet if ethernet doesn't do the job.
-    if (!ethernet) {
-        console.log(
-            `Ethernet device has no internet. Attempting to use secondary wireless device to connect to WiFi...`
-        );
+    // // Use secondary wireless device for internet if ethernet doesn't do the job.
+    // if (!ethernet) {
+    //     console.log(
+    //         `Ethernet device has no internet. Attempting to use secondary wireless device to connect to WiFi...`
+    //     );
 
-        if (!bridge) {
-            console.log(
-                `Could not find a secondary wireless device. Exiting...`
-            );
-            return;
-        }
+    //     if (!bridge) {
+    //         console.log(
+    //             `Could not find a secondary wireless device. Exiting...`
+    //         );
+    //         return;
+    //     }
 
-        if (!WIFI_SSID || !WIFI_PASSWORD) {
-            console.log(
-                `WiFi credentials for secondary wireless device not provided. Exiting...`
-            );
-            return;
-        }
+    //     if (!WIFI_SSID || !WIFI_PASSWORD) {
+    //         console.log(
+    //             `WiFi credentials for secondary wireless device not provided. Exiting...`
+    //         );
+    //         return;
+    //     }
 
-        // Connect secondary wireless interface to WiFi
-        console.log(
-            `Connecting ${bridge.iface} to WiFi with SSID "${WIFI_SSID}" and password "${WIFI_PASSWORD}"`
-        );
-        await connectToWifi({
-            iface: bridge.iface,
-            ssid: WIFI_SSID,
-            password: WIFI_PASSWORD,
-        });
+    //     // Connect secondary wireless interface to WiFi
+    //     console.log(
+    //         `Connecting ${bridge.iface} to WiFi with SSID "${WIFI_SSID}" and password "${WIFI_PASSWORD}"`
+    //     );
+    //     await connectToWifi({
+    //         iface: bridge.iface,
+    //         ssid: WIFI_SSID,
+    //         password: WIFI_PASSWORD,
+    //     });
 
-        // Check if we are now connected to the internet
-        const nmConnected = await checkNMConnectivity();
-        if (!nmConnected) {
-            console.log(
-                `Warning: Could not detect internet access. Bad WiFi credentials provided or WiFi network has no internet access...`
-            );
-            return;
-        }
+    //     // Check if we are now connected to the internet
+    //     const nmConnected = await checkNMConnectivity();
+    //     if (!nmConnected) {
+    //         console.log(
+    //             `Warning: Could not detect internet access. Bad WiFi credentials provided or WiFi network has no internet access...`
+    //         );
+    //         return;
+    //     }
 
-        console.log(`WiFi repeater started in REPEATER mode.`);
-    } else {
-        console.log(`WiFi repeater started in AP mode.`);
-    }
+    //     console.log(`WiFi repeater started in REPEATER mode.`);
+    // } else {
+    //     console.log(`WiFi repeater started in AP mode.`);
+    // }
 })();

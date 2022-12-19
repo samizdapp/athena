@@ -147,7 +147,6 @@ export class AbstractTransformer {
         const request = new Request(url, {
             headers: req.headers,
             method: req.method,
-            mode: req.mode,
             credentials: req.credentials,
             cache: req.cache,
             redirect: req.redirect,
@@ -155,6 +154,9 @@ export class AbstractTransformer {
             integrity: req.integrity,
         });
         Object.defineProperties(request, {
+            mode: {
+                get: () => req.mode,
+            },
             headers: {
                 get: () => req.headers,
                 configurable: true,

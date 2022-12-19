@@ -22,4 +22,5 @@ export const environment = {
     fetch_localhost_ip: process.env.FETCH_LOCALHOST_IP || '127.0.0.1',
     fetch_localhost_port: parseInt(process.env.FETCH_LOCALHOST_PORT || '80'),
     nx_local: (process.env.NX_LOCAL as unknown as boolean) || false,
+    yggdrasil_scan_interval: process.env.YGGDRASIL_SCAN_INTERVAL || '60000',
 };

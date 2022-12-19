@@ -71,17 +71,17 @@ class FetchAgent {
             Array.from((url as Request).headers?.entries() || [])
         );
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        const fetchPromise = this._fetch!(url, options);
-        fetchPromise.then((response: Response) => {
-            this.log.info(
-                'fetch response',
-                randomUUID,
-                response.status,
-                response.statusText
-            );
-            this.log.debug('', Array.from(response.headers?.entries() || []));
-        });
-        return fetchPromise;
+        const response = await this._fetch!(url, options);
+
+        this.log.info(
+            'fetch response',
+            randomUUID,
+            response.status,
+            response.statusText
+        );
+        this.log.debug('', Array.from(response.headers?.entries() || []));
+
+        return response;
     }
 
     public getAgent(url: string) {

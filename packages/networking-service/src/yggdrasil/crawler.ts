@@ -28,9 +28,16 @@ class YggdrasilCrawler extends EventEmitter {
     }
 
     private initialize() {
-        this.status.sendStatus(Status.IDLE, 'Starting up...');
+        let started = true;
+        (async () => {
+            while (started) {
+                this.status.sendStatus(Status.ONLINE, 'Scanning...');
+                await waitFor(4 * 60 * 1000);
+            }
+        })();
         this.start().catch(async e => {
-            this.log.error('crawler error', e);
+            started = false;
+            this.log.error('Crawler error: ', e);
             this.status.sendStatus(Status.ERROR, e.message);
             await waitFor(60 * 1000);
             this.initialize();
@@ -44,7 +51,6 @@ class YggdrasilCrawler extends EventEmitter {
     async start() {
         while (this.isStarted) {
             this.log.info('scanning...');
-            this.status.sendStatus(Status.ONLINE, 'Scanning...');
             this.currentCrawl = this.scan();
             await this.currentCrawl;
             this.log.info('scanning complete, trigger dns save');

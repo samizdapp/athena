@@ -24,13 +24,16 @@ class YggdrasilCrawler extends EventEmitter {
 
     constructor() {
         super();
+        this.initialize();
+    }
+
+    private initialize() {
         this.status.sendStatus(Status.IDLE, 'Starting up...');
         this.start().catch(async e => {
             this.log.error('crawler error', e);
-            while (true) {
-                this.status.sendStatus(Status.ERROR, e.message);
-                await waitFor(4 * 60 * 1000);
-            }
+            this.status.sendStatus(Status.ERROR, e.message);
+            await waitFor(60 * 1000);
+            this.initialize();
         });
     }
 

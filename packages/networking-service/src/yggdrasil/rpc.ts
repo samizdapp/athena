@@ -90,6 +90,7 @@ type RPCResponse = {
 export class RPCWorker extends EventEmitter {
     static readonly log = new Debug('yggdrasil-rpc-worker');
     static readonly poolSize = 10;
+    static readonly defaultReadyTimeout = 10000;
     static readonly watchdogTimeout = 30000;
     static readonly available = new Set();
     static readonly in_use = new Set();
@@ -221,8 +222,17 @@ export class RPCWorker extends EventEmitter {
         RPCWorker.available.add(this);
     }
 
-    private async ready() {
+    private async ready(timeout = RPCWorker.defaultReadyTimeout) {
+        const start = Date.now();
         while (this._locked) {
+            if (Date.now() - start > timeout) {
+                this.log.error(
+                    'RPC ready timeout reached - connection not ready.'
+                );
+                throw new Error(
+                    'Timeout while waiting for RPC connection to be ready.'
+                );
+            }
             await waitFor(100);
         }
     }

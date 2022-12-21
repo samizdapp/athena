@@ -9,7 +9,7 @@ class YggdrasilWatchdog {
 
     constructor(private readonly worker = new RPCWorker()) {
         worker.on('watchdog', () => {
-            this.log.info('yggdrasil daemon error, count:', this.errorCount);
+            this.log.debug('yggdrasil daemon error, count:', this.errorCount);
             this.errorCount++;
             if (this.errorCount >= this.maxErrors) {
                 this.log.info(

@@ -105,6 +105,7 @@ export class RPCWorker extends EventEmitter {
 
     constructor() {
         super();
+        this.log.info('Initializing RPC connection...');
         this.initialize();
     }
 
@@ -124,7 +125,7 @@ export class RPCWorker extends EventEmitter {
             this.receive(data);
         });
         this.socket.on('error', error => {
-            this.log.warn(error.message);
+            this.log[this._locked ? 'debug' : 'warn'](error.message);
             if (this.socket === socket) {
                 this.log.trace('socket error', error.message);
                 setTimeout(() => {
@@ -161,7 +162,7 @@ export class RPCWorker extends EventEmitter {
     }
 
     async recover(msg: string) {
-        this.log.warn(msg);
+        this.log[this._locked ? 'debug' : 'warn'](msg);
         this.lock();
         await waitFor(1000);
         this.socket = new Socket();

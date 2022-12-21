@@ -6,4 +6,10 @@ export default {
             `${this.CADDY_ROOT}/smz/api/status`
         );
     },
+    get NETWORKING_API_ROOT() {
+        return (
+            process.env.NX_NETWORKING_API_ROOT ??
+            `${this.CADDY_ROOT}/smz/api/networking`
+        );
+    },
 };

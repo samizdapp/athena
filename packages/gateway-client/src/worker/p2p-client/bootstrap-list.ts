@@ -9,6 +9,7 @@ import { multiaddr, Multiaddr } from '@multiformats/multiaddr';
 import localforage from 'localforage';
 
 import type { P2pClient } from '.';
+import environment from '../../environment';
 import { logger } from '../logging';
 import { nativeFetch } from '../p2p-fetch';
 import status from '../status';
@@ -345,9 +346,7 @@ export class BootstrapList extends Bootstrap {
         let publicMultiaddr = null;
         try {
             const p2pInfo = await nativeFetch(
-                `${
-                    process.env.NX_NETWORKING_API_ROOT ?? '/smz/api/networking'
-                }/info/p2p`
+                `${environment.NETWORKING_API_ROOT}/info/p2p`
             ).then(res => {
                 if (res.status >= 400) {
                     throw res;

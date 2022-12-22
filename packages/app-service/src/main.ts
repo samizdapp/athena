@@ -12,6 +12,7 @@ async function bootstrap() {
     const app = await NestFactory.create(AppModule);
     const globalPrefix = '/smz/api/app';
     app.setGlobalPrefix(globalPrefix);
+    app.enableCors({ origin: true });
     const port = process.env.PORT || 3412;
     await app.listen(port);
     Logger.log(

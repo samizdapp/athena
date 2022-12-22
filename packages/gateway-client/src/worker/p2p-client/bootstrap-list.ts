@@ -9,6 +9,7 @@ import { multiaddr, Multiaddr } from '@multiformats/multiaddr';
 import localforage from 'localforage';
 
 import type { P2pClient } from '.';
+import environment from '../../environment';
 import { logger } from '../logging';
 import { nativeFetch } from '../p2p-fetch';
 import status from '../status';
@@ -340,42 +341,38 @@ export class BootstrapList extends Bootstrap {
         // start by loading our cached bootstrap list
         await this.loadCache();
 
-        // next, check for a new bootstrap address
-        let newBootstrapAddress = null;
+        // next, check for new addresses from our box
+        let localMultiaddr = null;
+        let publicMultiaddr = null;
         try {
-            newBootstrapAddress = await nativeFetch(
-                '/smz/pwa/assets/libp2p.bootstrap'
-            )
-                .then(res => {
-                    if (res.status >= 400) {
-                        throw res;
-                    }
-                    return res.text();
-                })
-                .then(text => text.trim());
+            const p2pInfo = await nativeFetch(
+                `${environment.NETWORKING_API_ROOT}/info/p2p`
+            ).then(res => {
+                if (res.status >= 400) {
+                    throw res;
+                }
+                return res.json();
+            });
+            ({ localMultiaddr, publicMultiaddr } = p2pInfo.info);
         } catch (e) {
-            this.log.warn(
-                'Error while trying to fetch new bootstrap address: ',
-                e
-            );
+            this.log.warn('Error while trying to fetch new p2p addresses: ', e);
         }
-        // if we received a new bootstrap address, add it to our list
+
+        // if we received a new local address, add it to our list
         // use it to override our server id (this allows us to get the new
         // server id from our box)
-        const addedBootstrap = await this.addAddress(
-            newBootstrapAddress ?? '',
-            { overrideServerId: true, statsTimeout: 3000 }
-        );
+        const addedLocal = await this.addAddress(localMultiaddr ?? '', {
+            overrideServerId: true,
+            statsTimeout: 3000,
+        });
         // if it was added successfully
-        if (addedBootstrap) {
+        if (addedLocal) {
             // our new bootstrap address was successfully added
-            this.log.info(
-                `Found updated bootstrap address, updating bootstrap list: ${addedBootstrap}`
-            );
+            this.log.info(`Fetched updated local address: ${addedLocal}`);
 
             // construct a /dns4 address from our new bootstrap address
             const { hostname } = new URL(self.origin);
-            const [_, _proto, _ip, ...rest] = addedBootstrap.address.split('/');
+            const [_, _proto, _ip, ...rest] = addedLocal.address.split('/');
             const withDns = `/dns4/${hostname}/${rest.join('/')}`;
             // add it to our list
             this.log.debug('Adding /dns4 address: ', withDns);
@@ -389,6 +386,12 @@ export class BootstrapList extends Bootstrap {
             // add it to our list
             this.log.debug('Adding /dns4 local address: ', withLocalDns);
             await this.addAddress(withLocalDns);
+        }
+
+        // added our public address, if we received one
+        const addedPublic = await this.addAddress(publicMultiaddr ?? '');
+        if (addedPublic) {
+            this.log.info(`Fetched updated public address: ${addedPublic}`);
         }
 
         // now that we've added all of our addresses,

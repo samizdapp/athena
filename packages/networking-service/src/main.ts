@@ -1,6 +1,6 @@
 import { Debug } from './logging';
 import './cleanup';
-import './app';
+import './api';
 import './libp2p';
 import './yggdrasil';
 

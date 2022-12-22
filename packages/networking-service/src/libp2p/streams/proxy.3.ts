@@ -44,7 +44,7 @@ export class NativeRequestStream extends RawStream {
         return fetchAgent.fetch(request, init).catch(e => {
             this.log.warn('fetch error', e);
             return fetchAgent.Response(`${e.code} ${e.message}`, {
-                status: 500,
+                status: 502,
             });
         });
     }

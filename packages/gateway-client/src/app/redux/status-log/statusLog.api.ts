@@ -1,6 +1,7 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { LogDto } from '@athena/shared/api';
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
+import environment from '../../../environment';
 import { createApiDataSelector, GenericOptions } from './rtk-api';
 
 // TODO: SAM-49
@@ -8,7 +9,7 @@ import { createApiDataSelector, GenericOptions } from './rtk-api';
 // Define a service using a base URL and expected endpoints
 export const statusLogsApi = createApi({
     reducerPath: 'statusLogsApi',
-    baseQuery: fetchBaseQuery({ baseUrl: '/smz/api/status' }),
+    baseQuery: fetchBaseQuery({ baseUrl: environment.STATUS_API_ROOT }),
     endpoints: builder => ({
         getStatusLogs: builder.query<LogDto.Log[], string>({
             query: () => `/logs`,

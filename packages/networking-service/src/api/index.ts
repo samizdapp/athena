@@ -6,7 +6,7 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 
-import { AppModule } from './app.module';
+import { AppModule } from './app/app.module';
 
 class App {
     constructor() {
@@ -18,6 +18,7 @@ class App {
         const app = await NestFactory.create(AppModule);
         const globalPrefix = '/smz/api/networking';
         app.setGlobalPrefix(globalPrefix);
+        app.enableCors({ origin: true });
         const port = process.env.PORT || 3413;
         await app.listen(port);
         Logger.log(

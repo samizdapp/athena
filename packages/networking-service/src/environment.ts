@@ -15,12 +15,18 @@ export const environment = {
     yggdrasil_config:
         process.env.YGGDRASIL_CONFIG || '/etc/yggdrasil-network/config.conf',
     yggdrasil_peer_file: process.env.YGGDRASIL_PEER_FILE || '/yggdrasil/peer',
+    yggdrasil_scan_interval: process.env.YGGDRASIL_SCAN_INTERVAL || '60000',
     hostsfile: process.env.HOSTSFILE || '/shared_etc/hosts',
     default_log_level: process.env.DEFAULT_LOG_LEVEL || 'INFO',
     ignore_status: (process.env.IGNORE_STATUS as unknown as boolean) || false,
     yggdrasil_alias_localhost: process.env.YGGDRASIL_LOCAL_ALIAS || '',
     fetch_localhost_ip: process.env.FETCH_LOCALHOST_IP || '127.0.0.1',
-    fetch_localhost_port: parseInt(process.env.FETCH_LOCALHOST_PORT || '80'),
     nx_local: (process.env.NX_LOCAL as unknown as boolean) || false,
-    yggdrasil_scan_interval: process.env.YGGDRASIL_SCAN_INTERVAL || '60000',
+    caddyRoot: (process.env.NX_CADDY_ROOT as string) ?? 'http://localhost',
+    get statusApiRoot() {
+        return (
+            (process.env.STATUS_API_ROOT as string) ??
+            `${this.caddyRoot}/smz/api/status`
+        );
+    },
 };

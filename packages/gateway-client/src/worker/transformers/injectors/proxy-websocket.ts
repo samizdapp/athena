@@ -1,6 +1,6 @@
-import { CompiledTransformer } from './transformers';
-import { WebsocketStreamStatus } from '../p2p-client/streams';
-import { ClientMessageType } from '../../worker-messaging';
+import { WebsocketStreamStatus } from '../../p2p-client/streams';
+import { ClientMessageType } from '../../../worker-messaging';
+import { InjectorTransformer } from './injector-transformer';
 
 const WEBSOCKET_CONTENT_TYPE = 'text/html';
 
@@ -98,8 +98,13 @@ window.WebSocket = SamizdappWebSocket;
 </script>
 `;
 
-export default new CompiledTransformer(
+export default new InjectorTransformer(
     WEBSOCKET_CONTENT_TYPE,
-    WEBSOCKET_SPLIT,
-    WEBSOCKET_SNIPPET
+    new RegExp(`(${WEBSOCKET_SPLIT})`),
+    {
+        replacement: `$1{{snippet}}`,
+        data: {
+            snippet: WEBSOCKET_SNIPPET,
+        },
+    }
 );

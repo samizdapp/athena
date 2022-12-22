@@ -1,6 +1,4 @@
-import { logger } from '../logging';
-
-class Transformer {
+class Transformers {
     private transformers = new Set<AbstractTransformer>();
 
     use(transformer: AbstractTransformer) {
@@ -47,6 +45,7 @@ export class AbstractTransformer {
         [ChunkType.REQUEST]: this.transformRequestChunk.bind(this),
         [ChunkType.RESPONSE]: this.transformResponseChunk.bind(this),
     };
+
     private transformBody(
         r: Request | Response,
         _type: ChunkType
@@ -55,7 +54,7 @@ export class AbstractTransformer {
 
         const chunkTransformer = this.chunkTransformers[_type];
         const reader = r.body.getReader();
-        const newbody = new ReadableStream({
+        const newBody = new ReadableStream({
             start(controller) {
                 return pump();
                 function pump() {
@@ -76,7 +75,7 @@ export class AbstractTransformer {
             },
         });
 
-        return newbody;
+        return newBody;
     }
 
     transformRequest(req: Request): Request {
@@ -241,52 +240,4 @@ export class AbstractTransformer {
     }
 }
 
-export class CompiledTransformer extends AbstractTransformer {
-    protected log = logger.getLogger('worker/transformer/compiled');
-
-    constructor(
-        protected readonly contentType: string,
-        protected readonly split: string,
-        protected readonly snippet: string
-    ) {
-        super();
-    }
-
-    override shouldTransformResponse(res: Response): boolean {
-        this.log.trace(
-            'shouldTransformResponse?',
-            res.headers.get('content-type'),
-            this.contentType
-        );
-        return (
-            res.headers.get('content-type')?.startsWith(this.contentType) ||
-            false
-        );
-    }
-
-    override transformResponseChunk(
-        _r: Response | Request,
-        chunk: Uint8Array
-    ): Uint8Array {
-        const [start, end] = chunk.toString().split(this.split);
-        // check if the response contains the split tag
-        this.log.trace('has start && end?', start && end, this.split);
-        if (start && end) {
-            const parts = [start, this.split, this.snippet, end];
-            return Buffer.from(parts.join(''));
-        }
-        return chunk;
-    }
-
-    override transformResponseHead(res: Response): Response {
-        const headers = new Headers(res.headers);
-        const prevLen = headers.get('content-length') || '0';
-        headers.set(
-            'content-length',
-            `${parseInt(prevLen) + this.snippet.length}`
-        );
-        return this.replaceResponseHeaders(res, headers);
-    }
-}
-
-export default new Transformer();
+export default new Transformers();

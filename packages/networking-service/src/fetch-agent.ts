@@ -44,21 +44,6 @@ class FetchAgent {
     public async fetch(url: string | Request, options: RequestInit = {}) {
         await this.ready;
         options.agent = this.getAgent((url as Request).url || (url as string));
-        const _inspect = new URL((url as Request).url || 'http://ignore');
-        if (_inspect.hostname === `localhost` && environment.nx_local) {
-            _inspect.port = '80';
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const { headers, body } = url as Request;
-            url = await this.Request(_inspect.toString(), url as Request);
-            Object.defineProperties(url, {
-                headers: {
-                    value: headers,
-                },
-                body: {
-                    value: body,
-                },
-            });
-        }
         const randomUUID = Math.random().toString(36).substring(2, 15);
         this.log.info(
             'fetch',

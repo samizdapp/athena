@@ -3,14 +3,11 @@ import { environment } from '../environment';
 import { Debug } from '../logging';
 import { EventEmitter } from 'node:stream';
 
-//eslint-disable-next-line @typescript-eslint/no-explicit-any
-class Deferred {
-    //eslint-disable-next-line @typescript-eslint/no-explicit-any
-    promise: Promise<any>;
-    //eslint-disable-next-line @typescript-eslint/no-explicit-any
-    resolve: any;
-    //eslint-disable-next-line @typescript-eslint/no-explicit-any
-    reject: any;
+export class Deferred<T> {
+    promise: Promise<T>;
+    resolve!: (value: T) => void;
+    reject!: (reason?: unknown) => void;
+
     constructor() {
         this.promise = new Promise((resolve, reject) => {
             this.resolve = resolve;
@@ -20,7 +17,7 @@ class Deferred {
 }
 
 const waitFor = (ms: number) =>
-    new Promise(resolve => setTimeout(() => resolve(null), ms));
+    new Promise<void>(resolve => setTimeout(() => resolve(), ms));
 
 enum RPCRequestType {
     getNodeInfo = 'getNodeInfo',
@@ -90,20 +87,22 @@ type RPCResponse = {
 export class RPCWorker extends EventEmitter {
     static readonly log = new Debug('yggdrasil-rpc-worker');
     static readonly poolSize = 10;
+    static readonly defaultReadyTimeout = 10000;
     static readonly watchdogTimeout = 30000;
-    static readonly available = new Set();
-    static readonly in_use = new Set();
+    static readonly available = new Set<RPCWorker>();
+    static readonly in_use = new Set<RPCWorker>();
     static errorCount = 0;
     static lastWatchdog = 0;
 
     private readonly log = RPCWorker.log;
     private socket = new Socket();
     private inboxBuffer = Buffer.alloc(0);
-    private inboxJSON = new Deferred();
+    private inboxJSON = new Deferred<RPCResponse>();
     private _locked = true;
 
     constructor() {
         super();
+        this.log.info('Initializing RPC connection...');
         this.initialize();
     }
 
@@ -123,7 +122,7 @@ export class RPCWorker extends EventEmitter {
             this.receive(data);
         });
         this.socket.on('error', error => {
-            this.log.warn(error.message);
+            this.log[this._locked ? 'debug' : 'warn'](error.message);
             if (this.socket === socket) {
                 this.log.trace('socket error', error.message);
                 setTimeout(() => {
@@ -160,7 +159,7 @@ export class RPCWorker extends EventEmitter {
     }
 
     async recover(msg: string) {
-        this.log.warn(msg);
+        this.log[this._locked ? 'debug' : 'warn'](msg);
         this.lock();
         await waitFor(1000);
         this.socket = new Socket();
@@ -187,7 +186,8 @@ export class RPCWorker extends EventEmitter {
     static async getFromPool() {
         while (true) {
             if (RPCWorker.available.size > 0) {
-                const worker = RPCWorker.available.values().next().value;
+                const worker = RPCWorker.available.values().next()
+                    .value as RPCWorker;
                 RPCWorker.available.delete(worker);
                 RPCWorker.in_use.add(worker);
                 this.log.trace(
@@ -221,8 +221,17 @@ export class RPCWorker extends EventEmitter {
         RPCWorker.available.add(this);
     }
 
-    private async ready() {
+    private async ready(timeout = RPCWorker.defaultReadyTimeout) {
+        const start = Date.now();
         while (this._locked) {
+            if (Date.now() - start > timeout) {
+                this.log.error(
+                    'RPC ready timeout reached - connection not ready.'
+                );
+                throw new Error(
+                    'Timeout while waiting for RPC connection to be ready.'
+                );
+            }
             await waitFor(100);
         }
     }
@@ -237,24 +246,27 @@ export class RPCWorker extends EventEmitter {
         this._locked = false;
     }
 
-    async rpc(json: RPCRequest): Promise<RPCResponse> {
+    async rpc(json: RPCRequest) {
         this.log.trace('rpc await ready');
-        await this.ready();
+        try {
+            await this.ready();
+        } catch (e) {
+            return null;
+        }
         this.log.debug('rpc request (use trace to see content)', json.request);
         this.log.trace(JSON.stringify(json, null, 4));
         const data = Buffer.from(JSON.stringify(json) + '\n');
         this.inboxJSON = new Deferred();
         this.socket.write(data);
         this.log.trace('rpc sent');
-        const response = await Promise.race([
-            this.inboxJSON.promise,
-            waitFor(10000),
-        ]);
+        const response =
+            (await Promise.race([this.inboxJSON.promise, waitFor(10000)])) ??
+            null;
         this.log.debug(
             'rpc response (use trace to see content)',
             response?.status
         );
-        this.log.trace(response);
+        this.log.trace('Response: ', response);
         return response;
     }
 }
@@ -262,7 +274,7 @@ export class RPCWorker extends EventEmitter {
 export class YggdrasilRPC {
     private readonly log = new Debug('yggdrasil-rpc');
 
-    private async rpc(json: RPCRequest): Promise<RPCResponse | null> {
+    private async rpc(json: RPCRequest) {
         this.log.trace('rpc', json);
         const worker = await RPCWorker.getFromPool();
         this.log.trace('got worker from pool, call rpc method on worker');

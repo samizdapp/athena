@@ -194,6 +194,8 @@ export class P2pClient {
         try {
             // now, ping our server
             this.log.trace('Pinging server: ', this.serverPeer?.toString());
+            // timeout configurable via `init.ping.timeout`,
+            // default is 10 seconds
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             await this.node!.ping(this.serverPeer!);
             // if our ping was successful, then our connection is still good
@@ -203,7 +205,7 @@ export class P2pClient {
             if (++failedAttempts < 2) {
                 // then try again
                 this.log.debug(
-                    `Ping failed, retrying (failed attempts: ${failedAttempts})`
+                    `Ping failed, retrying (failed attempts: ${failedAttempts}): ${e}`
                 );
                 this.loopConnectionStatus(failedAttempts);
                 return;

@@ -1,15 +1,7 @@
 import transformers from './transformers';
-
-import proxyWebSocketTransformer from './proxy-websocket';
-import pingServiceWorkerTransformer from './ping-service-worker';
-import basePathTransformer from './base-path';
-import { SamizdappFlagTransformer } from './samizdapp-flags';
-
 export default transformers;
 
-export {
-    proxyWebSocketTransformer,
-    pingServiceWorkerTransformer,
-    basePathTransformer,
-    SamizdappFlagTransformer,
-};
+export * from './injectors';
+export { default as basePathTransformer } from './base-path';
+export { default as caddyHostTransformer } from './caddy-host';
+export { SamizdappFlagTransformer } from './samizdapp-flags';

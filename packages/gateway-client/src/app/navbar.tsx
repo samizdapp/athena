@@ -92,7 +92,7 @@ export const Navbar = () => {
     };
 
     return (
-        <StyledNavbar ref={menuContainerRef}>
+        <StyledNavbar ref={menuContainerRef} className="navbar">
             <AppBar position="static">
                 <Container className="content">
                     <Toolbar disableGutters>

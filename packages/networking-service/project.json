@@ -56,11 +56,13 @@
     "serve": {
       "executor": "@nrwl/node:node",
       "options": {
-        "buildTarget": "networking-service:build_after"
+        "buildTarget": "networking-service:build_after",
+        "waitUntilTargets": ["networking-service:build"]
       },
       "configurations": {
         "production": {
-          "buildTarget": "networking-service:build_after:production"
+          "buildTarget": "networking-service:build_after:production",
+          "waitUntilTargets": ["networking-service:build:production"]
         }
       }
     },

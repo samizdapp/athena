@@ -1,10 +1,13 @@
-import { CompiledTransformer } from './transformers';
-import messenger from '../messenger';
-import { WorkerMessageType, ClientMessageType } from '../../worker-messaging';
+import messenger from '../../messenger';
+import {
+    WorkerMessageType,
+    ClientMessageType,
+} from '../../../worker-messaging';
+import { InjectorTransformer } from './injector-transformer';
 
 // HEARTBEAT Transformer
 
-// iOS service workers sporatically become unresponsive when the app is in the background
+// iOS service workers sporadically become unresponsive when the app is in the background
 // this injector injects a script into any html page that will check for responsiveness
 // and prompt the user to restart the app if the service worker is unresponsive
 
@@ -45,8 +48,13 @@ const HEARTBEAT_SNIPPET = `<script>
     }
 </script>`;
 
-export default new CompiledTransformer(
+export default new InjectorTransformer(
     HEARTBEAT_CONTENT_TYPE,
-    HEARTBEAT_SPLIT,
-    HEARTBEAT_SNIPPET
+    new RegExp(`(${HEARTBEAT_SPLIT})`),
+    {
+        replacement: `$1{{snippet}}`,
+        data: {
+            snippet: HEARTBEAT_SNIPPET,
+        },
+    }
 );

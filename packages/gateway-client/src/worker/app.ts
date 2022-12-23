@@ -16,6 +16,8 @@ import transformers, {
     pingServiceWorkerTransformer,
     basePathTransformer,
     SamizdappFlagTransformer,
+    caddyHostTransformer,
+    debugModeGesture,
 } from './transformers';
 import { logger } from './logging';
 import './version';
@@ -50,6 +52,8 @@ transformers
     .use(proxyWebSocketTransformer)
     .use(pingServiceWorkerTransformer)
     .use(basePathTransformer)
+    .use(caddyHostTransformer)
+    .use(debugModeGesture)
     .use(new SamizdappFlagTransformer('/manifest.json', 'pleroma', true))
     .use(new SamizdappFlagTransformer('/smz', 'samizdapp'));
 

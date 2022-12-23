@@ -1,11 +1,12 @@
+import OpenWithIcon from '@mui/icons-material/OpenWith';
 import { forwardRef } from 'react';
 import * as Rgl from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 import styled from 'styled-components';
-import OpenWithIcon from '@mui/icons-material/OpenWith';
 
 import BoxStatus from './box-status/box-status';
+import DebugInfo from './debug-info/debug-info';
 import Version from './version/version';
 import WorkerStatus from './worker-status/worker-status';
 
@@ -126,25 +127,20 @@ export const StatusDashboard = () => {
                 className="layout"
                 layouts={{
                     lg: [
-                        {
-                            i: 'box-status',
-                            x: 5,
-                            y: 0,
-                            w: 7,
-                            h: 16,
-                        },
-                        {
-                            i: 'version',
-                            x: 0,
-                            y: 0,
-                            w: 5,
-                            h: 9,
-                        },
-                        { i: 'worker-status', x: 0, y: 8, w: 5, h: 7 },
+                        { i: 'box-status', x: 5, y: 0, w: 7, h: 16 },
+                        { i: 'worker-status', x: 0, y: 0, w: 5, h: 7 },
+                        { i: 'version', x: 0, y: 7, w: 3, h: 9 },
+                        { i: 'debug-info', x: 3, y: 7, w: 2, h: 9 },
+                    ],
+                    xs: [
+                        { i: 'box-status', x: 0, y: 0, w: 5, h: 16 },
+                        { i: 'worker-status', x: 0, y: 16, w: 5, h: 7 },
+                        { i: 'version', x: 0, y: 23, w: 3, h: 9 },
+                        { i: 'debug-info', x: 3, y: 23, w: 2, h: 9 },
                     ],
                 }}
                 breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
-                cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
+                cols={{ lg: 12, md: 10, sm: 6, xs: 5, xxs: 2 }}
                 rowHeight={30}
                 draggableHandle="header"
                 resizeHandles={['s', 'e', 'se']}
@@ -153,12 +149,16 @@ export const StatusDashboard = () => {
                     <BoxStatus />
                 </GridItem>
 
+                <GridItem key="worker-status" title="Worker Status">
+                    <WorkerStatus />
+                </GridItem>
+
                 <GridItem key="version" title="Version">
                     <Version />
                 </GridItem>
 
-                <GridItem key="worker-status" title="Worker Status">
-                    <WorkerStatus />
+                <GridItem key="debug-info" title="Debug Info">
+                    <DebugInfo />
                 </GridItem>
             </ResponsiveGridLayout>
         </StyledStatus>

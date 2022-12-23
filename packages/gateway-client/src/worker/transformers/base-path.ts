@@ -1,8 +1,10 @@
-import { AbstractTransformer, CompiledTransformer } from './transformers';
 import { logger } from '../logging';
+import { InjectorTransformer } from './injectors';
+import { AbstractTransformer } from './transformers';
 
 class BasePathTransformer extends AbstractTransformer {
-    protected log = logger.getLogger('worker/tranformer/base-path');
+    protected log = logger.getLogger('worker/transformer/base-path');
+
     private readonly contentType = 'text/html';
     private readonly header = 'x-samizdapp-base-path';
 
@@ -122,11 +124,12 @@ class BasePathTransformer extends AbstractTransformer {
         const url = _url.toString();
         const newBody = chunk.toString().replace(/<base[^>]*>/, '');
         // make a new compiled injector with the base path
-        const injector = new CompiledTransformer(
-            this.contentType,
-            '<head>',
-            makeSnippet(targetHeader, url)
-        );
+        const injector = new InjectorTransformer(this.contentType, /(<head>)/, {
+            replacement: '$1{{snippet}}',
+            data: {
+                snippet: makeSnippet(targetHeader, url),
+            },
+        });
 
         return injector.transformResponseChunk(
             res,
@@ -142,11 +145,12 @@ class BasePathTransformer extends AbstractTransformer {
         _url.search = '';
         _url.hash = '';
         const url = _url.toString();
-        const injector = new CompiledTransformer(
-            this.contentType,
-            '<head>',
-            makeSnippet(targetHeader, url)
-        );
+        const injector = new InjectorTransformer(this.contentType, /(<head>)/, {
+            replacement: '$1{{snippet}}',
+            data: {
+                snippet: makeSnippet(targetHeader, url),
+            },
+        });
         return injector.transformResponseHead(res);
     }
 }

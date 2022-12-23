@@ -5,44 +5,49 @@ import { WorkerVersion } from '../../../../../src/worker-messaging';
 import { selectVersions } from '../../../redux/service-worker/serviceWorker.slice';
 
 const StyledVersion = styled.div`
-    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     height: 100%;
-    margin: 0;
-    padding: 1px;
 
-    .version-line {
-        min-width: 16em;
+    .version-info {
+        flex: 1;
+        overflow: auto;
 
-        .title {
-            font-weight: bold;
-            width: 7em;
-            display: inline-block;
-        }
+        .version-line {
+            min-width: 16em;
 
-        .version,
-        .build {
-            font-family: monospace;
-            background-color: #ddd;
-            padding: 0 5px;
-            border-radius: 1px;
-        }
+            .title {
+                font-weight: bold;
+                width: 7em;
+                display: inline-block;
+            }
 
-        .version {
-            padding-right: 2px;
-        }
+            .version,
+            .build {
+                font-family: monospace;
+                background-color: #ddd;
+                padding: 0 5px;
+                border-radius: 1px;
+            }
 
-        .commit {
-            font-size: 0.6em;
-            font-weight: bold;
-            text-transform: uppercase;
-            color: #aaa;
-        }
+            .version {
+                padding-right: 2px;
+            }
 
-        .update-instruction {
-            font-size: 0.7em;
-            font-weight: bold;
-            text-transform: uppercase;
-            color: #333;
+            .commit {
+                font-size: 0.6em;
+                font-weight: bold;
+                text-transform: uppercase;
+                color: #aaa;
+            }
+
+            .update-instruction {
+                font-size: 0.7em;
+                font-weight: bold;
+                text-transform: uppercase;
+                color: #333;
+            }
         }
     }
 
@@ -51,20 +56,17 @@ const StyledVersion = styled.div`
         align-items: center;
         justify-content: space-evenly;
         flex-wrap: wrap;
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        width: 100%;
+        height: 60px;
 
         button {
             background-color: #8acae9;
             border-radius: 10px;
             border: 0;
             box-shadow: 0px 0px 7px -4px #000 inset;
-            font-size: 1.1em;
+            cursor: pointer;
+            font-size: 0.8em;
             font-weight: bold;
-            margin: 10px 0;
-            padding: 10px 20px;
+            padding: 5px 10px;
         }
     }
 `;

@@ -1,9 +1,9 @@
+import OpenWithIcon from '@mui/icons-material/OpenWith';
 import { forwardRef } from 'react';
 import * as Rgl from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 import styled from 'styled-components';
-import OpenWithIcon from '@mui/icons-material/OpenWith';
 
 import BoxStatus from './box-status/box-status';
 import Version from './version/version';

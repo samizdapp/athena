@@ -9,6 +9,14 @@ const StyledApp = styled.div`
     overflow: hidden;
     position: relative;
     height: 100%;
+
+    .navbar {
+        height: 65px;
+    }
+
+    .screen {
+        height: calc(100% - 65px);
+    }
 `;
 
 export function App() {
@@ -16,11 +24,16 @@ export function App() {
         <StyledApp>
             <Navbar />
 
-            <Routes>
-                <Route path="/smz/pwa" element={<Home />} />
-                <Route path="/smz/pwa/status" element={<Status />} />
-                <Route path="*" element={<Navigate to="/smz/pwa" replace />} />
-            </Routes>
+            <div className="screen">
+                <Routes>
+                    <Route path="/smz/pwa" element={<Home />} />
+                    <Route path="/smz/pwa/status" element={<Status />} />
+                    <Route
+                        path="*"
+                        element={<Navigate to="/smz/pwa" replace />}
+                    />
+                </Routes>
+            </div>
         </StyledApp>
     );
 }

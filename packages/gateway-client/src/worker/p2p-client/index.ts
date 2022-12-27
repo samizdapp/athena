@@ -133,7 +133,7 @@ export class P2pClient {
         this.log.debug('Re-adding server peer addresses');
         this.node.peerStore.addressBook.add(
             this.serverPeer,
-            this.bootstrapList.all().map(it => it.multiaddr)
+            this.bootstrapList.multiaddrList
         );
 
         // now, attempt to dial our server

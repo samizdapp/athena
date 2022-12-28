@@ -1,4 +1,5 @@
 import { Noise } from '@chainsafe/libp2p-noise';
+import { Connection } from '@libp2p/interface-connection';
 import { ConnectionEncrypter } from '@libp2p/interface-connection-encrypter';
 import { PeerId } from '@libp2p/interface-peer-id';
 import type { Address } from '@libp2p/interface-peer-store';
@@ -9,6 +10,7 @@ import { WebSockets } from '@libp2p/websockets';
 import { all as filtersAll } from '@libp2p/websockets/filters';
 import { Multiaddr as MultiaddrType } from '@multiformats/multiaddr';
 import { createLibp2p, Libp2p } from 'libp2p';
+import { DefaultConnectionManager } from 'libp2p/connection-manager';
 import { DefaultDialer } from 'libp2p/connection-manager/dialer';
 import { Libp2pNode } from 'libp2p/libp2p';
 
@@ -23,6 +25,24 @@ import { HeartbeatStream } from './streams';
 
 const waitFor = async (t: number): Promise<void> =>
     new Promise(r => setTimeout(r, t));
+
+const withTimeout = async <T, E = void>(
+    action: () => Promise<T>,
+    timeout = 1000,
+    onTimeout?: () => Promise<E>
+): Promise<T | E> => {
+    return Promise.race([
+        action(),
+        waitFor(timeout).then(() => {
+            throw new Error('E_TIMEOUT');
+        }) as Promise<E>,
+    ]).catch(async (e): Promise<E> => {
+        if ((e as Error).message !== 'E_TIMEOUT') {
+            throw e;
+        }
+        return onTimeout?.() as unknown as E;
+    });
+};
 
 export class P2pClient {
     private log = logger.getLogger('worker/p2p/client');
@@ -77,14 +97,15 @@ export class P2pClient {
         const abortController = new AbortController();
         const signal = abortController.signal;
         waitFor(timeout).then(() => abortController.abort());
-        return Promise.race([
-            action(signal),
-            waitFor(timeout + 1000).then(() => {
+        return withTimeout(
+            () => action(signal),
+            timeout + 1000,
+            () => {
                 throw new Error(
                     'Abort controller failed to abort within 1 second past timeout.'
                 );
-            }),
-        ]);
+            }
+        ) as Promise<T>;
     }
 
     private setDisconnectedStatus() {
@@ -117,7 +138,30 @@ export class P2pClient {
         // first, close any open connections to our server
         this.setDisconnectedStatus();
         this.log.debug('Closing existing server connections...');
-        await this.node.hangUp(this.serverPeer);
+        await withTimeout(
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            () => this.node!.hangUp(this.serverPeer!),
+            7000,
+            async () => {
+                this.log.warn(
+                    'Timeout while closing existing server connections, manually setting disconnect state.'
+                );
+                // manually set the disconnect state on our connection manager
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                const connectionManager = this.node!
+                    .connectionManager as DefaultConnectionManager;
+                const connections =
+                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                    connectionManager.getConnections(this.serverPeer!) ?? [];
+                connections.forEach(connection => {
+                    connectionManager.onDisconnect(
+                        new CustomEvent<Connection>('connectionEnd', {
+                            detail: connection,
+                        })
+                    );
+                });
+            }
+        );
         // clear away any pending dials
         // (it is possible for pending dials to hang indefinitely)
         const dialer = (

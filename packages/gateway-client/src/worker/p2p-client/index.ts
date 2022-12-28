@@ -195,28 +195,6 @@ export class P2pClient {
                 'Successfully dialed: ',
                 connection.remoteAddr.toString()
             );
-            // wait a bit for our connection event to fire
-            // await withTimeout(
-            //     () =>
-            //         new Promise<void>(resolve => {
-            //             const eventListener = () => {
-            //                 this.removeEventListener(
-            //                     'connected',
-            //                     eventListener
-            //                 );
-            //                 resolve();
-            //             };
-            //             this.addEventListener('connected', eventListener);
-            //         }),
-            //     3000,
-            //     async () => {
-            //         // if it doesn't fire, then manually register our connection
-            //         this.log.warn(
-            //             'Timeout while waiting for connection event to fire, manually registering connection.'
-            //         );
-            //         await this.registerConnection(connection);
-            //     }
-            // );
         } catch (e) {
             // we weren't able to dial
             this.log.error('Error dialing server: ', e);

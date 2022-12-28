@@ -95,7 +95,7 @@ export class BootstrapList extends Bootstrap {
     private addresses: Record<string, BootstrapAddress> = {};
     private _serverId?: string;
 
-    constructor(private client: P2pClient) {
+    constructor(private client: P2pClient, private limit = 10) {
         // initialize bootstrap discovery with dummy list
         super({ list: ['/ip4/1.2.3.4/tcp/1234/tls/p2p/QmFoo'] });
         // open the relay stream to receive new relay addresses
@@ -408,7 +408,7 @@ export class BootstrapList extends Bootstrap {
         status.relays.push(...addressList);
 
         // if we have no addresses
-        if (!Object.keys(this.addresses).length) {
+        if (!Object.keys(this.addresses).length || !this._serverId) {
             // this isn't good
             this.log.error(
                 'No addresses loaded into bootstrap list, client will fail.'
@@ -419,24 +419,16 @@ export class BootstrapList extends Bootstrap {
         // update our cache
         await this.dumpCache();
 
-        // create a bootstrap discovery list grouped by peer
-        const addressesByPeer: Record<string, BootstrapAddress[]> = {};
-        Object.values(this.addresses).forEach(address => {
-            if (!addressesByPeer[address.serverId]) {
-                addressesByPeer[address.serverId] = [];
-            }
-            addressesByPeer[address.serverId].push(address);
-        });
         // override our current bootstrap discovery list
         Object.defineProperty(this, 'list', {
             configurable: true,
-            value: Object.entries(addressesByPeer).map(
-                ([peerId, addresses]) => ({
-                    id: peerIdFromString(peerId),
-                    multiaddrs: addresses.map(address => address.multiaddr),
+            value: [
+                {
+                    id: peerIdFromString(this._serverId),
+                    multiaddrs: this.multiaddrList,
                     protocols: [],
-                })
-            ),
+                },
+            ],
         });
     }
 
@@ -493,8 +485,12 @@ export class BootstrapList extends Bootstrap {
     }
 
     public get addressList() {
-        return Object.values(this.addresses).sort((a, b) =>
-            this.addressSorter(a, b)
-        );
+        return Object.values(this.addresses)
+            .sort((a, b) => this.addressSorter(a, b))
+            .slice(0, this.limit);
+    }
+
+    public get multiaddrList() {
+        return this.addressList.map(it => it.multiaddr);
     }
 }

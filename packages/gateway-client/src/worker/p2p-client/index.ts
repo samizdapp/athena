@@ -49,6 +49,7 @@ export class P2pClient {
 
     private DIAL_TIMEOUT = 3000;
     private MAX_PARALLEL_DIALS = 20;
+    private MAX_DIALS_PER_PEER = 20;
 
     private streamFactory?: StreamFactory;
     private bootstrapList: BootstrapList;
@@ -60,7 +61,7 @@ export class P2pClient {
     private _connectionStatus: ServerPeerStatus = ServerPeerStatus.OFFLINE;
 
     public constructor() {
-        this.bootstrapList = new BootstrapList(this);
+        this.bootstrapList = new BootstrapList(this, this.MAX_DIALS_PER_PEER);
     }
 
     public get connectionStatus(): ServerPeerStatus {
@@ -177,7 +178,7 @@ export class P2pClient {
         this.log.debug('Re-adding server peer addresses');
         this.node.peerStore.addressBook.add(
             this.serverPeer,
-            this.bootstrapList.all().map(it => it.multiaddr)
+            this.bootstrapList.multiaddrList
         );
 
         // now, attempt to dial our server
@@ -298,7 +299,7 @@ export class P2pClient {
                 // explicitly disabled (removed in later version)
                 autoDial: false,
                 minConnections: 3,
-                maxDialsPerPeer: 20,
+                maxDialsPerPeer: this.MAX_DIALS_PER_PEER,
                 maxParallelDials: this.MAX_PARALLEL_DIALS,
                 addressSorter: (a: Address, b: Address) =>
                     this.bootstrapList.libp2pAddressSorter(a, b),

@@ -1,14 +1,15 @@
-import rpc from './rpc';
 import {
-    readFileSync,
-    readFile,
-    writeFile,
-    utimesSync,
-    openSync,
     closeSync,
-} from 'fs';
+    openSync,
+    readFile,
+    readFileSync,
+    utimesSync,
+    writeFile,
+} from 'node:fs';
+
 import { environment } from '../environment';
 import { Debug } from '../logging';
+import rpc from './rpc';
 
 const HOST_HEADER = `
 127.0.0.1	localhost.localdomain		localhost

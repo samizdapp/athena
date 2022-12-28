@@ -1,5 +1,5 @@
 import { ScalableBloomFilter } from 'bloom-filters';
-import { EventEmitter } from 'stream';
+import { EventEmitter } from 'node:stream';
 
 import { environment } from '../environment';
 import { Debug } from '../logging';

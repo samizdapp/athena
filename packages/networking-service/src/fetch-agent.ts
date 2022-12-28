@@ -1,11 +1,12 @@
-import yggdrasilDNS from './yggdrasil/dns';
-import http from 'http';
-import https from 'https';
-import dns from 'dns';
-import { LookupFunction } from 'net';
-import { Debug } from './logging';
-import type { RequestInit, Request, Response } from 'node-fetch';
+import type { Request, RequestInit, Response } from 'node-fetch';
+import dns from 'node:dns';
+import http from 'node:http';
+import https from 'node:https';
+import { LookupFunction } from 'node:net';
+
 import { environment } from './environment';
+import { Debug } from './logging';
+import yggdrasilDNS from './yggdrasil/dns';
 
 class FetchAgent {
     private readonly log = new Debug('fetch-agent');

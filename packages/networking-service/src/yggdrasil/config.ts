@@ -1,5 +1,6 @@
+import { readFileSync, writeFile } from 'node:fs';
+
 import { environment } from '../environment';
-import { readFileSync, writeFile } from 'fs';
 import { Debug } from '../logging';
 import upnp from '../upnp';
 

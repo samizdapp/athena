@@ -1,11 +1,17 @@
-import { RawStream, Deferred } from './raw';
-import type { Request, Response, RequestInfo } from 'node-fetch';
-import fetchAgent from '../../fetch-agent';
 import { Stream } from '@libp2p/interface-connection';
-import { Readable } from 'stream';
-import { Debug } from '../../logging';
-import type { FetchError, RequestInit } from 'node-fetch';
+import type {
+    FetchError,
+    Request,
+    RequestInfo,
+    RequestInit,
+    Response,
+} from 'node-fetch';
 import { AbortSignal } from 'node-fetch/externals';
+import { Readable } from 'node:stream';
+
+import fetchAgent from '../../fetch-agent';
+import { Debug } from '../../logging';
+import { Deferred, RawStream } from './raw';
 
 enum ChunkType {
     HEAD = 0x00,

@@ -1,14 +1,14 @@
-import { Noise } from '@chainsafe/libp2p-noise';
+import { Noise } from '@athena/shared/libp2p/@chainsafe/libp2p-noise';
+import { Mplex } from '@athena/shared/libp2p/@libp2p/mplex';
+import { WebSockets } from '@athena/shared/libp2p/@libp2p/websockets';
+import { Multiaddr as MultiaddrType } from '@athena/shared/libp2p/@multiformats/multiaddr';
+import { createLibp2p, Libp2p } from '@athena/shared/libp2p/libp2p';
 import { ConnectionEncrypter } from '@libp2p/interface-connection-encrypter';
 import { PeerId } from '@libp2p/interface-peer-id';
 import type { Address } from '@libp2p/interface-peer-store';
 import { KEEP_ALIVE } from '@libp2p/interface-peer-store/tags';
 import { StreamMuxerFactory } from '@libp2p/interface-stream-muxer';
-import { Mplex } from '@libp2p/mplex';
-import { WebSockets } from '@libp2p/websockets';
 import { all as filtersAll } from '@libp2p/websockets/filters';
-import { Multiaddr as MultiaddrType } from '@multiformats/multiaddr';
-import { createLibp2p, Libp2p } from 'libp2p';
 import { DefaultDialer } from 'libp2p/connection-manager/dialer';
 import { Libp2pNode } from 'libp2p/libp2p';
 

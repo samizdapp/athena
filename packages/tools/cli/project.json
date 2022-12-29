@@ -4,6 +4,26 @@
   "projectType": "application",
   "targets": {
     "build": {
+      "executor": "@nrwl/workspace:run-commands",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "commands": [
+          {
+            "command": "npm run nx run tools-cli:build-libp2p && npm run nx run tools-cli:build-cli"
+          }
+        ]
+      },
+      "configurations": {
+        "production": {
+          "commands": [
+            {
+              "command": "npm run nx run tools-cli:build-libp2p:production && npm run nx run tools-cli:build-cli:production"
+            }
+          ]
+        }
+      }
+    },
+    "build-cli": {
       "executor": "@nrwl/node:webpack",
       "outputs": ["{options.outputPath}"],
       "options": {
@@ -40,12 +60,12 @@
     "serve": {
       "executor": "@nrwl/node:node",
       "options": {
-        "buildTarget": "tools-cli:build",
+        "buildTarget": "tools-cli:build-cli",
         "waitUntilTargets": ["tools-cli:build-libp2p"]
       },
       "configurations": {
         "production": {
-          "buildTarget": "tools-cli:build:production",
+          "buildTarget": "tools-cli:build-cli:production",
           "waitUntilTargets": ["tools-cli:build-libp2p:production"]
         }
       }

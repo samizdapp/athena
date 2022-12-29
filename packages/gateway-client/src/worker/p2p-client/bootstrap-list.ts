@@ -1,11 +1,14 @@
+import { WebSockets } from '@athena/shared/libp2p/@libp2p/websockets';
+import {
+    multiaddr,
+    Multiaddr,
+} from '@athena/shared/libp2p/@multiformats/multiaddr';
 import { Bootstrap } from '@libp2p/bootstrap';
 import { MultiaddrConnection } from '@libp2p/interface-connection';
 import type { Address } from '@libp2p/interface-peer-store';
 import { Upgrader } from '@libp2p/interface-transport';
 import { peerIdFromString } from '@libp2p/peer-id';
-import { WebSockets } from '@libp2p/websockets';
 import { P2P } from '@multiformats/mafmt';
-import { multiaddr, Multiaddr } from '@multiformats/multiaddr';
 import localforage from 'localforage';
 
 import type { P2pClient } from '.';

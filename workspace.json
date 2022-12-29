@@ -8,6 +8,7 @@
     "shared-api": "packages/shared/api",
     "shared-libp2p": "packages/shared/libp2p",
     "shared-service-worker": "packages/shared/service-worker",
-    "status-service": "packages/status-service"
+    "status-service": "packages/status-service",
+    "tools-cli": "packages/tools/cli"
   }
 }

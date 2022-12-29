@@ -1,0 +1,70 @@
+{
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/tools/cli/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "@nrwl/node:webpack",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/packages/tools/cli",
+        "main": "packages/tools/cli/src/main.ts",
+        "tsConfig": "packages/tools/cli/tsconfig.app.json",
+        "assets": ["packages/tools/cli/src/assets"],
+        "fileReplacements": [
+          {
+            "replace": "packages/shared/libp2p/src",
+            "with": "dist/packages/shared/libp2p"
+          }
+        ]
+      },
+      "configurations": {
+        "production": {
+          "optimization": true,
+          "extractLicenses": true,
+          "inspect": false
+        }
+      }
+    },
+    "build-libp2p": {
+      "executor": "@nrwl/workspace:run-commands",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "commands": [
+          {
+            "command": "npm run build shared-libp2p"
+          }
+        ]
+      }
+    },
+    "serve": {
+      "executor": "@nrwl/node:node",
+      "options": {
+        "buildTarget": "tools-cli:build",
+        "waitUntilTargets": ["tools-cli:build-libp2p"]
+      },
+      "configurations": {
+        "production": {
+          "buildTarget": "tools-cli:build:production",
+          "waitUntilTargets": ["tools-cli:build-libp2p:production"]
+        }
+      }
+    },
+    "lint": {
+      "executor": "@nrwl/linter:eslint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["packages/tools/cli/**/*.ts"]
+      }
+    },
+    "test": {
+      "executor": "@nrwl/jest:jest",
+      "outputs": ["coverage/packages/tools/cli"],
+      "options": {
+        "jestConfig": "packages/tools/cli/jest.config.ts",
+        "passWithNoTests": true
+      }
+    }
+  },
+  "tags": []
+}

@@ -1,6 +1,7 @@
+import { internalIpV4 } from '@athena/shared/libp2p/internal-ip';
 import type { Mapping } from 'node-portmapping';
+
 import { environment } from './environment';
-import { internalIpV4 } from '@athena/shared/libp2p';
 import { Debug } from './logging';
 
 let natMapping: typeof import('node-portmapping') | null = null;

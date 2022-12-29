@@ -13,6 +13,36 @@
         "tsConfig": "packages/shared/libp2p/tsconfig.json",
         "verbose": true,
         "externalDependencies": ["bufferutil", "utf-8-validate"],
+        "additionalEntryPoints": [
+          {
+            "entryName": "@chainsafe/libp2p-noise",
+            "entryPath": "packages/shared/libp2p/src/@chainsafe/libp2p-noise.ts"
+          },
+          {
+            "entryName": "@libp2p/mplex",
+            "entryPath": "packages/shared/libp2p/src/@libp2p/mplex.ts"
+          },
+          {
+            "entryName": "@libp2p/peer-id-factory",
+            "entryPath": "packages/shared/libp2p/src/@libp2p/peer-id-factory.ts"
+          },
+          {
+            "entryName": "@libp2p/websockets",
+            "entryPath": "packages/shared/libp2p/src/@libp2p/websockets.ts"
+          },
+          {
+            "entryName": "@multiformats/multiaddr",
+            "entryPath": "packages/shared/libp2p/src/@multiformats/multiaddr.ts"
+          },
+          {
+            "entryName": "internal-ip",
+            "entryPath": "packages/shared/libp2p/src/internal-ip.ts"
+          },
+          {
+            "entryName": "libp2p",
+            "entryPath": "packages/shared/libp2p/src/libp2p.ts"
+          }
+        ],
         "webpackConfig": "packages/shared/libp2p/webpack.config.js"
       }
     },

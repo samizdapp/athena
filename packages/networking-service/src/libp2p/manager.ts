@@ -1,7 +1,8 @@
-import node from './node';
-import { writeFile } from 'fs/promises';
+import { writeFile } from 'node:fs/promises';
+
 import { environment } from '../environment';
 import { Debug } from '../logging';
+import node from './node';
 
 class Libp2pManager {
     private readonly log = new Debug('libp2p-manager');

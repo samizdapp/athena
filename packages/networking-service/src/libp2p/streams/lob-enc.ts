@@ -3,7 +3,7 @@
  *
  */
 
-import Stream from 'stream';
+import Stream from 'node:stream';
 
 export type Packet<J = Record<string, unknown>> = {
     head?: Buffer;

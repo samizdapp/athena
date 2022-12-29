@@ -33,6 +33,201 @@
           {
             "checkLoops": false
           }
+        ],
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@chainsafe/libp2p-noise",
+                "message": "Please use @athena/shared/libp2p/@chainsafe/libp2p-noise instead."
+              },
+              {
+                "name": "@libp2p/mplex",
+                "message": "Please use @athena/shared/libp2p/@libp2p/mplex instead."
+              },
+              {
+                "name": "@libp2p/peer-id-factory",
+                "message": "Please use @athena/shared/libp2p/@libp2p/peer-id-factory instead."
+              },
+              {
+                "name": "@libp2p/websockets",
+                "message": "Please use @athena/shared/libp2p/@libp2p/websockets instead."
+              },
+              {
+                "name": "@multiformats/multiaddr",
+                "message": "Please use @athena/shared/libp2p/@multiformats/multiaddr instead."
+              },
+              {
+                "name": "internal-ip",
+                "message": "Please use @athena/shared/libp2p/internal-ip instead."
+              },
+              {
+                "name": "libp2p",
+                "message": "Please use @athena/shared/libp2p/libp2p instead."
+              },
+              {
+                "name": "assert",
+                "message": "Please use node:assert instead."
+              },
+              {
+                "name": "buffer",
+                "message": "Please use node:buffer instead."
+              },
+              {
+                "name": "child_process",
+                "message": "Please use node:child_process instead."
+              },
+              {
+                "name": "cluster",
+                "message": "Please use node:cluster instead."
+              },
+              {
+                "name": "console",
+                "message": "Please use node:console instead."
+              },
+              {
+                "name": "constants",
+                "message": "Please use node:constants instead."
+              },
+              {
+                "name": "crypto",
+                "message": "Please use node:crypto instead."
+              },
+              {
+                "name": "dgram",
+                "message": "Please use node:dgram instead."
+              },
+              {
+                "name": "dns",
+                "message": "Please use node:dns instead."
+              },
+              {
+                "name": "domain",
+                "message": "Please use node:domain instead."
+              },
+              {
+                "name": "events",
+                "message": "Please use node:events instead."
+              },
+              {
+                "name": "fs",
+                "message": "Please use node:fs instead."
+              },
+              {
+                "name": "fs/promises",
+                "message": "Please use node:fs/promises instead."
+              },
+              {
+                "name": "http",
+                "message": "Please use node:http instead."
+              },
+              {
+                "name": "https",
+                "message": "Please use node:https instead."
+              },
+              {
+                "name": "inspector",
+                "message": "Please use node:inspector instead."
+              },
+              {
+                "name": "module",
+                "message": "Please use node:module instead."
+              },
+              {
+                "name": "net",
+                "message": "Please use node:net instead."
+              },
+              {
+                "name": "os",
+                "message": "Please use node:os instead."
+              },
+              {
+                "name": "path",
+                "message": "Please use node:path instead."
+              },
+              {
+                "name": "perf_hooks",
+                "message": "Please use node:perf_hooks instead."
+              },
+              {
+                "name": "process",
+                "message": "Please use node:process instead."
+              },
+              {
+                "name": "punycode",
+                "message": "Please use node:punycode instead."
+              },
+              {
+                "name": "querystring",
+                "message": "Please use node:querystring instead."
+              },
+              {
+                "name": "readline",
+                "message": "Please use node:readline instead."
+              },
+              {
+                "name": "repl",
+                "message": "Please use node:repl instead."
+              },
+              {
+                "name": "stream",
+                "message": "Please use node:stream instead."
+              },
+              {
+                "name": "string_decoder",
+                "message": "Please use node:string_decoder instead."
+              },
+              {
+                "name": "sys",
+                "message": "Please use node:sys instead."
+              },
+              {
+                "name": "timers",
+                "message": "Please use node:timers instead."
+              },
+              {
+                "name": "tls",
+                "message": "Please use node:tls instead."
+              },
+              {
+                "name": "trace_events",
+                "message": "Please use node:trace_events instead."
+              },
+              {
+                "name": "tty",
+                "message": "Please use node:tty instead."
+              },
+              {
+                "name": "url",
+                "message": "Please use node:url instead."
+              },
+              {
+                "name": "util",
+                "message": "Please use node:util instead."
+              },
+              {
+                "name": "v8",
+                "message": "Please use node:v8 instead."
+              },
+              {
+                "name": "vm",
+                "message": "Please use node:vm instead."
+              },
+              {
+                "name": "wasi",
+                "message": "Please use node:wasi instead."
+              },
+              {
+                "name": "worker_threads",
+                "message": "Please use node:worker_threads instead."
+              },
+              {
+                "name": "zlib",
+                "message": "Please use node:zlib instead."
+              }
+            ]
+          }
         ]
       }
     },

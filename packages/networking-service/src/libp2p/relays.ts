@@ -1,13 +1,15 @@
-import crawler from '../yggdrasil/crawler';
+import { multiaddr } from '@athena/shared/libp2p/@multiformats/multiaddr';
+import { EventEmitter } from 'node:stream';
+
+import { environment } from '../environment';
 import fetchAgent from '../fetch-agent';
+import { Debug } from '../logging';
 import upnp from '../upnp';
+import crawler from '../yggdrasil/crawler';
+import node from './node';
 import { HeartbeatStream, HeartbeatType } from './streams/heartbeat';
 import { Deferred } from './streams/raw';
-import node from './node';
-import { environment } from '../environment';
-import { EventEmitter } from 'stream';
-import { Debug } from '../logging';
-import { multiaddr } from '@athena/shared/libp2p';
+
 const waitFor = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 class ActiveRelay {

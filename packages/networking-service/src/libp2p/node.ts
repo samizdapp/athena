@@ -1,25 +1,25 @@
+import { Noise } from '@athena/shared/libp2p/@chainsafe/libp2p-noise';
+import { Mplex } from '@athena/shared/libp2p/@libp2p/mplex';
 import {
-    Mplex,
-    WebSockets,
-    Noise,
-    createLibp2p,
-    createFromProtobuf,
     createEd25519PeerId,
+    createFromProtobuf,
     exportToProtobuf,
-    Libp2p,
-    multiaddr,
-} from '@athena/shared/libp2p';
-import { readFile, writeFile } from 'fs/promises';
-import { environment } from '../environment';
+} from '@athena/shared/libp2p/@libp2p/peer-id-factory';
+import { WebSockets } from '@athena/shared/libp2p/@libp2p/websockets';
+import { multiaddr } from '@athena/shared/libp2p/@multiformats/multiaddr';
+import { createLibp2p, Libp2p } from '@athena/shared/libp2p/libp2p';
 import { ConnectionEncrypter } from '@libp2p/interface-connection-encrypter';
-import { StreamMuxerFactory } from '@libp2p/interface-stream-muxer';
 import {
     StreamHandler,
     StreamHandlerOptions,
 } from '@libp2p/interface-registrar';
-import { Deferred } from './streams/raw';
-import upnp from '../upnp';
+import { StreamMuxerFactory } from '@libp2p/interface-stream-muxer';
+import { readFile, writeFile } from 'node:fs/promises';
+
+import { environment } from '../environment';
 import { Debug } from '../logging';
+import upnp from '../upnp';
+import { Deferred } from './streams/raw';
 
 class Libp2pNode {
     private log = new Debug('libp2p-node');

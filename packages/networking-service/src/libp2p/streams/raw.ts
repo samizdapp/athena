@@ -1,5 +1,6 @@
 import { Stream } from '@libp2p/interface-connection';
-import { EventEmitter } from 'stream';
+import { EventEmitter } from 'node:stream';
+
 import { Debug } from '../../logging';
 
 export class Deferred<T> {

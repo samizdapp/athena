@@ -3,12 +3,14 @@ import { Mplex } from '@athena/shared/libp2p/@libp2p/mplex';
 import { WebSockets } from '@athena/shared/libp2p/@libp2p/websockets';
 import { Multiaddr as MultiaddrType } from '@athena/shared/libp2p/@multiformats/multiaddr';
 import { createLibp2p, Libp2p } from '@athena/shared/libp2p/libp2p';
+import { Connection } from '@libp2p/interface-connection';
 import { ConnectionEncrypter } from '@libp2p/interface-connection-encrypter';
 import { PeerId } from '@libp2p/interface-peer-id';
 import type { Address } from '@libp2p/interface-peer-store';
 import { KEEP_ALIVE } from '@libp2p/interface-peer-store/tags';
 import { StreamMuxerFactory } from '@libp2p/interface-stream-muxer';
 import { all as filtersAll } from '@libp2p/websockets/filters';
+import { DefaultConnectionManager } from 'libp2p/connection-manager';
 import { DefaultDialer } from 'libp2p/connection-manager/dialer';
 import { Libp2pNode } from 'libp2p/libp2p';
 
@@ -23,6 +25,24 @@ import { HeartbeatStream } from './streams';
 
 const waitFor = async (t: number): Promise<void> =>
     new Promise(r => setTimeout(r, t));
+
+const withTimeout = async <T, E = void>(
+    action: () => Promise<T>,
+    timeout = 1000,
+    onTimeout?: () => Promise<E>
+): Promise<T | E> => {
+    return Promise.race([
+        action(),
+        waitFor(timeout).then(() => {
+            throw new Error('E_TIMEOUT');
+        }) as Promise<E>,
+    ]).catch(async (e): Promise<E> => {
+        if ((e as Error).message !== 'E_TIMEOUT') {
+            throw e;
+        }
+        return onTimeout?.() as unknown as E;
+    });
+};
 
 export class P2pClient {
     private log = logger.getLogger('worker/p2p/client');
@@ -78,14 +98,15 @@ export class P2pClient {
         const abortController = new AbortController();
         const signal = abortController.signal;
         waitFor(timeout).then(() => abortController.abort());
-        return Promise.race([
-            action(signal),
-            waitFor(timeout + 1000).then(() => {
+        return withTimeout(
+            () => action(signal),
+            timeout + 1000,
+            () => {
                 throw new Error(
                     'Abort controller failed to abort within 1 second past timeout.'
                 );
-            }),
-        ]);
+            }
+        ) as Promise<T>;
     }
 
     private setDisconnectedStatus() {
@@ -118,7 +139,30 @@ export class P2pClient {
         // first, close any open connections to our server
         this.setDisconnectedStatus();
         this.log.debug('Closing existing server connections...');
-        await this.node.hangUp(this.serverPeer);
+        await withTimeout(
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            () => this.node!.hangUp(this.serverPeer!),
+            7000,
+            async () => {
+                this.log.warn(
+                    'Timeout while closing existing server connections, manually setting disconnect state.'
+                );
+                // manually set the disconnect state on our connection manager
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                const connectionManager = this.node!
+                    .connectionManager as DefaultConnectionManager;
+                const connections =
+                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                    connectionManager.getConnections(this.serverPeer!) ?? [];
+                connections.forEach(connection => {
+                    connectionManager.onDisconnect(
+                        new CustomEvent<Connection>('connectionEnd', {
+                            detail: connection,
+                        })
+                    );
+                });
+            }
+        );
         // clear away any pending dials
         // (it is possible for pending dials to hang indefinitely)
         const dialer = (
@@ -158,6 +202,13 @@ export class P2pClient {
             this.log.debug('Retrying dial in: ', retryTimeout);
             // wait before retrying
             await waitFor(retryTimeout);
+            // ensure that we didn't become connected during our timeout
+            if (this.connectionStatus === ServerPeerStatus.CONNECTED) {
+                this.log.debug(
+                    'Connection established during timeout, aborting retry.'
+                );
+                return;
+            }
             // refresh our stats so that the dial gets an updated order
             await this.bootstrapList.refreshStats();
             // retry

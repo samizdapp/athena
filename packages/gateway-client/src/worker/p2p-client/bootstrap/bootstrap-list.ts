@@ -2,10 +2,10 @@ import { Bootstrap } from '@libp2p/bootstrap';
 import type { Address } from '@libp2p/interface-peer-store';
 import { peerIdFromString } from '@libp2p/peer-id';
 import localforage from 'localforage';
-import { ServerPeerStatus } from 'packages/gateway-client/src/worker-messaging';
 
 import type { P2pClient } from '..';
 import environment from '../../../environment';
+import { ServerPeerStatus } from '../../../worker-messaging';
 import { logger } from '../../logging';
 import { nativeFetch } from '../../p2p-fetch';
 import status from '../../status';

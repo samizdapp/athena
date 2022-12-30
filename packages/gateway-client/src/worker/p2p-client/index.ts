@@ -1,7 +1,7 @@
 import { Noise } from '@athena/shared/libp2p/@chainsafe/libp2p-noise';
 import { Mplex } from '@athena/shared/libp2p/@libp2p/mplex';
 import { WebSockets } from '@athena/shared/libp2p/@libp2p/websockets';
-import { Multiaddr as MultiaddrType } from '@athena/shared/libp2p/@multiformats/multiaddr';
+import { Multiaddr } from '@athena/shared/libp2p/@multiformats/multiaddr';
 import { createLibp2p, Libp2p } from '@athena/shared/libp2p/libp2p';
 import { Connection } from '@libp2p/interface-connection';
 import { ConnectionEncrypter } from '@libp2p/interface-connection-encrypter';
@@ -9,6 +9,7 @@ import { PeerId } from '@libp2p/interface-peer-id';
 import type { Address } from '@libp2p/interface-peer-store';
 import { KEEP_ALIVE } from '@libp2p/interface-peer-store/tags';
 import { StreamMuxerFactory } from '@libp2p/interface-stream-muxer';
+import { AbortOptions } from '@libp2p/interfaces';
 import { all as filtersAll } from '@libp2p/websockets/filters';
 import { DefaultConnectionManager } from 'libp2p/connection-manager';
 import { DefaultDialer } from 'libp2p/connection-manager/dialer';
@@ -18,8 +19,9 @@ import { ClientMessageType, ServerPeerStatus } from '../../worker-messaging';
 import { logger } from '../logging';
 import messenger from '../messenger';
 import status from '../status';
-import { BootstrapList } from './bootstrap-list';
+import { BootstrapList } from './bootstrap';
 import { initLibp2pLogging } from './libp2p-logging';
+import { PingService } from './ping-service';
 import { StreamFactory } from './stream-factory';
 import { HeartbeatStream } from './streams';
 
@@ -53,6 +55,7 @@ export class P2pClient {
 
     private streamFactory?: StreamFactory;
     private bootstrapList: BootstrapList;
+    private pingService: PingService;
     private eventTarget = new EventTarget();
 
     private serverPeer?: PeerId;
@@ -62,6 +65,7 @@ export class P2pClient {
 
     public constructor() {
         this.bootstrapList = new BootstrapList(this, this.MAX_DIALS_PER_PEER);
+        this.pingService = new PingService(this);
     }
 
     public get connectionStatus(): ServerPeerStatus {
@@ -73,7 +77,7 @@ export class P2pClient {
         status.serverPeer = connectionStatus;
     }
 
-    public async addServerPeerAddress(multiaddr: MultiaddrType) {
+    public async addServerPeerAddress(multiaddr: Multiaddr) {
         if (!this.serverPeer) {
             throw new Error('No server peer discovered.');
         }
@@ -249,7 +253,7 @@ export class P2pClient {
             // timeout configurable via `init.ping.timeout`,
             // default is 10 seconds
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            await this.node!.ping(this.serverPeer!);
+            await this.ping(this.serverPeer!);
             // if our ping was successful, then our connection is still good
             this.log.trace('Ping successful!');
         } catch (e) {
@@ -443,6 +447,13 @@ export class P2pClient {
                 this.connectionStatus = ServerPeerStatus.OFFLINE;
             }
         });
+    }
+
+    public async ping(
+        peer: Multiaddr | PeerId,
+        options?: AbortOptions
+    ): Promise<number> {
+        return this.pingService.ping(peer, options);
     }
 
     private async handleWebsocketMessages() {

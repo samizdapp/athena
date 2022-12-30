@@ -7,6 +7,7 @@ RUN mkdir -p packages/gateway-client
 
 COPY packages/gateway-client packages/gateway-client
 COPY packages/shared/api packages/shared/api
+COPY packages/shared/libp2p packages/shared/libp2p
 COPY packages/shared/service-worker packages/shared/service-worker
 
 ARG NX_BUILD_NUMBER

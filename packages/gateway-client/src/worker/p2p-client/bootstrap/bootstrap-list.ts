@@ -1,96 +1,22 @@
-import { WebSockets } from '@athena/shared/libp2p/@libp2p/websockets';
-import {
-    multiaddr,
-    Multiaddr,
-} from '@athena/shared/libp2p/@multiformats/multiaddr';
 import { Bootstrap } from '@libp2p/bootstrap';
-import { MultiaddrConnection } from '@libp2p/interface-connection';
 import type { Address } from '@libp2p/interface-peer-store';
-import { Upgrader } from '@libp2p/interface-transport';
 import { peerIdFromString } from '@libp2p/peer-id';
-import { P2P } from '@multiformats/mafmt';
 import localforage from 'localforage';
+import { ServerPeerStatus } from 'packages/gateway-client/src/worker-messaging';
 
-import type { P2pClient } from '.';
-import environment from '../../environment';
-import { logger } from '../logging';
-import { nativeFetch } from '../p2p-fetch';
-import status from '../status';
+import type { P2pClient } from '..';
+import environment from '../../../environment';
+import { logger } from '../../logging';
+import { nativeFetch } from '../../p2p-fetch';
+import status from '../../status';
+import { BootstrapAddress } from './bootstrap-address';
+import { pingStats, websocketStats } from './stats-transports';
 
 const waitFor = async (t: number): Promise<void> =>
     new Promise(r => setTimeout(r, t));
 
-class BootstrapAddress {
-    public multiaddr: Multiaddr;
-    public lastSeen = 0;
-    public latency = Infinity;
-    public isRelay = false;
-    public isDNS = false;
-    public address: string;
-
-    private _serverId: string;
-
-    public constructor(address: string) {
-        if (!P2P.matches(address)) {
-            throw new Error('Invalid multiaddr');
-        }
-
-        this.multiaddr = multiaddr(address);
-        const serverId = this.multiaddr.getPeerId();
-        if (!serverId) {
-            throw new Error(
-                `Address ${address} contains invalid or missing peer id.`
-            );
-        }
-
-        this.address = this.multiaddr.toString();
-        this._serverId = serverId;
-        this.isRelay = this.address.includes('/p2p-circuit/');
-        this.isDNS = this.address.includes('/dns4/');
-    }
-
-    static fromJson(json: Record<string, unknown>): BootstrapAddress {
-        const addr = new BootstrapAddress(json.address as string);
-        addr.lastSeen = json.lastSeen as number;
-        addr.latency = json.latency as number;
-        return addr;
-    }
-
-    toJson(): Record<string, unknown> {
-        return {
-            address: this.address ?? '',
-            lastSeen: this.lastSeen ?? Date.now(),
-            latency: this.latency ?? Infinity,
-        };
-    }
-
-    toString(): string {
-        return this.address;
-    }
-
-    get serverId(): string {
-        return this._serverId;
-    }
-
-    set serverId(id: string) {
-        // update multiaddr
-        const newMultiaddr = multiaddr(
-            this.multiaddr.toString().replace(this._serverId, id)
-        );
-        const newServerId = newMultiaddr.getPeerId();
-        if (!newServerId) {
-            throw new Error(
-                `Error setting serverId: ${id} (was parsed to: ${newServerId}).`
-            );
-        }
-        this.address = newMultiaddr.toString();
-        this.multiaddr = newMultiaddr;
-        this._serverId = newServerId;
-    }
-}
-
 export class BootstrapList extends Bootstrap {
-    private log = logger.getLogger('worker/p2p/bootstrap');
+    private log = logger.getLogger('worker/p2p/bootstrap/list');
 
     private maxOffline = 7 * 24 * 60 * 60 * 1000;
     private defaultStatsTimeout = 10000;
@@ -98,15 +24,29 @@ export class BootstrapList extends Bootstrap {
     private addresses: Record<string, BootstrapAddress> = {};
     private _serverId?: string;
 
-    constructor(private client: P2pClient, private limit = 10) {
+    constructor(public client: P2pClient, private limit = 10) {
         // initialize bootstrap discovery with dummy list
         super({ list: ['/ip4/1.2.3.4/tcp/1234/tls/p2p/QmFoo'] });
         // open the relay stream to receive new relay addresses
         let relayDebounce = 0;
+        let statsRefreshed = false;
         client.addEventListener('connected', () => {
             if (Date.now() - relayDebounce > 60000) {
                 relayDebounce = Date.now();
                 this.openRelayStream();
+            }
+
+            // Refresh our stats an additional time.
+            // This does two things: 1) It gives our slower addresses another
+            // chance to be seen using the default timeout. 2) It allows
+            // populateStats() to use the ping() method to validate our
+            // addresses, which will also validate our peer id.
+            if (!statsRefreshed) {
+                this.refreshStats().then(() => {
+                    // update our cache
+                    this.dumpCache();
+                    statsRefreshed = true;
+                });
             }
         });
     }
@@ -119,35 +59,24 @@ export class BootstrapList extends Bootstrap {
         const abortController = new AbortController();
         const signal = abortController.signal;
         waitFor(timeout).then(() => abortController.abort());
-        // send websocket request, track time
-        const start = Date.now();
-        let socket;
-        try {
-            socket = await new WebSockets().dial(
-                address.isRelay
-                    ? address.multiaddr.decapsulate('p2p-circuit')
-                    : address.multiaddr,
-                {
-                    signal,
-                    upgrader: {
-                        upgradeOutbound: async (socket: MultiaddrConnection) =>
-                            socket,
-                    } as unknown as Upgrader,
-                }
-            );
-            address.latency = Date.now() - start;
-            address.lastSeen = Date.now();
-        } catch (e) {
-            this.log.debug(`Failed to connect to ${address}: `, e);
-            address.latency = Infinity;
+        // get our latency using a transport method
+        let latency;
+        // if we have a connection
+        if (
+            this.client.node &&
+            this.client.connectionStatus === ServerPeerStatus.CONNECTED
+        ) {
+            // use ping
+            latency = await pingStats(this, address, signal);
         }
-        // close the socket
-        try {
-            if (socket) {
-                await socket.close();
-            }
-        } catch (e) {
-            this.log.warn(`Failed to close socket to ${address}: `, e);
+        // else, use websockets
+        else {
+            latency = await websocketStats(this, address, signal);
+        }
+        // update our address with our latency
+        address.latency = latency;
+        if (latency !== Infinity) {
+            address.lastSeen = Date.now();
         }
         // we've finished collecting stats
         this.log.trace(
@@ -330,12 +259,14 @@ export class BootstrapList extends Bootstrap {
         // refresh the stats for all addresses
         await Promise.all(
             Object.values(this.addresses).map(async address => {
+                // for (const address of Object.values(this.addresses)) {
                 await this.populateStats(address);
                 // if this address is stale, remove it
                 if (!this.isRecent(address)) {
                     this.log.debug(`Removing stale address: ${address}`);
                     await this.removeAddress(address);
                 }
+                // }
             })
         );
     }
@@ -396,14 +327,6 @@ export class BootstrapList extends Bootstrap {
         if (addedPublic) {
             this.log.info(`Fetched updated public address: ${addedPublic}`);
         }
-
-        // now that we've added all of our addresses,
-        // give our slower addresses another chance to be seen using the
-        // default timeout, but don't wait for them
-        this.refreshStats().then(() => {
-            // update our cache
-            this.dumpCache();
-        });
 
         // log list
         const addressList = this.addressList.map(it => it.address);

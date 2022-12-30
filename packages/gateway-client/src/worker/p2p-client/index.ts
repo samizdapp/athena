@@ -19,7 +19,7 @@ import { ClientMessageType, ServerPeerStatus } from '../../worker-messaging';
 import { logger } from '../logging';
 import messenger from '../messenger';
 import status from '../status';
-import { BootstrapList } from './bootstrap-list';
+import { BootstrapList } from './bootstrap';
 import { initLibp2pLogging } from './libp2p-logging';
 import { PingService } from './ping-service';
 import { StreamFactory } from './stream-factory';

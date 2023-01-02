@@ -9,7 +9,7 @@
       "options": {
         "commands": [
           {
-            "command": "npm run build shared-libp2p && npm run nx run networking-service:build_after"
+            "command": "npm run nx run networking-service:build-libp2p && npm run nx run networking-service:build-service"
           }
         ]
       },
@@ -17,13 +17,13 @@
         "production": {
           "commands": [
             {
-              "command": "npm run build shared-libp2p && npm run nx run networking-service:build_after:production"
+              "command": "npm run nx run networking-service:build-libp2p:production && npm run nx run networking-service:build-service:production"
             }
           ]
         }
       }
     },
-    "build_after": {
+    "build-service": {
       "executor": "@nrwl/node:webpack",
       "outputs": ["{options.outputPath}"],
       "options": {
@@ -43,26 +43,31 @@
         "production": {
           "optimization": true,
           "extractLicenses": true,
-          "inspect": false,
-          "fileReplacements": [
-            {
-              "replace": "packages/shared/libp2p/src/index.ts",
-              "with": "dist/packages/shared/libp2p/main.js"
-            }
-          ]
+          "inspect": false
         }
+      }
+    },
+    "build-libp2p": {
+      "executor": "@nrwl/workspace:run-commands",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "commands": [
+          {
+            "command": "npm run build shared-libp2p"
+          }
+        ]
       }
     },
     "serve": {
       "executor": "@nrwl/node:node",
       "options": {
-        "buildTarget": "networking-service:build_after",
-        "waitUntilTargets": ["networking-service:build"]
+        "buildTarget": "networking-service:build-service",
+        "waitUntilTargets": ["networking-service:build-libp2p"]
       },
       "configurations": {
         "production": {
-          "buildTarget": "networking-service:build_after:production",
-          "waitUntilTargets": ["networking-service:build:production"]
+          "buildTarget": "networking-service:build-service:production",
+          "waitUntilTargets": ["networking-service:build-libp2p:production"]
         }
       }
     },

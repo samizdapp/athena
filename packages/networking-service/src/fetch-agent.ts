@@ -46,12 +46,7 @@ class FetchAgent {
         await this.ready;
         options.agent = this.getAgent((url as Request).url || (url as string));
         const randomUUID = Math.random().toString(36).substring(2, 15);
-        this.log.info(
-            'fetch',
-            randomUUID,
-            (url as Request).url ?? url,
-            options
-        );
+        this.log.info('fetch', randomUUID, (url as Request).url ?? url);
         this.log.debug(
             '',
             Array.from((url as Request).headers?.entries() || [])

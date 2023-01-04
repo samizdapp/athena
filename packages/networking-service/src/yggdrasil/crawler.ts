@@ -89,7 +89,7 @@ class YggdrasilCrawler extends EventEmitter {
 
     async scanNodeInfo(key: string) {
         this.log.debug('scanning node info', key);
-        if (dns.has(key)) {
+        if (!environment.recrawl_known_yggdrasil_nodes && dns.has(key)) {
             this.log.debug('found in dns', key);
             const nodeInfo = await dns.get(key);
             this.emitFoundOnce(key, nodeInfo as unknown as NodeInfo);

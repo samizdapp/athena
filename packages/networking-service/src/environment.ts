@@ -29,4 +29,7 @@ export const environment = {
             `${this.caddyRoot}/smz/api/status`
         );
     },
+    recrawl_known_yggdrasil_nodes:
+        (process.env.RECRAWL_KNOWN_YGGDRASIL_NODES as unknown as boolean) ||
+        false,
 };

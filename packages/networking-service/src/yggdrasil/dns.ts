@@ -82,8 +82,7 @@ class YggdrasilDNS {
         this.log.trace('consumeNodeInfo', key, nodeInfo);
         if (nodeInfo?.samizdapp) {
             // TODO: this should perform a diff and only update the hosts file if there are changes
-            // since we haven't implemented a way to change nodeInfo.samizdapp.groups yet, this is fine
-            if (this.store.has(key)) return true;
+            // but for now we just update it every time
             this.store.set(key, nodeInfo);
             this.log.debug('consumed new node info', key, nodeInfo);
             return true;

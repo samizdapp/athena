@@ -201,7 +201,7 @@ export function Home(_props: HomeProps) {
             // we've accomplished all we needed, time to go
             setStatusMessage('Redirecting to SamizdApp...');
             setStatusIcon(<AnimatedCheckIcon />);
-            window.location.href = '/timeline/fediverse';
+            window.location.href = '/';
         }
     }, [pwaOpen, secureContext, serverPeerStatus, workerActive]);
 

@@ -61,9 +61,33 @@ export class YggdrasilConfig {
     private async sanitizeConfig() {
         const selfPeer = await this.getSelfPeerString();
         this.json.AdminListen = `tcp://${environment.yggdrasil_admin_host}:${environment.yggdrasil_admin_port}`;
-        this.json.Peers = this.json.Peers.filter(
-            (peer: string) => peer !== selfPeer
-        );
+        this.json.Peers = this.json.Peers.filter((peer: string) => {
+            return this.isValidPeer(peer) && peer !== selfPeer;
+        });
+    }
+
+    private isValidPeer(peer: string) {
+        if (!peer.startsWith('tcp://')) return false;
+        const parts = peer.split(':');
+        if (parts.length !== 3) return false;
+        const host = parts[1]
+            .replace('[', '')
+            .replace(']', '')
+            .replace('//', '');
+        const port = parts[2];
+        if (!host || !port) return false;
+
+        //check if host is ip address or domain name
+        if (
+            !host.match(
+                // eslint-disable-next-line no-useless-escape
+                /^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$/
+            )
+        ) {
+            return false;
+        }
+
+        return true;
     }
 
     private async getSelfPeerString() {

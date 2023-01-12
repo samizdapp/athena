@@ -77,7 +77,8 @@ export class YggdrasilConfig {
         //check if host is ip address or domain name
         if (
             !host.match(
-                /^([0-9]{1,3}\.){3}[0-9]{1,3}$|^[a-zA-Z0-9]+([\-\.]{1}[a-zA-Z0-9]+)*\.[a-zA-Z]{2,5}$/
+                // eslint-disable-next-line no-useless-escape
+                /^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$/
             )
         ) {
             return false;

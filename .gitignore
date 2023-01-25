@@ -42,3 +42,7 @@ Thumbs.db
 .local.env
 packages/gateway-client/src/assets/libp2p.bootstrap
 manifests.json
+etc-hosts
+libp2p.bootstrap
+libp2p.id
+yggdrasil.conf

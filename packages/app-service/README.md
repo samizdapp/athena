@@ -5,8 +5,8 @@ A NestJS app.
 The `app-service` facilitates the installation of custom docker compose stacks.
 
 Once [CasaOS](https://www.casaos.io/) releases native docker compose support
-(https://www.casaos.io/), it will be able to serve as a drop-in replacement for
-this package.
+(https://github.com/IceWhaleTech/CasaOS/milestone/13), it will be able to serve
+as a drop-in replacement for this package.
 
 ## Running Locally
 

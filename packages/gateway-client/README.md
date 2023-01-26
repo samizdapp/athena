@@ -1,7 +1,7 @@
 # Gateway Client
 
 A React app plus service worker app. This package
-[uses libp2p libraries](../../#using-libp2p-libraries).
+[uses libp2p libraries](../../README.md#using-libp2p-libraries).
 
 The [gateway-client](packages/gateway-client) is a web app that installs a PWA
 on both mobile and desktop. The PWA intercepts all network traffic from

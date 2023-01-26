@@ -14,6 +14,8 @@ To run the app service locally, execute `npm start app-service` with the
 following environment variables set:
 
 ```
+NX_LOCAL = true
+NX_CADDY_ROOT = "http://joshua-samizdapp.local"
 APP_MANIFESTS_VOLUME = ./
 SUPERVISOR_PATH = ./packages/app-service/src/supervisor.py
 APP_API_ROOT = "http://localhost:3412/smz/api/app"
